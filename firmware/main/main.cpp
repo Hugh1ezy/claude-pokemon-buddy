@@ -44,6 +44,14 @@
 #include <esp_heap_caps.h>
 #include "driver/usb_serial_jtag.h"
 
+#include <lwip/sockets.h>
+#include <lwip/netdb.h>
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_netif.h"
+#include "nvs_flash.h"
+#include "mdns.h"
+
 #include "display_bsp.h"
 #include "shtc3.h"
 #include "multi_button.h"
@@ -97,6 +105,26 @@ static constexpr uint32_t SENSOR_PERIOD_MS = 30000;
 static uint8_t *rxbuf = nullptr;                  // frame accumulation (PSRAM)
 static size_t   rxlen = 0;
 static uint8_t *rectbuf = nullptr;                // RLE-decoded rect (PSRAM)
+
+// ---- WiFi (Phase 2: bring-up + reachability probe only, no frame protocol
+// wired to it yet -- that's Phase 3). Credentials are hardcoded per the
+// project's "flash-time config" approach; edit before flashing for your own
+// networks. Device joins as a STA client (not an AP) so it lands on the same
+// LAN as whichever computer is running the host, and advertises itself via
+// mDNS (_cpb._tcp.local) so the host doesn't need a fixed IP.
+struct WifiCred { const char *ssid; const char *pass; };
+static const WifiCred WIFI_CREDS[] = {
+    { "CHANGE_ME_HOME_SSID", "CHANGE_ME_HOME_PASSWORD" },
+    { "CHANGE_ME_WORK_SSID", "CHANGE_ME_WORK_PASSWORD" },
+};
+static constexpr int WIFI_CRED_COUNT = sizeof(WIFI_CREDS) / sizeof(WIFI_CREDS[0]);
+static constexpr uint32_t WIFI_RETRY_CYCLE_DELAY_MS = 5000; // pause after a full pass over all creds fails
+static constexpr uint16_t WIFI_TCP_PORT = 7311;
+// Must match host/config.json's wifi.token (host/config.json is gitignored --
+// this literal is the only place this specific value has to be copied to).
+static const char *WIFI_PAIRING_TOKEN = "3f8f358c348ddcc0c6695ab2bf5fae6d";
+static std::atomic<int> g_wifi_cred_idx{0};
+static bool g_mdns_started = false;
 
 static SemaphoreHandle_t tx_mutex = nullptr;      // serializes USJ writes
 static QueueHandle_t     btn_queue = nullptr;     // button events -> button_task
@@ -445,6 +473,121 @@ static void buttons_init(void)
     ESP_ERROR_CHECK(esp_timer_start_periodic(th, 5000));   // 5ms tick (multi_button)
 }
 
+// ---- WiFi bring-up (Phase 2) ------------------------------------------------
+static void start_mdns_once(void)
+{
+    if (g_mdns_started) return;
+    g_mdns_started = true;
+    ESP_ERROR_CHECK(mdns_init());
+    ESP_ERROR_CHECK(mdns_hostname_set("cpb-buddy"));
+    ESP_ERROR_CHECK(mdns_instance_name_set("Claude Pokemon Buddy"));
+    ESP_ERROR_CHECK(mdns_service_add(nullptr, "_cpb", "_tcp", WIFI_TCP_PORT, nullptr, 0));
+    ESP_LOGI(TAG, "mdns: advertising _cpb._tcp on port %u", (unsigned)WIFI_TCP_PORT);
+}
+
+static void apply_wifi_credential(int idx)
+{
+    wifi_config_t wc = {};
+    const WifiCred &c = WIFI_CREDS[idx];
+    strncpy((char *)wc.sta.ssid, c.ssid, sizeof(wc.sta.ssid) - 1);
+    strncpy((char *)wc.sta.password, c.pass, sizeof(wc.sta.password) - 1);
+    wc.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
+    ESP_LOGI(TAG, "wifi: trying \"%s\"", c.ssid);
+}
+
+// All retry/fallback logic lives here rather than a separate polling task:
+// STA_START applies the first credential and connects; STA_DISCONNECTED
+// (auth failure, AP out of range, or a genuine drop after a successful
+// connect) advances to the next credential and retries. A full pass over
+// every credential without success backs off WIFI_RETRY_CYCLE_DELAY_MS
+// before starting over, so a temporarily-unreachable network doesn't spin
+// the radio in a hot loop.
+static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
+        apply_wifi_credential(g_wifi_cred_idx.load());
+        esp_wifi_connect();
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        int next = (g_wifi_cred_idx.load() + 1) % WIFI_CRED_COUNT;
+        g_wifi_cred_idx.store(next);
+        vTaskDelay(pdMS_TO_TICKS(next == 0 ? WIFI_RETRY_CYCLE_DELAY_MS : 500));
+        apply_wifi_credential(next);
+        esp_wifi_connect();
+    } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        auto *event = (ip_event_got_ip_t *)data;
+        ESP_LOGI(TAG, "wifi: got ip " IPSTR, IP2STR(&event->ip_info.ip));
+        start_mdns_once();
+    }
+}
+
+static void wifi_init_sta(void)
+{
+    esp_err_t nvs_err = nvs_flash_init();
+    if (nvs_err == ESP_ERR_NVS_NO_FREE_PAGES || nvs_err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        nvs_err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(nvs_err);
+
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_create_default_wifi_sta();
+
+    wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wifi_cfg));
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, nullptr, nullptr));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, nullptr, nullptr));
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start()); // -> WIFI_EVENT_STA_START -> handler applies first credential + connects
+}
+
+// Phase 2 reachability probe: accepts a connection and logs it, nothing else.
+// Phase 3 replaces this body with the real frame-parsing accept loop (shared
+// with parse_frames()/send_frame(), gated on a valid T_AUTH token). Having a
+// listening socket up now lets WiFi bring-up be verified independently of
+// the frame protocol -- "is the network up" and "does the protocol work"
+// are different failure modes and easy to conflate when debugging blind on
+// real hardware.
+static void wifi_tcp_probe_task(void *)
+{
+    int listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listen_fd < 0) {
+        ESP_LOGE(TAG, "wifi: probe socket() failed errno=%d", errno);
+        vTaskDelete(nullptr);
+        return;
+    }
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(WIFI_TCP_PORT);
+    if (bind(listen_fd, (sockaddr *)&addr, sizeof(addr)) != 0) {
+        ESP_LOGE(TAG, "wifi: probe bind() failed errno=%d", errno);
+        close(listen_fd);
+        vTaskDelete(nullptr);
+        return;
+    }
+    listen(listen_fd, 1);
+    ESP_LOGI(TAG, "wifi: probe listening on tcp/%u", (unsigned)WIFI_TCP_PORT);
+
+    for (;;) {
+        sockaddr_in client_addr = {};
+        socklen_t client_len = sizeof(client_addr);
+        int client_fd = accept(listen_fd, (sockaddr *)&client_addr, &client_len);
+        if (client_fd < 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+        ESP_LOGI(TAG, "wifi: probe client connected from %s", inet_ntoa(client_addr.sin_addr));
+        close(client_fd);
+    }
+}
+
 extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "B3: init ST7305 panel");
@@ -476,6 +619,12 @@ extern "C" void app_main(void)
     xTaskCreate(rx_task,     "rx",     8192, nullptr, 6, nullptr);
     xTaskCreate(button_task, "btnup",  3072, nullptr, 5, nullptr);
     buttons_init();
+
+    // WiFi (Phase 2): connecting is fully event-driven (wifi_init_sta only
+    // kicks it off), so this doesn't block the rest of app_main. Independent
+    // of USB -- USB keeps working exactly as before regardless of WiFi state.
+    wifi_init_sta();
+    xTaskCreate(wifi_tcp_probe_task, "wifi_probe", 4096, nullptr, 4, nullptr);
 
     // I2C/SHTC3 deferred out of static init (see g_bus note). Sensor uplink last.
     g_bus    = new I2cMasterBus(I2C_SCL, I2C_SDA, 0);
