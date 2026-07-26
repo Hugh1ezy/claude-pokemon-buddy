@@ -126,6 +126,23 @@ static const char *WIFI_PAIRING_TOKEN = "3f8f358c348ddcc0c6695ab2bf5fae6d";
 static std::atomic<int> g_wifi_cred_idx{0};
 static bool g_mdns_started = false;
 
+// Which physical channel a frame arrived on / should be sent on. USB and WiFi
+// each get their own rx accumulation buffer, duplicate-ACK dedup state, and
+// tx mutex (below) so they work fully independently -- e.g. a stalled WiFi
+// client's send() blocking under wifi_tx_mutex never holds up USB uplink, and
+// vice versa. Only T_FRAME/T_PLAY/T_CONFIG/T_VOLUME on the WIFI link require
+// prior T_AUTH; USB is trusted implicitly (physical possession = the trust
+// boundary there).
+enum class Link : uint8_t { USB, WIFI };
+
+static SemaphoreHandle_t wifi_tx_mutex = nullptr;
+static int  g_wifi_client_fd = -1;                // -1 = no client connected
+static bool g_wifi_authenticated = false;
+static uint8_t *wifi_rxbuf = nullptr;             // WiFi frame accumulation (PSRAM), mirrors rxbuf
+static size_t   wifi_rxlen = 0;
+static bool     wifi_have_last_acked_frame_seq = false;
+static uint8_t  wifi_last_acked_frame_seq = 0;
+
 static SemaphoreHandle_t tx_mutex = nullptr;      // serializes USJ writes
 static QueueHandle_t     btn_queue = nullptr;     // button events -> button_task
 static std::atomic<uint32_t> g_tx_drop_count{0};
@@ -164,8 +181,40 @@ static uint32_t crc32(const uint8_t *b, size_t n)
     return ~c;
 }
 
-// Build [MAGIC|type|seq|len(2)|payload|crc32] and write it atomically.
-static bool send_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
+static bool usb_write_raw(const uint8_t *bytes, size_t total)
+{
+    xSemaphoreTake(tx_mutex, portMAX_DELAY);
+    int written = usb_serial_jtag_write_bytes(bytes, total, pdMS_TO_TICKS(100));
+    xSemaphoreGive(tx_mutex);
+    return written == (int)total;
+}
+
+// Returns true when there's nothing to do (no client connected) as well as on
+// a successful write -- only an actual write failure on a live socket is an
+// error. On failure, drops the connection; wifi_link_task's accept loop
+// notices via g_wifi_client_fd and starts listening for the next client.
+static bool wifi_write_raw(const uint8_t *bytes, size_t total)
+{
+    xSemaphoreTake(wifi_tx_mutex, portMAX_DELAY);
+    int fd = g_wifi_client_fd;
+    bool ok = true;
+    if (fd >= 0) {
+        int written = send(fd, bytes, total, 0);
+        ok = written == (int)total;
+        if (!ok) {
+            close(fd);
+            g_wifi_client_fd = -1;
+            g_wifi_authenticated = false;
+        }
+    }
+    xSemaphoreGive(wifi_tx_mutex);
+    return ok;
+}
+
+// Build [MAGIC|type|seq|len(2)|payload|crc32] and write it atomically on one
+// channel. Outbound frames are always small (HELLO/ACK/NACK/SENSOR/BUTTON),
+// unlike inbound FRAME payloads, hence the 64-byte cap.
+static bool send_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len, Link link)
 {
     uint8_t f[5 + 64 + 4];
     if (len > 64) return false;
@@ -176,33 +225,41 @@ static bool send_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_
     f[5 + len + 1] = (c >> 8) & 0xff;
     f[5 + len + 2] = (c >> 16) & 0xff;
     f[5 + len + 3] = (c >> 24) & 0xff;
-    xSemaphoreTake(tx_mutex, portMAX_DELAY);
     const size_t total = 5 + (size_t)len + 4;
-    int written = usb_serial_jtag_write_bytes(f, total, pdMS_TO_TICKS(100));
-    xSemaphoreGive(tx_mutex);
-    if (written != (int)total) {
+    bool ok = (link == Link::USB) ? usb_write_raw(f, total) : wifi_write_raw(f, total);
+    if (!ok) {
         uint32_t drops = ++g_tx_drop_count;
-        ESP_LOGW(TAG, "serial tx drop #%u type=0x%02x seq=%u wrote=%d/%u",
-                 (unsigned)drops, type, seq, written, (unsigned)total);
-        return false;
+        ESP_LOGW(TAG, "%s tx drop #%u type=0x%02x seq=%u",
+                 link == Link::USB ? "serial" : "wifi", (unsigned)drops, type, seq);
     }
-    return true;
+    return ok;
 }
 
-static void send_ack(uint8_t seq)
+// Fire-and-forget uplink events (HELLO/SENSOR/BUTTON) have no seq semantics
+// the host cares about, so they're safe to send on every currently-live
+// channel rather than picking one -- USB always, WiFi only if a client is
+// connected (a no-op write on an unconnected WiFi link is not an error, see
+// wifi_write_raw, so this never spams tx-drop warnings when WiFi is unused).
+static void broadcast_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
 {
-    send_frame(T_ACK, seq, &seq, 1);              // payload[0] = acked seq
+    send_frame(type, seq, payload, len, Link::USB);
+    send_frame(type, seq, payload, len, Link::WIFI);
 }
 
-static void send_nack(uint8_t seq)
+static void send_ack(uint8_t seq, Link link)
 {
-    send_frame(T_NACK, seq, &seq, 1);             // payload[0] = rejected seq
+    send_frame(T_ACK, seq, &seq, 1, link);         // payload[0] = acked seq
+}
+
+static void send_nack(uint8_t seq, Link link)
+{
+    send_frame(T_NACK, seq, &seq, 1, link);        // payload[0] = rejected seq
 }
 
 static void send_hello(void)
 {
     uint8_t p[2] = { PROTO_VER, SND_COUNT };
-    send_frame(T_HELLO, 0, p, sizeof(p));
+    broadcast_frame(T_HELLO, 0, p, sizeof(p));
 }
 
 static void hello_task(void *)
@@ -256,28 +313,44 @@ static bool handle_frame_payload(const uint8_t *p, size_t len)
     return true;
 }
 
-static void parse_frames(void)
+// Shared by both channels: USB and WiFi each own their rx buffer, dedup
+// state, and call this the same way (see the Link comment at its
+// declaration). WIFI additionally requires a prior valid T_AUTH before
+// anything else in the switch is acted on; USB does not.
+static void parse_frames(uint8_t *buf, size_t &len_in_buf, Link link)
 {
+    bool &have_seq = (link == Link::USB) ? have_last_acked_frame_seq : wifi_have_last_acked_frame_seq;
+    uint8_t &last_seq = (link == Link::USB) ? last_acked_frame_seq : wifi_last_acked_frame_seq;
+
     size_t pos = 0;
-    while (rxlen - pos >= 5) {
-        if (rxbuf[pos] != MAGIC) { pos++; continue; }
-        uint16_t len = rxbuf[pos + 3] | (rxbuf[pos + 4] << 8);
+    while (len_in_buf - pos >= 5) {
+        if (buf[pos] != MAGIC) { pos++; continue; }
+        uint16_t len = buf[pos + 3] | (buf[pos + 4] << 8);
         if (len > MAX_INBOUND_PAYLOAD) { pos++; continue; }
         size_t frameLen = 5 + (size_t)len + 4;
-        if (rxlen - pos < frameLen) break;
-        const uint8_t *f = rxbuf + pos;
+        if (len_in_buf - pos < frameLen) break;
+        const uint8_t *f = buf + pos;
         uint32_t got = f[5 + len] | (f[5 + len + 1] << 8) |
                        (f[5 + len + 2] << 16) | ((uint32_t)f[5 + len + 3] << 24);
         if (crc32(f, 5 + len) == got) {
-            if (f[1] == T_FRAME) {
-                if (have_last_acked_frame_seq && f[2] == last_acked_frame_seq) {
-                    send_ack(f[2]);                  // duplicate retry: ACK, do not re-blit
+            bool authed = (link == Link::USB) || g_wifi_authenticated;
+            if (f[1] == T_AUTH) {
+                if (link == Link::WIFI) {
+                    g_wifi_authenticated = (len == strlen(WIFI_PAIRING_TOKEN) &&
+                                             memcmp(f + 5, WIFI_PAIRING_TOKEN, len) == 0);
+                    ESP_LOGI(TAG, "wifi: auth %s", g_wifi_authenticated ? "accepted" : "rejected");
+                } // T_AUTH on USB is a no-op: nothing to gate there.
+            } else if (!authed) {
+                // Unauthenticated WiFi client sent something other than AUTH -> ignore it.
+            } else if (f[1] == T_FRAME) {
+                if (have_seq && f[2] == last_seq) {
+                    send_ack(f[2], link);            // duplicate retry: ACK, do not re-blit
                 } else if (handle_frame_payload(f + 5, len)) {
-                    last_acked_frame_seq = f[2];
-                    have_last_acked_frame_seq = true;
-                    send_ack(f[2]);                  // ACK on success
+                    last_seq = f[2];
+                    have_seq = true;
+                    send_ack(f[2], link);            // ACK on success
                 } else {
-                    send_nack(f[2]);                 // semantic reject: bad rect/RLE shape
+                    send_nack(f[2], link);           // semantic reject: bad rect/RLE shape
                 }
             } else if (f[1] == T_PLAY && len >= 1) {
                 play_sound(f[5]);                  // payload[0] = sound id; fire-and-forget (no ACK)
@@ -292,8 +365,8 @@ static void parse_frames(void)
         }
     }
     if (pos > 0) {
-        memmove(rxbuf, rxbuf + pos, rxlen - pos);
-        rxlen -= pos;
+        memmove(buf, buf + pos, len_in_buf - pos);
+        len_in_buf -= pos;
     }
 }
 
@@ -304,14 +377,14 @@ static void rx_task(void *arg)
         int n = usb_serial_jtag_read_bytes(tmp, sizeof(tmp), pdMS_TO_TICKS(100));
         if (n <= 0) continue;
         if (rxlen + (size_t)n > RX_MAX) {
-            parse_frames();                       // drain any complete frames before dropping
+            parse_frames(rxbuf, rxlen, Link::USB); // drain any complete frames before dropping
             if (rxlen + (size_t)n > RX_MAX) {
                 rxlen = 0;                        // backlog is unparseable garbage -> last-resort resync
             }
         }
         memcpy(rxbuf + rxlen, tmp, n);
         rxlen += n;
-        parse_frames();
+        parse_frames(rxbuf, rxlen, Link::USB);
     }
 }
 
@@ -325,7 +398,7 @@ static void sensor_task(void *arg)
             int16_t ti = (int16_t)lroundf(t * 10.0f);
             uint8_t p[3] = { (uint8_t)(ti & 0xff), (uint8_t)((ti >> 8) & 0xff),
                              (uint8_t)lroundf(h) };
-            send_frame(T_SENSOR, 0, p, sizeof(p));
+            broadcast_frame(T_SENSOR, 0, p, sizeof(p));
             ESP_LOGI(TAG, "sensor %.1fC %.0f%%", t, (double)h);
         } else {
             ESP_LOGW(TAG, "sensor read failed");
@@ -340,7 +413,7 @@ static void button_task(void *arg)
     for (;;) {
         if (xQueueReceive(btn_queue, &ev, portMAX_DELAY) == pdTRUE) {
             uint8_t p[2] = { (uint8_t)(ev >> 8), (uint8_t)(ev & 0xff) };
-            send_frame(T_BUTTON, 0, p, sizeof(p));
+            broadcast_frame(T_BUTTON, 0, p, sizeof(p));
             ESP_LOGI(TAG, "button key=%u kind=%u", p[0], p[1]);
         }
     }
@@ -544,18 +617,15 @@ static void wifi_init_sta(void)
     ESP_ERROR_CHECK(esp_wifi_start()); // -> WIFI_EVENT_STA_START -> handler applies first credential + connects
 }
 
-// Phase 2 reachability probe: accepts a connection and logs it, nothing else.
-// Phase 3 replaces this body with the real frame-parsing accept loop (shared
-// with parse_frames()/send_frame(), gated on a valid T_AUTH token). Having a
-// listening socket up now lets WiFi bring-up be verified independently of
-// the frame protocol -- "is the network up" and "does the protocol work"
-// are different failure modes and easy to conflate when debugging blind on
-// real hardware.
-static void wifi_tcp_probe_task(void *)
+// One client at a time, matching the trust model of a single USB cable: a
+// second connection attempt just sits in the listen backlog (size 1) until
+// the current client disconnects, since accept() isn't called again until
+// this loop's recv() loop below exits.
+static void wifi_link_task(void *)
 {
     int listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listen_fd < 0) {
-        ESP_LOGE(TAG, "wifi: probe socket() failed errno=%d", errno);
+        ESP_LOGE(TAG, "wifi: socket() failed errno=%d", errno);
         vTaskDelete(nullptr);
         return;
     }
@@ -567,13 +637,13 @@ static void wifi_tcp_probe_task(void *)
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(WIFI_TCP_PORT);
     if (bind(listen_fd, (sockaddr *)&addr, sizeof(addr)) != 0) {
-        ESP_LOGE(TAG, "wifi: probe bind() failed errno=%d", errno);
+        ESP_LOGE(TAG, "wifi: bind() failed errno=%d", errno);
         close(listen_fd);
         vTaskDelete(nullptr);
         return;
     }
     listen(listen_fd, 1);
-    ESP_LOGI(TAG, "wifi: probe listening on tcp/%u", (unsigned)WIFI_TCP_PORT);
+    ESP_LOGI(TAG, "wifi: listening on tcp/%u", (unsigned)WIFI_TCP_PORT);
 
     for (;;) {
         sockaddr_in client_addr = {};
@@ -583,7 +653,33 @@ static void wifi_tcp_probe_task(void *)
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
-        ESP_LOGI(TAG, "wifi: probe client connected from %s", inet_ntoa(client_addr.sin_addr));
+        ESP_LOGI(TAG, "wifi: client connected from %s", inet_ntoa(client_addr.sin_addr));
+
+        wifi_rxlen = 0;
+        wifi_have_last_acked_frame_seq = false;
+        g_wifi_authenticated = false;                 // must re-send T_AUTH on every new connection
+        xSemaphoreTake(wifi_tx_mutex, portMAX_DELAY);
+        g_wifi_client_fd = client_fd;
+        xSemaphoreGive(wifi_tx_mutex);
+
+        uint8_t tmp[1024];
+        for (;;) {
+            int n = recv(client_fd, tmp, sizeof(tmp), 0);
+            if (n <= 0) break;                        // 0 = orderly close, <0 = error
+            if (wifi_rxlen + (size_t)n > RX_MAX) {
+                parse_frames(wifi_rxbuf, wifi_rxlen, Link::WIFI); // drain before dropping
+                if (wifi_rxlen + (size_t)n > RX_MAX) wifi_rxlen = 0; // unparseable backlog -> resync
+            }
+            memcpy(wifi_rxbuf + wifi_rxlen, tmp, n);
+            wifi_rxlen += n;
+            parse_frames(wifi_rxbuf, wifi_rxlen, Link::WIFI);
+        }
+
+        ESP_LOGI(TAG, "wifi: client disconnected");
+        xSemaphoreTake(wifi_tx_mutex, portMAX_DELAY);
+        g_wifi_client_fd = -1;
+        xSemaphoreGive(wifi_tx_mutex);
+        g_wifi_authenticated = false;
         close(client_fd);
     }
 }
@@ -599,13 +695,15 @@ extern "C" void app_main(void)
             RlcdPort.RLCD_SetPixel(xx, yy, ColorBlack);
     RlcdPort.RLCD_Display();
 
-    rxbuf   = (uint8_t *) heap_caps_malloc(RX_MAX, MALLOC_CAP_SPIRAM);
-    rectbuf = (uint8_t *) heap_caps_malloc(RECT_MAX, MALLOC_CAP_SPIRAM);
-    assert(rxbuf && rectbuf);
+    rxbuf     = (uint8_t *) heap_caps_malloc(RX_MAX, MALLOC_CAP_SPIRAM);
+    rectbuf   = (uint8_t *) heap_caps_malloc(RECT_MAX, MALLOC_CAP_SPIRAM);
+    wifi_rxbuf = (uint8_t *) heap_caps_malloc(RX_MAX, MALLOC_CAP_SPIRAM);
+    assert(rxbuf && rectbuf && wifi_rxbuf);
 
-    tx_mutex  = xSemaphoreCreateMutex();
-    btn_queue = xQueueCreate(8, sizeof(uint16_t));
-    assert(tx_mutex && btn_queue);
+    tx_mutex      = xSemaphoreCreateMutex();
+    wifi_tx_mutex = xSemaphoreCreateMutex();
+    btn_queue     = xQueueCreate(8, sizeof(uint16_t));
+    assert(tx_mutex && wifi_tx_mutex && btn_queue);
 
     usb_serial_jtag_driver_config_t cfg = {
         .tx_buffer_size = 1024,
@@ -624,7 +722,7 @@ extern "C" void app_main(void)
     // kicks it off), so this doesn't block the rest of app_main. Independent
     // of USB -- USB keeps working exactly as before regardless of WiFi state.
     wifi_init_sta();
-    xTaskCreate(wifi_tcp_probe_task, "wifi_probe", 4096, nullptr, 4, nullptr);
+    xTaskCreate(wifi_link_task, "wifi_link", 4096, nullptr, 4, nullptr);
 
     // I2C/SHTC3 deferred out of static init (see g_bus note). Sensor uplink last.
     g_bus    = new I2cMasterBus(I2C_SCL, I2C_SDA, 0);
