@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.60",
+    "bonjour-service": "^1.4.3",
     "serialport": "^13.0.0"
   }
 }

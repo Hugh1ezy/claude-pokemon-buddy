@@ -6,18 +6,25 @@ import { diffRect } from "./diff.js";
 import { createMockTransport } from "./mock.js";
 import { rleEncode } from "./proto.js";
 import { createSerialTransport, DEFAULT_RECONNECT_DELAY_MS } from "./serial.js";
+import { createWifiTransport } from "./wifi.js";
 
 let loggedMockFallback = false;
 
 export async function createTransport({
   framePath = "out/frame.png",
   serialTransportFactory = createSerialTransport,
+  wifiTransportFactory = createWifiTransport,
   mockFactory = createMockTransport,
   logger = console,
+  // { enabled, token, host?, port? } — host/port pin a known address; omit them
+  // to discover the device via mDNS. USB stays the priority path: wifi is only
+  // tried when no serial device is found, both on startup and on every probe.
+  wifi = null,
   ...serialOptions
 } = {}) {
   const events = new EventEmitter();
   let inner = null;
+  let innerKind = null;
   let mock = null;
   let previousBytes = null;
   let lastFrame = null;
@@ -28,15 +35,25 @@ export async function createTransport({
   let closed = false;
   let chain = Promise.resolve();
   const probeDelayMs = serialOptions.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS;
+  const wifiEnabled = Boolean(wifi?.enabled && wifi?.token);
+  const wifiOptions = wifiEnabled ? { token: wifi.token, host: wifi.host, port: wifi.port, logger } : null;
 
-  const serial = await serialTransportFactory(serialOptions);
-  if (serial) {
-    attachSerial(serial);
+  const initial = await connectAny();
+  if (initial) {
+    attachInner(initial.next, initial.kind);
     await chain;
   } else {
     logMockFallback(logger);
     attachMock(mockFactory({ framePath }));
     scheduleProbe();
+  }
+
+  async function connectAny() {
+    const serial = await serialTransportFactory(serialOptions);
+    if (serial) return { next: serial, kind: "serial" };
+    if (!wifiEnabled) return null;
+    const w = await wifiTransportFactory(wifiOptions).catch(() => null);
+    return w ? { next: w, kind: "wifi" } : null;
   }
 
   return {
@@ -64,24 +81,19 @@ export async function createTransport({
     probeTimer = null;
     if (closed || inner) return;
 
-    let next = null;
-    try {
-      next = await serialTransportFactory(serialOptions);
-    } catch {
-      next = null;
-    }
+    const found = await connectAny().catch(() => null);
 
     if (closed || inner) {
-      closeQuietly(next);
+      closeQuietly(found?.next);
       return;
     }
-    if (!next) {
+    if (!found) {
       scheduleProbe();
       return;
     }
 
-    attachSerial(next);
-    logger?.warn?.("ESP serial port detected; upgrading mock transport to serial");
+    attachInner(found.next, found.kind);
+    logger?.warn?.(`ESP ${found.kind} device detected; upgrading mock transport to ${found.kind}`);
   }
 
   function attachMock(next) {
@@ -94,9 +106,10 @@ export async function createTransport({
     };
   }
 
-  function attachSerial(next) {
+  function attachInner(next, kind) {
     detachInner();
     inner = next;
+    innerKind = kind;
     previousBytes = null;
     const offs = [
       next.onButton?.((event) => events.emit("button", event)),
@@ -205,7 +218,7 @@ export async function createTransport({
   }
 
   function getKind() {
-    return inner ? "serial" : "mock";
+    return inner ? innerKind : "mock";
   }
 
   function close() {

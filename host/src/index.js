@@ -243,7 +243,7 @@ export async function main({
   nowProvider = () => new Date(),
 } = {}) {
   let config = loadConfig(configPath);
-  const transport = injectedTransport ?? await createTransport({ framePath });
+  const transport = injectedTransport ?? await createTransport({ framePath, wifi: config.wifi });
   try {
     const initialNow = nowProvider();
     let soundNow = initialNow;
