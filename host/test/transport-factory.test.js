@@ -11,17 +11,19 @@ test("createTransport logs mock fallback once", async () => {
   const warnings = [];
   const logger = { warn: (message) => warnings.push(String(message)) };
 
-  await createTransport({
+  const first = await createTransport({
     serialTransportFactory: async () => null,
     logger,
   });
-  await createTransport({
+  const second = await createTransport({
     serialTransportFactory: async () => null,
     logger,
   });
 
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /mock transport/);
+  first.close();
+  second.close();
 });
 
 test("createTransport falls back to mock when no ESP serial port is found", async () => {
@@ -36,6 +38,7 @@ test("createTransport falls back to mock when no ESP serial port is found", asyn
 
   assert.equal(existsSync(framePath), true);
   assert.deepEqual([...readFileSync(framePath)], [1, 2, 3]);
+  transport.close();
 });
 
 test("createTransport sends dirty-rect payloads through detected serial transport", async () => {

@@ -9,6 +9,7 @@ const PORT_GUARDED = Symbol("serialPortErrorsGuarded");
 const DEFAULT_BAUD_RATE = 115200;
 const DEFAULT_TIMEOUT_MS = 250;
 const DEFAULT_MAX_RETRIES = 3;
+export const DEFAULT_RECONNECT_DELAY_MS = 1500;
 const MAX_RX_PAYLOAD = 512; // firmware uplink payloads are <=255 (uint8 len); bound rejects noise/desync
 const BUTTON_KEYS = new Map([
   [1, "KEY"],
@@ -68,7 +69,7 @@ export async function createSerialTransport({
 export function makeTransport({
   port,
   openPort,
-  reconnectDelayMs = 1500,
+  reconnectDelayMs = DEFAULT_RECONNECT_DELAY_MS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxRetries = DEFAULT_MAX_RETRIES,
   logger = console,
