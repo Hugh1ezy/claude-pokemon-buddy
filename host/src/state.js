@@ -204,7 +204,7 @@ function isParseableJsonFile(path) {
 }
 
 function fsyncFile(path) {
-  const fd = openSync(path, "r");
+  const fd = openSync(path, "r+");
   try {
     fsyncSync(fd);
   } finally {

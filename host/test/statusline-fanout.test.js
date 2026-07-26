@@ -4,8 +4,9 @@ import { execFile } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const FANOUT = new URL("../scripts/cpb-statusline-fanout.mjs", import.meta.url).pathname;
+const FANOUT = fileURLToPath(new URL("../scripts/cpb-statusline-fanout.mjs", import.meta.url));
 const INPUT = JSON.stringify({ rate_limits: { five_hour: { used_percentage: 42 }, seven_day: { used_percentage: 7 } } });
 
 function run(args, input, env = {}) {

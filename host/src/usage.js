@@ -98,7 +98,14 @@ export function normalizeUsage({ blocksJson, dailyJson, today = localYmd(new Dat
 
 export function runCcusage(command, args, { timeoutMs = 60_000, timeZone, spawnImpl = spawn } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawnImpl(command, args, { stdio: ["ignore", "pipe", "pipe"], env: ccusageEnv(timeZone) });
+    // Windows can't exec npx directly — it's npx.cmd, and CreateProcess only runs
+    // .cmd/.bat files through a shell (spawn() without shell:true throws ENOENT).
+    // args here are fixed literals (no user input), so shell interpolation is safe.
+    const child = spawnImpl(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: ccusageEnv(timeZone),
+      shell: process.platform === "win32",
+    });
     let stdout = "";
     let stderr = "";
 
