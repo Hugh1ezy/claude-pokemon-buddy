@@ -10,32 +10,42 @@ import { createTransport } from "../src/transport/index.js";
 test("createTransport logs mock fallback once", async () => {
   const warnings = [];
   const logger = { warn: (message) => warnings.push(String(message)) };
+  let first;
+  let second;
+  try {
+    first = await createTransport({
+      serialTransportFactory: async () => null,
+      logger,
+    });
+    second = await createTransport({
+      serialTransportFactory: async () => null,
+      logger,
+    });
 
-  await createTransport({
-    serialTransportFactory: async () => null,
-    logger,
-  });
-  await createTransport({
-    serialTransportFactory: async () => null,
-    logger,
-  });
-
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /mock transport/);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /mock transport/);
+  } finally {
+    first?.close();
+    second?.close();
+  }
 });
 
 test("createTransport falls back to mock when no ESP serial port is found", async () => {
   const framePath = join("out", "test-factory-mock.png");
   rmSync(framePath, { force: true });
+  let transport;
+  try {
+    transport = await createTransport({
+      framePath,
+      serialTransportFactory: async () => null,
+    });
+    await transport.push(Buffer.from([1, 2, 3]));
 
-  const transport = await createTransport({
-    framePath,
-    serialTransportFactory: async () => null,
-  });
-  await transport.push(Buffer.from([1, 2, 3]));
-
-  assert.equal(existsSync(framePath), true);
-  assert.deepEqual([...readFileSync(framePath)], [1, 2, 3]);
+    assert.equal(existsSync(framePath), true);
+    assert.deepEqual([...readFileSync(framePath)], [1, 2, 3]);
+  } finally {
+    transport?.close();
+  }
 });
 
 test("createTransport sends dirty-rect payloads through detected serial transport", async () => {

@@ -35,6 +35,12 @@
 - **N1（Nit）** onboarding 按键缓冲上限 8 静默丢弃（`index.js:538`）。
 - **N2（Nit）** `weekTokens` 生产环境无消费者（死计算，`usage.js:63-65`；测试仍读）。
 
+### 2026-07-26 mock 升级冲刺沉淀（既有问题，非本次引入）
+
+- **MNT-4（Medium，测试）** `--test-concurrency=4` 全量跑时 canvas/render 密集测试**文件级**偶发失败，且 node --test 只报 `'test failed'` 无断言输出（受影响族：`buddy-geometry` / `buddy-hop` / `evolution-anim` / `evolution-trigger` / `layout` / `integration` / `onboarding`）。量化：基线 `HEAD~1` 6 次全量跑复现 2 次；同期 HEAD 9 次全量跑 0 次复现；把 4 个受影响文件单独并发跑 8 轮不复现 → 与全量负载相关而非文件间冲突（`out/` fixture 文件名已确认无碰撞）。与 MNT-3 不同族（那条是 `sleep(500)` 竞速）。排查建议：先让子进程 stderr 可见（`--test-reporter=spec` 或直接 spawn），确认是 OOM 还是 `@napi-rs/canvas` 原生层竞争。
+- **MNT-5（Low，transport）** `createTransport({ framePath: null })` 在 **mock 分支必抛** `TypeError: dirname(null)`（`mock.js:13`）。默认参数只对 `undefined` 生效，null 直接穿透；serial 分支的 `writePreview` 有 `if (!framePath) return` 守卫，两边不一致。生产不可达（`main` 恒传字符串），`push-mutex.test.js` 传 null 但走 serial 分支。修法：给 `mock.js` 补同样的守卫。
+- **MNT-6（Low，transport）** `mock.push(frame?.pngBuffer ?? frame)`（`transport/index.js`）在 `pngBuffer` 为空但 `bitmap` 存在时，会把**整个 frame 对象**交给 `writeFileSync` → `TypeError`。既有语义（为兼容裸 Buffer 入参），生产不可达。修法：改为显式分支判断，而非 `??` 兜底。
+
 ## 连板冒烟清单（owner 手工，Batch G 产出）
 
 - [ ] 上电后 host 收到 HELLO（proto_ver=1, snd_count），约 500ms 后收到第二次。

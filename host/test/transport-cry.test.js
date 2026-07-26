@@ -61,13 +61,23 @@ test("sendVolume is replayed after reconnect (RM12)", async () => {
 });
 
 test("mock transport exposes a no-op setActiveCry", async () => {
-  const t = await createTransport({ serialTransportFactory: async () => null });
-  assert.equal(typeof t.setActiveCry, "function");
-  assert.doesNotThrow(() => t.setActiveCry(5));
+  let t;
+  try {
+    t = await createTransport({ serialTransportFactory: async () => null });
+    assert.equal(typeof t.setActiveCry, "function");
+    assert.doesNotThrow(() => t.setActiveCry(5));
+  } finally {
+    t?.close();
+  }
 });
 
 test("mock transport exposes a no-op sendVolume (RM12)", async () => {
-  const t = await createTransport({ serialTransportFactory: async () => null });
-  assert.equal(typeof t.sendVolume, "function");
-  assert.doesNotThrow(() => t.sendVolume(5));
+  let t;
+  try {
+    t = await createTransport({ serialTransportFactory: async () => null });
+    assert.equal(typeof t.sendVolume, "function");
+    assert.doesNotThrow(() => t.sendVolume(5));
+  } finally {
+    t?.close();
+  }
 });

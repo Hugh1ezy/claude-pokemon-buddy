@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
+import { createServer } from "node:net";
 import { join } from "node:path";
 
 import { createButtonDispatcher, main, runOneTick, runTickLoop } from "../src/index.js";
@@ -306,6 +307,53 @@ test("main once-mode closes transport before resolving (RM13)", async () => {
   });
 
   assert.equal(closed, true);
+});
+
+test("main closes transport when dashboard startup rejects (R1)", async () => {
+  mkdirSync("out", { recursive: true });
+  const statePath = join("out", "test-main-r1-startup-failure-state.json");
+  const framePath = join("out", "test-main-r1-startup-failure-frame.png");
+  const configPath = join("out", "test-main-r1-startup-failure-config.json");
+  rmSync(statePath, { force: true });
+  rmSync(`${statePath}.bak`, { force: true });
+  rmSync(configPath, { force: true });
+  writeState(statePath);
+  writeConfig(configPath);
+
+  const occupied = createServer();
+  await new Promise((resolve, reject) => {
+    occupied.once("error", reject);
+    occupied.listen(0, "127.0.0.1", resolve);
+  });
+  const address = occupied.address();
+  let closeCalls = 0;
+  try {
+    await assert.rejects(
+      main({
+        once: false,
+        dashboard: true,
+        dashboardHost: "127.0.0.1",
+        dashboardPort: address.port,
+        statePath,
+        framePath,
+        configPath,
+        transport: createBitmapMockTransport({
+          onClose: () => { closeCalls += 1; },
+        }),
+        weatherClient: {
+          get: async () => ({ cond: "多云", temp: 19, feels: 17, hi: 22, lo: 14, precip: 30, wind: 11, humidity: 64, degraded: false }),
+        },
+        pollUsage: async () => ({ ok: true, skipped: true }),
+        usageRun: async (_command, args) => (args.includes("daily") ? dailyJson : blocksJson),
+      }),
+      (error) => error?.code === "EADDRINUSE",
+    );
+    assert.equal(closeCalls, 1);
+  } finally {
+    await new Promise((resolve, reject) => {
+      occupied.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });
 
 test("quietHours gate host top-of-hour sounds across midnight (RM12)", async () => {
