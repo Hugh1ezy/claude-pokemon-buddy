@@ -244,180 +244,186 @@ export async function main({
 } = {}) {
   let config = loadConfig(configPath);
   const transport = injectedTransport ?? await createTransport({ framePath });
-  const initialNow = nowProvider();
-  let soundNow = initialNow;
-  const hostTransport = withSoundGate(transport, () => config, () => soundNow);
-  let lastQuietActive = isQuietNow(config, initialNow);
-  const sendEffectiveVolume = (now) => {
-    transport.sendVolume?.(effectiveVolume(config, now));
-  };
-  sendEffectiveVolume(initialNow);
-  let currentModel = null;
-  const animator = createBuddyAnimator({
-    transport: hostTransport,
-    getModel: () => currentModel,
-    render: renderFrame,
-    logger,
-  });
-
-  await runOnboardingGate({
-    statePath,
-    onboarding: async () => {
-      const { io, off } = makeOnboardingIo(hostTransport);
-      try { return await runOnboarding(io); } finally { off?.(); }
-    },
-    tutorial: async () => {
-      const { io, off } = makeOnboardingIo(hostTransport);
-      try { await runTutorial(io); } finally { off?.(); }
-    },
-  });
-
-  const weatherClient = injectedWeatherClient ?? makeWeather();
-  let lastKnownUsage = null;
-  let stopped = false;
-  let timer = null;
-  let resolveLoopSleep = null;
-  let runtime = {};
-  let lastLoadUsageFailureReason = null;
-  let lastPollUsageFailureReason = null;
-  const actions = createActionQueue();
-  const evolutionIntents = createEvolutionIntentQueue();
-  const buttonDispatcher = createButtonDispatcher({
-    transport: hostTransport,
-    getPet: () => runtime.pet,
-    getModel: () => currentModel,
-    actions,
-    animator,
-    onSignatureError: () => {},
-  });
-  const dashboardServer = dashboard
-    ? await startDashboardServer({
-        host: dashboardHost,
-        port: dashboardPort,
-        statePath,
-        configPath,
-        framePath,
-        getRuntime: () => runtime,
-        getConfig: () => config,
-        setConfig: (next) => { config = next; },
-        onSettingsChanged: (changed) => {
-          if (!("volume" in changed) && !("quietHours" in changed)) return;
-          const now = nowProvider();
-          soundNow = now;
-          lastQuietActive = isQuietNow(config, now);
-          sendEffectiveVolume(now);
-        },
-        evolutionIntents,
-        nowProvider,
-      })
-    : null;
-
-  const stop = () => {
-    stopped = true;
-    if (timer) clearTimeout(timer);
-    timer = null;
-    resolveLoopSleep?.();
-    resolveLoopSleep = null;
-    buttonDispatcher.stop();
-    animator.stop();
-    dashboardServer?.close().catch(() => {});
-    transport.close?.();
-  };
-
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
-
-  let lastHour = initialNow.getHours();
-  async function tick() {
-    await actions.run(async () => {
-      const now = nowProvider();
-      soundNow = now;
-      const quietActive = isQuietNow(config, now);
-      if (quietActive !== lastQuietActive) {
-        lastQuietActive = quietActive;
-        sendEffectiveVolume(now);
-      }
-      animator.pause();
-      try {
-        const snapshot = await loadUsageSnapshot({ ...config, run: usageRun });
-        lastLoadUsageFailureReason = logFailureReasonTransition({
-          result: snapshot,
-          lastReason: lastLoadUsageFailureReason,
-          logger,
-          label: "loadUsageSnapshot",
-        });
-        const selected = usageForDisplay(snapshot, lastKnownUsage);
-        lastKnownUsage = selected.lastKnown;
-        const pollResult = await pollUsage().catch((error) => ({
-          ok: false,
-          reason: errorReason(error),
-        }));
-        lastPollUsageFailureReason = logFailureReasonTransition({
-          result: pollResult,
-          lastReason: lastPollUsageFailureReason,
-          logger,
-          label: "pollUsage",
-        });
-        const usage = mergeUsage(selected.usage, loadRateLimits());
-        const weather = await loadWeatherSnapshot(weatherClient, config);
-        const room = hostTransport.feedSensor();
-        const pendingButtons = buttonDispatcher.drainTickEvents();
-        let pet;
-        try {
-          pet = await runOneTick({
-            usage,
-            weather,
-            room,
-            statePath,
-            framePath,
-            transport: hostTransport,
-            now,
-            today: localYmd(now),
-            onRenderModel: (model) => { currentModel = model; },
-            pendingButtons,
-            evolutionIntents,
-          });
-        } catch (error) {
-          buttonDispatcher.requeueForRetry(pendingButtons);
-          throw error;
-        }
-        runtime = { usage, weather, room, pet };
-        const hour = now.getHours();
-        if (hour !== lastHour) {
-          lastHour = hour;
-          hostTransport.playSound?.(SOUND.HOUR);       // top-of-hour chime
-        }
-        console.log(`wrote ${framePath}`);
-      } finally {
-        animator.resume();
-      }
-    });
-  }
-
   try {
-    if (once) {
-      await tick(); // once mode: let errors propagate to the exit code
-      return;
-    }
+    const initialNow = nowProvider();
+    let soundNow = initialNow;
+    const hostTransport = withSoundGate(transport, () => config, () => soundNow);
+    let lastQuietActive = isQuietNow(config, initialNow);
+    const sendEffectiveVolume = (now) => {
+      transport.sendVolume?.(effectiveVolume(config, now));
+    };
+    sendEffectiveVolume(initialNow);
+    let currentModel = null;
+    const animator = createBuddyAnimator({
+      transport: hostTransport,
+      getModel: () => currentModel,
+      render: renderFrame,
+      logger,
+    });
 
-    await runTickLoop({
-      runTick: tick,
-      intervalMs,
-      isStopped: () => stopped,
-      beforeLoop: () => animator.start(),
-      setTimer: (resolve, ms) => {
-        resolveLoopSleep = () => {
-          timer = null;
-          resolveLoopSleep = null;
-          resolve();
-        };
-        timer = setTimeout(resolveLoopSleep, ms);
+    await runOnboardingGate({
+      statePath,
+      onboarding: async () => {
+        const { io, off } = makeOnboardingIo(hostTransport);
+        try { return await runOnboarding(io); } finally { off?.(); }
+      },
+      tutorial: async () => {
+        const { io, off } = makeOnboardingIo(hostTransport);
+        try { await runTutorial(io); } finally { off?.(); }
       },
     });
-  } finally {
-    process.off("SIGINT", stop);
-    process.off("SIGTERM", stop);
-    if (once && !stopped) stop();
+
+    const weatherClient = injectedWeatherClient ?? makeWeather();
+    let lastKnownUsage = null;
+    let stopped = false;
+    let timer = null;
+    let resolveLoopSleep = null;
+    let runtime = {};
+    let lastLoadUsageFailureReason = null;
+    let lastPollUsageFailureReason = null;
+    const actions = createActionQueue();
+    const evolutionIntents = createEvolutionIntentQueue();
+    const buttonDispatcher = createButtonDispatcher({
+      transport: hostTransport,
+      getPet: () => runtime.pet,
+      getModel: () => currentModel,
+      actions,
+      animator,
+      onSignatureError: () => {},
+    });
+    const dashboardServer = dashboard
+      ? await startDashboardServer({
+          host: dashboardHost,
+          port: dashboardPort,
+          statePath,
+          configPath,
+          framePath,
+          getRuntime: () => runtime,
+          getConfig: () => config,
+          setConfig: (next) => { config = next; },
+          onSettingsChanged: (changed) => {
+            if (!("volume" in changed) && !("quietHours" in changed)) return;
+            const now = nowProvider();
+            soundNow = now;
+            lastQuietActive = isQuietNow(config, now);
+            sendEffectiveVolume(now);
+          },
+          evolutionIntents,
+          nowProvider,
+        })
+      : null;
+
+    const stop = () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      resolveLoopSleep?.();
+      resolveLoopSleep = null;
+      buttonDispatcher.stop();
+      animator.stop();
+      dashboardServer?.close().catch(() => {});
+      transport.close?.();
+    };
+
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+
+    let lastHour = initialNow.getHours();
+    async function tick() {
+      await actions.run(async () => {
+        const now = nowProvider();
+        soundNow = now;
+        const quietActive = isQuietNow(config, now);
+        if (quietActive !== lastQuietActive) {
+          lastQuietActive = quietActive;
+          sendEffectiveVolume(now);
+        }
+        animator.pause();
+        try {
+          const snapshot = await loadUsageSnapshot({ ...config, run: usageRun });
+          lastLoadUsageFailureReason = logFailureReasonTransition({
+            result: snapshot,
+            lastReason: lastLoadUsageFailureReason,
+            logger,
+            label: "loadUsageSnapshot",
+          });
+          const selected = usageForDisplay(snapshot, lastKnownUsage);
+          lastKnownUsage = selected.lastKnown;
+          const pollResult = await pollUsage().catch((error) => ({
+            ok: false,
+            reason: errorReason(error),
+          }));
+          lastPollUsageFailureReason = logFailureReasonTransition({
+            result: pollResult,
+            lastReason: lastPollUsageFailureReason,
+            logger,
+            label: "pollUsage",
+          });
+          const usage = mergeUsage(selected.usage, loadRateLimits());
+          const weather = await loadWeatherSnapshot(weatherClient, config);
+          const room = hostTransport.feedSensor();
+          const pendingButtons = buttonDispatcher.drainTickEvents();
+          let pet;
+          try {
+            pet = await runOneTick({
+              usage,
+              weather,
+              room,
+              statePath,
+              framePath,
+              transport: hostTransport,
+              now,
+              today: localYmd(now),
+              onRenderModel: (model) => { currentModel = model; },
+              pendingButtons,
+              evolutionIntents,
+            });
+          } catch (error) {
+            buttonDispatcher.requeueForRetry(pendingButtons);
+            throw error;
+          }
+          runtime = { usage, weather, room, pet };
+          const hour = now.getHours();
+          if (hour !== lastHour) {
+            lastHour = hour;
+            hostTransport.playSound?.(SOUND.HOUR);       // top-of-hour chime
+          }
+          console.log(`wrote ${framePath}`);
+        } finally {
+          animator.resume();
+        }
+      });
+    }
+
+    try {
+      if (once) {
+        await tick(); // once mode: let errors propagate to the exit code
+        return;
+      }
+
+      await runTickLoop({
+        runTick: tick,
+        intervalMs,
+        isStopped: () => stopped,
+        beforeLoop: () => animator.start(),
+        setTimer: (resolve, ms) => {
+          resolveLoopSleep = () => {
+            timer = null;
+            resolveLoopSleep = null;
+            resolve();
+          };
+          timer = setTimeout(resolveLoopSleep, ms);
+        },
+      });
+    } finally {
+      process.off("SIGINT", stop);
+      process.off("SIGTERM", stop);
+      if (!stopped) stop();
+    }
+  } catch (error) {
+    // mock 模式探测 timer 是 referenced 的；启动期抛出若不释放，会把进程钉成僵尸，launchd 不重启且会在插板瞬间抢走串口。
+    transport.close?.();
+    throw error;
   }
 }
 

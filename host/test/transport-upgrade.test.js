@@ -243,10 +243,15 @@ test("T8: close stops future probes", async () => {
     });
 
     await waitFor(() => calls >= 2);
+    const timeoutsBeforeClose = process.getActiveResourcesInfo()
+      .filter((resource) => resource === "Timeout").length;
     transport.close();
+    const timeoutsAfterClose = process.getActiveResourcesInfo()
+      .filter((resource) => resource === "Timeout").length;
     const callsAfterClose = calls;
     await sleep(20);
 
+    assert.ok(timeoutsAfterClose < timeoutsBeforeClose);
     assert.equal(calls, callsAfterClose);
   } finally {
     transport?.close();
@@ -284,6 +289,28 @@ test("T9: close during a probe closes the freshly opened serial without attachin
     assert.equal(serial.listenerCount("button"), 0);
   } finally {
     releaseProbe?.();
+    transport?.close();
+  }
+});
+
+test("T9b: close after upgrade closes the attached serial exactly once", async () => {
+  const serial = makeSerial();
+  const probe = makeUpgradeFactory(serial.transport);
+  let transport;
+  try {
+    transport = await createTransport({
+      serialTransportFactory: probe.factory,
+      mockFactory: () => makeMock().transport,
+      reconnectDelayMs: 5,
+      logger,
+    });
+
+    await waitFor(() => transport.getKind() === "serial");
+    transport.close();
+    transport = null;
+
+    assert.equal(serial.closed(), 1);
+  } finally {
     transport?.close();
   }
 });
@@ -363,6 +390,36 @@ test("T10c: off returned before upgrade still removes the facade subscription", 
   }
 });
 
+test("T10d: reconnect resets the diff baseline before an identical frame", async () => {
+  const serial = makeSerial();
+  const probe = makeUpgradeFactory(serial.transport);
+  const a = frame([0x80, 0x01]);
+  let transport;
+  try {
+    transport = await createTransport({
+      serialTransportFactory: probe.factory,
+      mockFactory: () => makeMock().transport,
+      reconnectDelayMs: 5,
+      framePath: null,
+      logger,
+    });
+
+    await waitFor(() => transport.getKind() === "serial");
+    await transport.push(a);
+    assert.deepEqual(await transport.push(a), { ok: true, skipped: true });
+
+    serial.emitReconnect();
+    await transport.push(a);
+
+    assert.equal(serial.frames.length, 2);
+    const dirty = readDirty(serial.frames.at(-1));
+    assert.deepEqual(dirty.header, { x: 0, y: 0, w: 16, h: 1 });
+    assert.deepEqual([...dirty.bytes], [...a.bitmap.bytes]);
+  } finally {
+    transport?.close();
+  }
+});
+
 test("T11: feedSensor switches from mock data to the serial transport", async () => {
   const serial = makeSerial({ sensor: { t: 18.2, h: 47 } });
   const probe = makeUpgradeFactory(serial.transport);
@@ -410,6 +467,44 @@ test("T12: mock push, sensors, cry, and volume behavior remains compatible", asy
   }
 });
 
+test("T13: spread facade keeps upgrade state, subscriptions, replay, and passthroughs", async () => {
+  const sensor = { t: 18.2, h: 47 };
+  const serial = makeSerial({ sensor });
+  const probe = makeUpgradeFactory(serial.transport);
+  const a = frame([0x80, 0x01]);
+  const buttons = [];
+  let transport;
+  try {
+    transport = await createTransport({
+      serialTransportFactory: probe.factory,
+      mockFactory: () => makeMock().transport,
+      reconnectDelayMs: 5,
+      framePath: null,
+      logger,
+    });
+    const spread = { ...transport };
+    spread.onButton((event) => buttons.push(event));
+    spread.setActiveCry(9);
+    spread.sendVolume(55);
+    await spread.push(a);
+
+    await waitFor(() => transport.getKind() === "serial");
+    await waitFor(() => serial.frames.length === 1);
+
+    const dirty = readDirty(serial.frames[0]);
+    assert.deepEqual(dirty.header, { x: 0, y: 0, w: 16, h: 1 });
+    assert.deepEqual([...dirty.bytes], [...a.bitmap.bytes]);
+    serial.emitButton({ key: "KEY", kind: "short" });
+    assert.deepEqual(buttons, [{ key: "KEY", kind: "short" }]);
+    assert.deepEqual(serial.writes, [["cry", 9], ["volume", 55]]);
+    spread.playSound(3);
+    assert.deepEqual(serial.sounds, [3]);
+    assert.deepEqual(spread.feedSensor(), sensor);
+  } finally {
+    transport?.close();
+  }
+});
+
 function makeUpgradeFactory(serial) {
   let calls = 0;
   return {
@@ -425,13 +520,16 @@ function makeSerial({ sensor = null } = {}) {
   const events = new EventEmitter();
   const frames = [];
   const writes = [];
+  const sounds = [];
   let closeCount = 0;
   const transport = {
     async pushFrame(payload) {
       frames.push(Uint8Array.from(payload));
       return { ok: true };
     },
-    playSound() {},
+    playSound(id) {
+      sounds.push(id);
+    },
     setActiveCry(id) {
       writes.push(["cry", id]);
     },
@@ -464,6 +562,7 @@ function makeSerial({ sensor = null } = {}) {
     transport,
     frames,
     writes,
+    sounds,
     emitButton: (event) => events.emit("button", event),
     emitSensor: (event) => events.emit("sensor", event),
     emitReconnect: () => events.emit("reconnect"),

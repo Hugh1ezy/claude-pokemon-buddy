@@ -32,6 +32,7 @@ export async function createTransport({
   const serial = await serialTransportFactory(serialOptions);
   if (serial) {
     attachSerial(serial);
+    await chain;
   } else {
     logMockFallback(logger);
     attachMock(mockFactory({ framePath }));
@@ -104,6 +105,7 @@ export async function createTransport({
         previousBytes = null;
         replay();
         events.emit("reconnect");
+        redrawLastFrame();
       }),
     ];
     detachInner = () => {
@@ -121,8 +123,10 @@ export async function createTransport({
   }
 
   function redrawLastFrame() {
-    if (!lastFrame) return;
-    push(lastFrame).catch(() => {});
+    chain = chain.then(async () => {
+      if (closed || !inner || previousBytes || !lastFrame) return; // 已有新帧上过线则无需补
+      await doPush(lastFrame);
+    }).then(() => {}, () => {});
   }
 
   async function doPush(frame) {
