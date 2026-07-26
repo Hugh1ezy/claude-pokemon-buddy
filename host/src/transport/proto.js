@@ -13,6 +13,7 @@ export const T = {
   SENSOR: 0x83,
   ACK: 0x84,
   NACK: 0x85,
+  AUTH: 0x86,
 };
 
 // Sound ids carried in a PLAY frame's payload[0]. Must match the firmware's

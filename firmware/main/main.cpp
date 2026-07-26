@@ -86,6 +86,7 @@ static constexpr uint8_t T_BUTTON = 0x82;
 static constexpr uint8_t T_SENSOR = 0x83;
 static constexpr uint8_t T_ACK    = 0x84;
 static constexpr uint8_t T_NACK   = 0x85;
+static constexpr uint8_t T_AUTH   = 0x86;   // host -> device (wifi only): pre-shared pairing token
 
 static constexpr size_t RX_MAX   = 48 * 1024;     // > largest valid frame (~30KB)
 static constexpr size_t RECT_MAX = (W * H) / 8;   // 15000B = full-screen 1bpp
