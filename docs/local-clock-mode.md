@@ -8,14 +8,25 @@ itself genuinely require the host; this mode doesn't pretend otherwise.
 
 ## Two ways to enter
 
-**Manual (power-save toggle).** Double-click **KEY** while in normal mode.
+**Manual (power-save toggle).** Double-click **BOOT** while in normal mode.
 This also stops the WiFi radio (`esp_wifi_stop()`) for real power savings —
-the dominant draw on battery is the radio, not the display. Any KEY press
+the dominant draw on battery is the radio, not the display. Any **KEY** press
 (short or double) exits back to normal and restarts WiFi
 (`esp_wifi_start()`), which kicks off an immediate reconnect attempt. Only a
 KEY press exits manual mode — the device keeps NACKing `T_FRAME` the whole
 time so the host's retry logic fails fast instead of waiting out the full
 ACK timeout on every attempt.
+
+> Entry was on **KEY** double-click until 2026-07-28, deliberately avoiding
+> KEY short because that already means "greet". Hourly 亲密度 then turned KEY
+> short into a several-times-a-day habit, and the reflex when a press seems not
+> to register is to press again — landing inside the double-click window and
+> silently stopping the radio, with nothing on screen to say so and only
+> another KEY press to undo it. Observed in the wild as "the device dropped off
+> WiFi for no reason and never came back". BOOT has no daily function, so it
+> cannot be hit while interacting with the buddy. `PLAYER-GUIDE.md` still
+> describes BOOT as having no use — update it if this becomes a feature people
+> are told about rather than one they can only trip over.
 
 **Automatic (connection-loss fallback).** If no authenticated `T_FRAME` has
 landed on either link (USB or WiFi) for 120 seconds, the device enters the

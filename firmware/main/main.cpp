@@ -592,18 +592,26 @@ static void button_task(void *arg)
             broadcast_frame(T_BUTTON, 0, p, sizeof(p));
             ESP_LOGI(TAG, "button key=%u kind=%u", p[0], p[1]);
 
-            // KEY double-click toggles local-clock mode; while in that mode,
-            // ANY KEY press (short or double) wakes it back up -- short is
-            // deliberately excluded as an entry trigger since it already
-            // means "greet" in normal mode and reusing it here risks an
-            // accidental power-save entry from a routine pet interaction.
-            if (key_id == KEY_ID_KEY) {
-                if (g_mode.load() == DeviceMode::NORMAL && kind_id == KIND_DOUBLE) {
-                    enter_local_clock_mode(true);
-                } else if (g_mode.load() == DeviceMode::LOCAL_CLOCK &&
-                           (kind_id == KIND_SHORT || kind_id == KIND_DOUBLE)) {
-                    exit_local_clock_mode();
-                }
+            // ENTER power-save (manual local-clock) is on BOOT, not KEY. It used
+            // to be KEY double-click, chosen because KEY short already means
+            // "greet" and reusing short would have risked an accidental entry.
+            // That reasoning held right up until 亲密度 became hourly: KEY short
+            // is now a several-times-a-day habit, and the natural response to
+            // "did that register?" is to press again -- straight into the
+            // double-click window. Entry stops the WiFi radio with nothing on
+            // screen to say so, and only another KEY press undoes it, so a
+            // mistimed second press reads as "the device fell off the network
+            // for no reason and never came back". BOOT has no daily function at
+            // all, so it cannot be hit while playing with the buddy.
+            //
+            // EXIT stays on KEY: waking it up is the thing you reach for without
+            // thinking, and any KEY press doing it is the forgiving behaviour.
+            if (key_id == KEY_ID_BOOT && kind_id == KIND_DOUBLE &&
+                g_mode.load() == DeviceMode::NORMAL) {
+                enter_local_clock_mode(true);
+            } else if (key_id == KEY_ID_KEY && g_mode.load() == DeviceMode::LOCAL_CLOCK &&
+                       (kind_id == KIND_SHORT || kind_id == KIND_DOUBLE)) {
+                exit_local_clock_mode();
             }
         }
     }
@@ -760,18 +768,48 @@ static void apply_wifi_credential(int idx)
 }
 
 // All retry/fallback logic lives here rather than a separate polling task:
-// STA_START applies the first credential and connects; STA_DISCONNECTED
+// STA_START applies the current credential and connects; STA_DISCONNECTED
 // (auth failure, AP out of range, or a genuine drop after a successful
-// connect) advances to the next credential and retries. A full pass over
-// every credential without success backs off WIFI_RETRY_CYCLE_DELAY_MS
-// before starting over, so a temporarily-unreachable network doesn't spin
-// the radio in a hot loop.
+// connect) retries and, if needed, moves on to the next credential. A full
+// pass over every credential without success backs off
+// WIFI_RETRY_CYCLE_DELAY_MS before starting over, so a temporarily-
+// unreachable network doesn't spin the radio in a hot loop.
+//
+// The credential that last earned an IP is retried ONCE before the cycle
+// advances. Without that, every single drop walks straight to a different
+// SSID -- and with home and work both listed, "a different SSID" is by
+// definition one that is not in range here, so each reconnect paid a failed
+// association plus the cycle backoff before coming back to the network that
+// was working seconds earlier. Measured as 10-18s of dead screen for what
+// should be an immediate reconnect. With one credential configured this
+// changes nothing (the cycle was already a no-op).
+static std::atomic<int> g_wifi_last_good_idx{-1};
+static std::atomic<bool> g_wifi_retry_last_good{false};
+
 static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         apply_wifi_credential(g_wifi_cred_idx.load());
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        // esp_wifi_stop() (manual local-clock mode) raises this too. Reconnecting
+        // there would fight the user's own power-save request, and worse, the
+        // esp_wifi_connect() below fails on a stopped radio without producing
+        // another event -- which silently kills the retry loop for good, so the
+        // device never rejoins even after the radio is started again.
+        if (g_wifi_user_stopped.load()) return;
+
+        if (g_wifi_retry_last_good.exchange(false)) {
+            int same = g_wifi_last_good_idx.load();
+            if (same >= 0) {
+                g_wifi_cred_idx.store(same);
+                vTaskDelay(pdMS_TO_TICKS(500));
+                apply_wifi_credential(same);
+                esp_wifi_connect();
+                return;
+            }
+        }
+
         int next = (g_wifi_cred_idx.load() + 1) % WIFI_CRED_COUNT;
         g_wifi_cred_idx.store(next);
         vTaskDelay(pdMS_TO_TICKS(next == 0 ? WIFI_RETRY_CYCLE_DELAY_MS : 500));
@@ -780,6 +818,11 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         auto *event = (ip_event_got_ip_t *)data;
         ESP_LOGI(TAG, "wifi: got ip " IPSTR, IP2STR(&event->ip_info.ip));
+        // Whatever we are on now is the network that is actually here. Pin it as
+        // the one to try first next time, including after the radio is restarted
+        // on the way out of manual local-clock mode.
+        g_wifi_last_good_idx.store(g_wifi_cred_idx.load());
+        g_wifi_retry_last_good.store(true);
         start_mdns_once();
     }
 }

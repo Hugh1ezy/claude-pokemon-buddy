@@ -92,31 +92,46 @@ Measured, so nobody re-debugs this as "the switch back is broken":
 
 | | |
 |---|---|
-| USB unplug → running on wifi | **2.1 s** (was an erratic 10-18 s — see below) |
+| USB unplug → running on wifi | **1.4 s**, device never leaving the network (was 15-18 s) |
 | push rate while the host is up | every **333 ms** (the buddy animator, not the 60 s tick) |
 | device leaves local-clock mode | on the **first frame** — no timer, no button needed |
 | device enters local-clock mode | after **120 s** with no frame on either link |
 
-So "it won't switch back to the networked screen" is almost never the device.
-It means no frames are arriving. Two causes accounted for everything seen here:
+So "it won't switch back to the networked screen" is almost never the device
+being broken. It means no frames are arriving. Three separate causes turned up
+in one afternoon, and they masked each other badly:
 
 1. **The host was not running at all.** `start-buddy.vbs` lives in the Startup
    folder, which fires **only at logon**. The work PC had not rebooted since
    2026-07-16 while the entry was added on 07-27, so it had never once run.
    Check this before touching firmware.
-2. **mDNS discovery was losing a race for UDP 5353.** On Windows the DNS Client
-   service owns that port, and `bonjour-service` competes with it for the
-   multicast replies. Measured with an established TCP session to the device the
-   whole time: four `findWifiHost` calls, 4 s each, zero answers; and a 90 s
-   continuous browse that saw the service zero times. Each miss costs a discover
-   timeout plus a reconnect delay, so reconnects landed anywhere in 10-18 s and
-   never measured the same twice. The host now remembers the address that last
-   worked (`host/out/wifi-last.json`) and tries it before browsing, which is
-   what the 2.1 s above is. mDNS is still the fallback for a device that moved.
+2. **A KEY double-click had silently stopped the WiFi radio** (manual
+   local-clock mode). Nothing on screen says so, and only another KEY press
+   undoes it — so the device sat on the clock face with a correct time,
+   completely off the network, indefinitely. Entry has since moved to BOOT (see
+   `docs/local-clock-mode.md`), and the disconnect handler no longer tries to
+   reconnect a radio we stopped on purpose — doing so failed silently and killed
+   the retry loop for good, which is why it never recovered on its own.
+3. **Reconnect always cycled to the *other* credential first.** With home and
+   work both in `wifi_creds.h`, every drop meant a guaranteed failed association
+   against a network that is not in range, plus the cycle backoff, before coming
+   back to the one that had been working seconds earlier. The credential that
+   last earned an IP is now retried once before the cycle advances.
 
+> **Attribution caveat.** The host also gained an address cache
+> (`host/out/wifi-last.json`, tried before mDNS) in the same afternoon, so the
+> 1.4 s is the two changes together and this note cannot split them. The
+> evidence originally offered for the cache — browses returning nothing while
+> the device was supposedly reachable — is **not sound**: cause 2 above means
+> the device was very likely off the network during those browses, which
+> explains zero answers without any port contention. The cache is still worth
+> having (skipping discovery is strictly less to go wrong) but do not repeat the
+> claim that bonjour-service loses a race for UDP 5353 against the Windows DNS
+> Client service. It was never demonstrated.
+>
 > The cache is written only after a connection succeeds, so the **first**
-> reconnect on a machine (or after the device changes IP) still pays the old
-> slow path. That is expected, not a regression — measure the second one.
+> reconnect on a machine (or after the device changes IP) still pays for a
+> discovery. That is expected, not a regression — measure the second one.
 
 Rejected, with the measurement, so nobody retries it: pinning `cpb-buddy.local`
 in `config.json` to skip discovery. `Resolve-DnsName` resolves it, but node's
