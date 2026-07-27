@@ -21,12 +21,17 @@
 //   HELLO  0x81 (out) = [proto_ver][sound_count]                   -> boot handshake
 //   ACK    0x84 (out) = [acked_seq]                               (host matches seq)
 //   NACK   0x85 (out) = [rejected_seq]                            (semantic FRAME reject)
-//   SENSOR 0x83 (out) = [temp i16 LE, units 0.1C][humidity u8 %]  (seq ignored by host)
+//   SENSOR 0x83 (out) = [temp i16 LE, units 0.1C][humidity u8 %][battery u8 %, 0xff=unknown]
 //   BUTTON 0x82 (out) = [key_id][kind_id]   key 1=KEY/2=BOOT, kind 1=short/2=long/3=double
+//   AUTH   0x86 (in, WiFi only) = [pairing token bytes]            -> gates the WiFi link
 //
 // Uplink frames are fire-and-forget: the host emits events on them without
 // ACKing, so we never wait. All USB-Serial-JTAG writes go through send_frame()
 // under tx_mutex so concurrent ACK / SENSOR / BUTTON frames never interleave.
+// The same protocol also runs over a WiFi TCP link (see the WiFi bring-up
+// section below) using the same frame format, an independent rx buffer/tx
+// mutex per channel, and a Link enum threaded through send_frame/parse_frames
+// to keep USB and WiFi from interfering with each other -- see docs/wifi.md.
 
 #include <assert.h>
 #include <math.h>
@@ -51,6 +56,9 @@
 #include "esp_netif.h"
 #include "nvs_flash.h"
 #include "mdns.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 
 #include "display_bsp.h"
 #include "shtc3.h"
@@ -101,6 +109,17 @@ static constexpr size_t RECT_MAX = (W * H) / 8;   // 15000B = full-screen 1bpp
 static constexpr size_t MAX_INBOUND_PAYLOAD = 30016; // RLE worst-case (~2x) + rect header slack
 static_assert(MAX_INBOUND_PAYLOAD == 2 * RECT_MAX + 16, "host protocol constants must match firmware payload limit");
 static constexpr uint32_t SENSOR_PERIOD_MS = 30000;
+
+// ---- Battery (18650 via onboard 3x resistor divider into GPIO4 / ADC1 CH3) --
+// Divider ratio and the empty/full voltage window are per Waveshare's board
+// docs, not independently measured against a multimeter -- if the on-screen
+// percentage looks off against a known battery state, recalibrate these two
+// thresholds rather than assuming the read is broken.
+static constexpr adc_channel_t BATTERY_ADC_CHANNEL = ADC_CHANNEL_3; // GPIO4 on ESP32-S3 ADC1
+static constexpr float BATTERY_DIVIDER_RATIO = 3.0f;
+static constexpr float BATTERY_EMPTY_V = 3.3f;    // conservative empty cutoff under load, not the 2.5V absolute min
+static constexpr float BATTERY_FULL_V  = 4.2f;
+static constexpr uint8_t BATTERY_UNKNOWN = 0xff;  // sentinel: no battery / ADC unavailable
 
 static uint8_t *rxbuf = nullptr;                  // frame accumulation (PSRAM)
 static size_t   rxlen = 0;
@@ -391,18 +410,71 @@ static void rx_task(void *arg)
     }
 }
 
+static adc_oneshot_unit_handle_t g_adc_handle = nullptr;
+static adc_cali_handle_t g_adc_cali = nullptr;    // nullptr if calibration scheme unsupported on this chip revision
+
+static void battery_adc_init(void)
+{
+    adc_oneshot_unit_init_cfg_t init_cfg = { .unit_id = ADC_UNIT_1, .ulp_mode = ADC_ULP_MODE_DISABLE };
+    if (adc_oneshot_new_unit(&init_cfg, &g_adc_handle) != ESP_OK) {
+        ESP_LOGW(TAG, "battery: adc_oneshot_new_unit failed, battery %% unavailable");
+        g_adc_handle = nullptr;
+        return;
+    }
+
+    adc_oneshot_chan_cfg_t chan_cfg = {
+        .atten = ADC_ATTEN_DB_12,
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(g_adc_handle, BATTERY_ADC_CHANNEL, &chan_cfg));
+
+    adc_cali_curve_fitting_config_t cali_cfg = {
+        .unit_id = ADC_UNIT_1,
+        .chan = BATTERY_ADC_CHANNEL,
+        .atten = ADC_ATTEN_DB_12,
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+    };
+    if (adc_cali_create_scheme_curve_fitting(&cali_cfg, &g_adc_cali) != ESP_OK) {
+        ESP_LOGW(TAG, "battery: no cali scheme available, using uncalibrated raw->mV approximation");
+        g_adc_cali = nullptr;
+    }
+}
+
+// Returns BATTERY_UNKNOWN if the ADC never initialized; otherwise 0-100.
+static uint8_t read_battery_percent(void)
+{
+    if (!g_adc_handle) return BATTERY_UNKNOWN;
+
+    int raw = 0;
+    if (adc_oneshot_read(g_adc_handle, BATTERY_ADC_CHANNEL, &raw) != ESP_OK) return BATTERY_UNKNOWN;
+
+    int mv;
+    if (g_adc_cali && adc_cali_raw_to_voltage(g_adc_cali, raw, &mv) == ESP_OK) {
+        // calibrated
+    } else {
+        mv = raw * 3300 / 4095;  // rough 12-bit/3.3V fallback when no calibration scheme is available
+    }
+
+    float batteryV = (mv / 1000.0f) * BATTERY_DIVIDER_RATIO;
+    float pct = (batteryV - BATTERY_EMPTY_V) / (BATTERY_FULL_V - BATTERY_EMPTY_V) * 100.0f;
+    if (pct < 0.0f) pct = 0.0f;
+    if (pct > 100.0f) pct = 100.0f;
+    return (uint8_t)lroundf(pct);
+}
+
 // Read SHTC3 every SENSOR_PERIOD_MS and uplink a SENSOR frame. First read runs
 // immediately so the host's "room" field stops showing -- within a few seconds.
 static void sensor_task(void *arg)
 {
     for (;;) {
         float t, h;
+        uint8_t battery = read_battery_percent();
         if (g_sensor->read(&t, &h)) {
             int16_t ti = (int16_t)lroundf(t * 10.0f);
-            uint8_t p[3] = { (uint8_t)(ti & 0xff), (uint8_t)((ti >> 8) & 0xff),
-                             (uint8_t)lroundf(h) };
+            uint8_t p[4] = { (uint8_t)(ti & 0xff), (uint8_t)((ti >> 8) & 0xff),
+                             (uint8_t)lroundf(h), battery };
             broadcast_frame(T_SENSOR, 0, p, sizeof(p));
-            ESP_LOGI(TAG, "sensor %.1fC %.0f%%", t, (double)h);
+            ESP_LOGI(TAG, "sensor %.1fC %.0f%% battery=%u", t, (double)h, battery);
         } else {
             ESP_LOGW(TAG, "sensor read failed");
         }
@@ -730,6 +802,7 @@ extern "C" void app_main(void)
     // I2C/SHTC3 deferred out of static init (see g_bus note). Sensor uplink last.
     g_bus    = new I2cMasterBus(I2C_SCL, I2C_SDA, 0);
     g_sensor = new Shtc3(*g_bus);
+    battery_adc_init();
     xTaskCreate(sensor_task, "sensor", 3072, nullptr, 4, nullptr);
     ESP_LOGI(TAG, "B3: sensor up");
 

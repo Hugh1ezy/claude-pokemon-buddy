@@ -73,8 +73,20 @@ test("incoming BUTTON and SENSOR frames dispatch callbacks", () => {
   port.emitData(encodeFrame({ type: T.SENSOR, seq: 10, payload: sensorPayload(234, 56) }));
 
   assert.deepEqual(buttons, [{ key: "KEY", kind: "long" }]);
-  assert.deepEqual(sensors, [{ t: 23.4, h: 56 }]);
-  assert.deepEqual(transport.feedSensor(), { t: 23.4, h: 56 });
+  assert.deepEqual(sensors, [{ t: 23.4, h: 56, battery: null }]);
+  assert.deepEqual(transport.feedSensor(), { t: 23.4, h: 56, battery: null });
+});
+
+test("SENSOR frames carry battery percent when present, null when the 0xff unknown sentinel is sent", () => {
+  const port = new FakePort();
+  const transport = makeTransport({ port });
+
+  port.emitData(encodeFrame({ type: T.SENSOR, seq: 1, payload: sensorPayload(220, 40, 87) }));
+  assert.deepEqual(transport.feedSensor(), { t: 22.0, h: 40, battery: 87 });
+
+  port.emitData(encodeFrame({ type: T.SENSOR, seq: 2, payload: sensorPayload(220, 40, 0xff) }));
+  assert.deepEqual(transport.feedSensor(), { t: 22.0, h: 40, battery: null });
+  transport.close();
 });
 
 test("malformed BUTTON payloads are ignored instead of emitting null events (RL7)", () => {
@@ -277,8 +289,8 @@ test("button and sensor callbacks remain active after reconnect", async () => {
   port2.emitData(encodeFrame({ type: T.SENSOR, seq: 10, payload: sensorPayload(187, 44) }));
 
   assert.deepEqual(buttons, [{ key: "BOOT", kind: "up" }]);
-  assert.deepEqual(sensors, [{ t: 18.7, h: 44 }]);
-  assert.deepEqual(transport.feedSensor(), { t: 18.7, h: 44 });
+  assert.deepEqual(sensors, [{ t: 18.7, h: 44, battery: null }]);
+  assert.deepEqual(transport.feedSensor(), { t: 18.7, h: 44, battery: null });
   transport.close();
 });
 
@@ -292,7 +304,7 @@ test("disconnect clears stale sensor state and the reconnected port ACKs normall
   });
 
   port1.emitData(encodeFrame({ type: T.SENSOR, seq: 1, payload: sensorPayload(211, 51) }));
-  assert.deepEqual(transport.feedSensor(), { t: 21.1, h: 51 });
+  assert.deepEqual(transport.feedSensor(), { t: 21.1, h: 51, battery: null });
 
   port1.emitClose();
   await waitFor(() => port2.listenerCount("data") > 0);
@@ -694,11 +706,13 @@ class FakePort extends EventEmitter {
   }
 }
 
-function sensorPayload(tempTenths, humidity) {
-  const payload = new Uint8Array(3);
+// battery omitted -> 3-byte payload, matching pre-battery firmware.
+function sensorPayload(tempTenths, humidity, battery) {
+  const payload = new Uint8Array(battery === undefined ? 3 : 4);
   const view = new DataView(payload.buffer);
   view.setInt16(0, tempTenths, true);
   payload[2] = humidity;
+  if (battery !== undefined) payload[3] = battery;
   return payload;
 }
 

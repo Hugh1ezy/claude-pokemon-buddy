@@ -89,12 +89,17 @@ export function parseHello(payload) {
   };
 }
 
+// payload[3] (battery %) is optional: older firmware sends only 3 bytes,
+// and 0xff is the firmware's "couldn't read it" sentinel -- both map to
+// battery: null so callers don't need to special-case protocol version.
 export function parseSensor(payload) {
   if (payload.length < 3) return null;
   const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const battery = payload.length >= 4 && payload[3] !== 0xff ? payload[3] : null;
   return {
     t: view.getInt16(0, true) / 10,
     h: payload[2],
+    battery,
   };
 }
 

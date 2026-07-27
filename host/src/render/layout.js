@@ -59,9 +59,13 @@ function drawLeftPanel(g, model) {
   g.font = `800 12px ${MONO}`;
   g.fillText("CLAUDE", 10, 26);
   g.font = `700 24px ${MONO}`;
+  const clockLeftX = LEFT_W - 12 - g.measureText(text.clock).width;
   g.textAlign = "right";
   g.fillText(text.clock, LEFT_W - 12, 28);
   g.textAlign = "left";
+  if (typeof model.room?.battery === "number") {
+    drawBatteryIndicator(g, clockLeftX, model.room.battery);
+  }
   line(g, 10, 36, LEFT_W - 12, 36);
 
   const p5h = clampPct(model.p5h);
@@ -390,6 +394,37 @@ export function heartCount(rawBond) {
   const perHeart = BOND_SOFT_CAP / HEART_MAX;
   const v = Math.round(((Number(rawBond) || 0) / perHeart) * 2) / 2;
   return Math.max(0, Math.min(HEART_MAX, v));
+}
+
+// Small battery glyph (outline + nub + proportional fill) placed just left
+// of the clock, right-anchored at `rightX` so it never collides with the
+// clock text regardless of how wide the current time string renders.
+function drawBatteryIndicator(g, rightX, pct) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const label = `${Math.round(clamped)}%`;
+  const iconW = 16;
+  const iconH = 9;
+  const nubW = 2;
+  const gap = 4;
+
+  g.font = `800 12px ${MONO}`;
+  const labelW = g.measureText(label).width;
+  const iconX = rightX - gap - labelW - gap - iconW - nubW;
+  const iconY = 12;
+
+  g.save();
+  g.lineWidth = 1.5;
+  g.strokeStyle = INK;
+  g.strokeRect(iconX, iconY, iconW, iconH);
+  g.fillStyle = INK;
+  g.fillRect(iconX + iconW, iconY + (iconH - 4) / 2, nubW, 4);
+  const innerW = iconW - 4;
+  const fillW = Math.round((clamped / 100) * innerW);
+  if (fillW > 0) g.fillRect(iconX + 2, iconY + 2, fillW, iconH - 4);
+  g.restore();
+
+  g.font = `800 12px ${MONO}`;
+  g.fillText(label, iconX + iconW + nubW + gap, iconY + iconH);
 }
 
 function tempHum(v) {
