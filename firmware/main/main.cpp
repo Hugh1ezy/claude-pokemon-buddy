@@ -35,6 +35,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <atomic>
@@ -415,7 +416,9 @@ static adc_cali_handle_t g_adc_cali = nullptr;    // nullptr if calibration sche
 
 static void battery_adc_init(void)
 {
-    adc_oneshot_unit_init_cfg_t init_cfg = { .unit_id = ADC_UNIT_1, .ulp_mode = ADC_ULP_MODE_DISABLE };
+    adc_oneshot_unit_init_cfg_t init_cfg = {};   // zero-init first so no field is left uninitialized
+    init_cfg.unit_id = ADC_UNIT_1;
+    init_cfg.ulp_mode = ADC_ULP_MODE_DISABLE;
     if (adc_oneshot_new_unit(&init_cfg, &g_adc_handle) != ESP_OK) {
         ESP_LOGW(TAG, "battery: adc_oneshot_new_unit failed, battery %% unavailable");
         g_adc_handle = nullptr;
@@ -759,6 +762,106 @@ static void wifi_link_task(void *)
     }
 }
 
+// ---- Local clock mode (Phase A: font + rendering only -- no mode switching
+// or triggers wired up yet, that's later phases). The device has no other
+// text/font rendering capability anywhere (RLCD_SetPixel is the only
+// primitive), so this is a from-scratch 5x7 bitmap font, block-scaled up
+// (thin scaled pixels stay crisp on this 1-bit display; blurring doesn't).
+// Prototyped and visually checked via a host-side canvas script before being
+// hand-ported here -- see the commit message for what that looked like.
+static constexpr int CLOCK_GLYPH_COLS = 5;
+static constexpr int CLOCK_GLYPH_ROWS = 7;
+// Row bit pattern per glyph, MSB = leftmost pixel. Index 10 = ':'.
+static const uint8_t CLOCK_FONT[11][CLOCK_GLYPH_ROWS] = {
+    { 0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110 }, // 0
+    { 0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110 }, // 1
+    { 0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111 }, // 2
+    { 0b11111, 0b00010, 0b00100, 0b00010, 0b00001, 0b10001, 0b01110 }, // 3
+    { 0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010 }, // 4
+    { 0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110 }, // 5
+    { 0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110 }, // 6
+    { 0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000 }, // 7
+    { 0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110 }, // 8
+    { 0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100 }, // 9
+    { 0b00000, 0b00100, 0b00000, 0b00000, 0b00100, 0b00000, 0b00000 }, // :
+};
+
+static void draw_clock_glyph(int glyph_idx, int x, int y, int scale)
+{
+    for (int r = 0; r < CLOCK_GLYPH_ROWS; r++) {
+        uint8_t row = CLOCK_FONT[glyph_idx][r];
+        for (int c = 0; c < CLOCK_GLYPH_COLS; c++) {
+            if (!((row >> (CLOCK_GLYPH_COLS - 1 - c)) & 1)) continue;
+            for (int sy = 0; sy < scale; sy++)
+                for (int sx = 0; sx < scale; sx++)
+                    RlcdPort.RLCD_SetPixel(x + c * scale + sx, y + r * scale + sy, ColorBlack);
+        }
+    }
+}
+
+static int clock_text_width(const char *text, int scale, int gap)
+{
+    int len = (int)strlen(text);
+    return len * CLOCK_GLYPH_COLS * scale + (len - 1) * gap;
+}
+
+// text may only contain '0'-'9' and ':'.
+static void draw_clock_text(const char *text, int cx, int cy, int scale, int gap)
+{
+    int x = cx - clock_text_width(text, scale, gap) / 2;
+    int y = cy - (CLOCK_GLYPH_ROWS * scale) / 2;
+    for (const char *p = text; *p; p++) {
+        draw_clock_glyph(*p == ':' ? 10 : (*p - '0'), x, y, scale);
+        x += CLOCK_GLYPH_COLS * scale + gap;
+    }
+}
+
+static void draw_clock_rect(int x, int y, int w, int h)
+{
+    for (int yy = 0; yy < h; yy++)
+        for (int xx = 0; xx < w; xx++)
+            RlcdPort.RLCD_SetPixel(x + xx, y + yy, ColorBlack);
+}
+
+// litSegments: 0-4 (25% each), matching the host's own battery indicator
+// design (host/src/render/layout.js's drawBatteryIndicator) -- same visual
+// language, independently drawn since the device can't reach the host to
+// ask it to render anything while showing this screen at all.
+static void draw_battery_icon(int cx, int y, int litSegments)
+{
+    constexpr int iconW = 40, iconH = 20, nubW = 4, segGap = 2, segCount = 4;
+    int x = cx - iconW / 2;
+    for (int i = 0; i < iconW; i++) {
+        RlcdPort.RLCD_SetPixel(x + i, y, ColorBlack);
+        RlcdPort.RLCD_SetPixel(x + i, y + iconH - 1, ColorBlack);
+    }
+    for (int j = 0; j < iconH; j++) {
+        RlcdPort.RLCD_SetPixel(x, y + j, ColorBlack);
+        RlcdPort.RLCD_SetPixel(x + iconW - 1, y + j, ColorBlack);
+    }
+    draw_clock_rect(x + iconW, y + (iconH - 8) / 2, nubW, 8);
+
+    const int innerW = iconW - 8, innerH = iconH - 8;
+    const float segW = (innerW - segGap * (segCount - 1)) / (float)segCount;
+    for (int i = 0; i < litSegments && i < segCount; i++) {
+        draw_clock_rect(x + 4 + (int)lroundf(i * (segW + segGap)), y + 4, (int)lroundf(segW), innerH);
+    }
+}
+
+// battery_pct = BATTERY_UNKNOWN suppresses the icon entirely.
+static void draw_clock_screen(uint8_t hour, uint8_t minute, uint8_t battery_pct)
+{
+    RlcdPort.RLCD_ColorClear(ColorWhite);
+    char buf[12]; // "HH:MM" is 5 chars + NUL, but uint8_t's range is 0-255 so size against the worst case
+    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(hour % 100), (unsigned)(minute % 100));
+    draw_clock_text(buf, W / 2, H / 2 - 10, 8, 10);
+    if (battery_pct != BATTERY_UNKNOWN) {
+        int lit = (int)lroundf((battery_pct / 100.0f) * 4.0f);
+        draw_battery_icon(W / 2, H / 2 + 50, lit);
+    }
+    RlcdPort.RLCD_Display();
+}
+
 extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "B3: init ST7305 panel");
@@ -769,6 +872,12 @@ extern "C" void app_main(void)
         for (int xx = W - 12; xx < W - 4; xx++)
             RlcdPort.RLCD_SetPixel(xx, yy, ColorBlack);
     RlcdPort.RLCD_Display();
+
+    // TEMPORARY Phase-A scaffold: force the local-clock screen up for a fixed
+    // window so it can be checked on real hardware in isolation, before any
+    // real mode-switching exists to trigger it for real. Removed in Phase C.
+    draw_clock_screen(14, 37, 75);
+    vTaskDelay(pdMS_TO_TICKS(15000));
 
     rxbuf     = (uint8_t *) heap_caps_malloc(RX_MAX, MALLOC_CAP_SPIRAM);
     rectbuf   = (uint8_t *) heap_caps_malloc(RECT_MAX, MALLOC_CAP_SPIRAM);
