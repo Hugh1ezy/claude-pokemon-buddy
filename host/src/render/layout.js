@@ -415,7 +415,16 @@ function drawHearts(g, x, y, filled) {
   }
 }
 
-function drawHeart(g, x, y, fill) {
+// heartPath spans x .. x+16 horizontally (its outermost bezier controls sit at
+// x and x+16) and y+1 .. y+13 vertically. The partial fill has to be measured
+// against that full width: it used 8, i.e. half of it, so a half heart filled
+// about 15% of the shape and read on the panel as "a sliver went dark" rather
+// than "half a heart". Nothing throws when this is wrong -- the fill is a
+// clipped rect, so it just quietly under-fills.
+const HEART_W = 16;
+const HEART_H = 14;
+
+export function drawHeart(g, x, y, fill) {
   heartPath(g, x, y);
 
   if (fill >= 1) {
@@ -428,7 +437,7 @@ function drawHeart(g, x, y, fill) {
     g.save();
     g.clip();
     g.fillStyle = INK;
-    g.fillRect(x, y, Math.round(8 * fill), 14);
+    g.fillRect(x, y, Math.round(HEART_W * fill), HEART_H);
     g.restore();
   }
 
