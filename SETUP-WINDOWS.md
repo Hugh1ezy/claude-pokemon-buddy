@@ -3,7 +3,7 @@
 > **如果你是人类**：把下面"发给 Claude 的指令"原样发给你的 Claude Code 就行，剩下交给它。
 >
 > **发给 Claude 的指令（复制这段）**：
-> 请打开并严格执行 https://raw.githubusercontent.com/aquamarinz/claude-pokemon-buddy/main/SETUP-WINDOWS.md —— 这是一份写给你（Claude）的安装手册。我桌上有一台连着 USB 的宝可梦小设备，请按手册把它从零装好，每一步都要跑手册里的验证命令确认成功再继续。
+> 请打开并严格执行 https://raw.githubusercontent.com/Hugh1ezy/claude-pokemon-buddy/main/SETUP-WINDOWS.md —— 这是一份写给你（Claude）的安装手册。我桌上有一台连着 USB 的宝可梦小设备，请按手册把它从零装好，每一步都要跑手册里的验证命令确认成功再继续。
 >
 > **送礼人转发话术**：送你的小设备到了！它是一只用你的 Claude 用量养大的宝可梦。用 USB **数据线**把它连上电脑，然后把上面那段指令原样发给你的 Claude Code。
 
@@ -52,7 +52,7 @@ $esptool = (Get-ChildItem "$HOME\esptool" -Recurse -Filter esptool.exe | Select-
 
 ```powershell
 cd $HOME
-git clone https://github.com/aquamarinz/claude-pokemon-buddy.git
+git clone https://github.com/Hugh1ezy/claude-pokemon-buddy.git
 cd claude-pokemon-buddy\host
 npm install
 npm ls --depth=0
