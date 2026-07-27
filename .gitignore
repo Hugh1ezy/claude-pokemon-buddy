@@ -6,3 +6,4 @@ host/config.json
 *.bin
 start-buddy.vbs
 *.bsp
+firmware/main/wifi_creds.h

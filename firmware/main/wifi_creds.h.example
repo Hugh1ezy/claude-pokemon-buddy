@@ -1,0 +1,13 @@
+// Copy to wifi_creds.h (gitignored) and fill in your own networks, then rebuild:
+//
+//   . "$HOME\esp\esp-idf\export.ps1"
+//   idf.py -C firmware -p COM3 flash
+//
+// The device tries each entry in order and cycles until one connects, so home
+// and work can both live here. Leave out any network you don't need.
+//
+// This file is the tracked template -- never put a real passphrase in it.
+static const WifiCred WIFI_CREDS[] = {
+    { "YOUR_HOME_SSID", "YOUR_HOME_PASSWORD" },
+    { "YOUR_WORK_SSID", "YOUR_WORK_PASSWORD" },
+};

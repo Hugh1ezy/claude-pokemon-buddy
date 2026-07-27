@@ -135,10 +135,21 @@ static uint8_t *rectbuf = nullptr;                // RLE-decoded rect (PSRAM)
 // LAN as whichever computer is running the host, and advertises itself via
 // mDNS (_cpb._tcp.local) so the host doesn't need a fixed IP.
 struct WifiCred { const char *ssid; const char *pass; };
+// Real credentials live in wifi_creds.h, which is gitignored (copy
+// wifi_creds.h.example and fill it in, one file per machine). This file is
+// tracked and this repo is public, so a WPA passphrase edited in here would be
+// one `git add .` away from being published -- hence the indirection rather
+// than a comment asking people to remember. With no wifi_creds.h present the
+// placeholders below still compile; the device simply never joins a network,
+// which is the right failure for anyone who cloned this without their own copy.
+#if __has_include("wifi_creds.h")
+#include "wifi_creds.h"
+#else
 static const WifiCred WIFI_CREDS[] = {
     { "CHANGE_ME_HOME_SSID", "CHANGE_ME_HOME_PASSWORD" },
     { "CHANGE_ME_WORK_SSID", "CHANGE_ME_WORK_PASSWORD" },
 };
+#endif
 static constexpr int WIFI_CRED_COUNT = sizeof(WIFI_CREDS) / sizeof(WIFI_CREDS[0]);
 static constexpr uint32_t WIFI_RETRY_CYCLE_DELAY_MS = 5000; // pause after a full pass over all creds fails
 static constexpr uint16_t WIFI_TCP_PORT = 7311;
