@@ -309,6 +309,9 @@ export function makeTransport({
     sendVolume(volume) {
       writeFireAndForget(T.VOLUME, Uint8Array.from([volumeByte(volume)]));
     },
+    sendTime(hour, minute) {
+      writeFireAndForget(T.TIME, Uint8Array.from([hour & 0xff, minute & 0xff]));
+    },
     onReconnect(callback) {
       events.on("reconnect", callback);
       return () => events.off("reconnect", callback);

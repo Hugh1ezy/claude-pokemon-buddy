@@ -97,6 +97,7 @@ static constexpr uint8_t PROTO_VER = 1;
 static constexpr uint8_t T_FRAME  = 0x01;
 static constexpr uint8_t T_PLAY   = 0x03;   // host -> device: play sound, payload[0]=id
 static constexpr uint8_t T_CONFIG = 0x04;   // host -> device: set active KEY cry
+static constexpr uint8_t T_TIME   = 0x05;   // host -> device: [hour u8][minute u8], local-clock time sync
 static constexpr uint8_t T_VOLUME = 0x25;   // host -> device: set codec volume 0..100
 static constexpr uint8_t T_HELLO  = 0x81;
 static constexpr uint8_t T_BUTTON = 0x82;
@@ -189,6 +190,7 @@ static QueueHandle_t audio_queue = nullptr;       // sound id -> audio_task
 static std::atomic<uint8_t> g_active_cry{SND_BUI};  // KEY-press cry; set by host CONFIG
 static std::atomic<uint8_t> g_volume{80};
 static void play_sound(uint8_t id);               // fwd decl (used by parse_frames)
+static void handle_time_sync(uint8_t hour, uint8_t minute); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
 
 static uint32_t crc32(const uint8_t *b, size_t n)
 {
@@ -379,6 +381,8 @@ static void parse_frames(uint8_t *buf, size_t &len_in_buf, Link link)
                 play_sound(f[5]);                  // payload[0] = sound id; fire-and-forget (no ACK)
             } else if (f[1] == T_CONFIG && len >= 1) {
                 if (f[5] < SND_COUNT) g_active_cry.store(f[5]); // 非法 id 拒绝, 不改值
+            } else if (f[1] == T_TIME && len == 2) {
+                handle_time_sync(f[5], f[6]);       // payload = [hour][minute]; malformed values ignored inside
             } else if (f[1] == T_VOLUME && len == 1) {
                 set_volume(f[5]);                   // malformed/oor values are ignored
             }
@@ -762,17 +766,26 @@ static void wifi_link_task(void *)
     }
 }
 
-// ---- Local clock mode (Phase A: font + rendering only -- no mode switching
-// or triggers wired up yet, that's later phases). The device has no other
-// text/font rendering capability anywhere (RLCD_SetPixel is the only
-// primitive), so this is a from-scratch 5x7 bitmap font, block-scaled up
-// (thin scaled pixels stay crisp on this 1-bit display; blurring doesn't).
-// Prototyped and visually checked via a host-side canvas script before being
-// hand-ported here -- see the commit message for what that looked like.
+// ---- Local clock mode (Phase A+B: font/rendering + time sync; mode
+// switching/triggers are later phases). The device has no other text/font
+// rendering capability anywhere (RLCD_SetPixel is the only primitive), so
+// this is a from-scratch 5x7 bitmap font, block-scaled up (thin scaled
+// pixels stay crisp on this 1-bit display; blurring doesn't). Prototyped and
+// visually checked via a host-side canvas script before being hand-ported
+// here -- see the commit message for what that looked like.
+//
+// No RTC chip driver exists in this codebase (stripped, per shtc3.h:2), so
+// there's no battery-backed time source. Host already computes correct
+// local wall-clock time every tick; T_TIME (host -> device, [hour u8][minute
+// u8]) syncs it down periodically, and the device free-runs the displayed
+// time from esp_timer between syncs -- no epoch/timezone math needed, good
+// enough for gaps measured in minutes/hours, and it resets to accurate the
+// moment the host is reachable again.
 static constexpr int CLOCK_GLYPH_COLS = 5;
 static constexpr int CLOCK_GLYPH_ROWS = 7;
-// Row bit pattern per glyph, MSB = leftmost pixel. Index 10 = ':'.
-static const uint8_t CLOCK_FONT[11][CLOCK_GLYPH_ROWS] = {
+// Row bit pattern per glyph, MSB = leftmost pixel. Index 10 = ':', 11 = '-'
+// (the '-' glyph exists only to render a "--:--" no-time-yet placeholder).
+static const uint8_t CLOCK_FONT[12][CLOCK_GLYPH_ROWS] = {
     { 0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110 }, // 0
     { 0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110 }, // 1
     { 0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111 }, // 2
@@ -784,6 +797,7 @@ static const uint8_t CLOCK_FONT[11][CLOCK_GLYPH_ROWS] = {
     { 0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110 }, // 8
     { 0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100 }, // 9
     { 0b00000, 0b00100, 0b00000, 0b00000, 0b00100, 0b00000, 0b00000 }, // :
+    { 0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000 }, // -
 };
 
 static void draw_clock_glyph(int glyph_idx, int x, int y, int scale)
@@ -805,13 +819,20 @@ static int clock_text_width(const char *text, int scale, int gap)
     return len * CLOCK_GLYPH_COLS * scale + (len - 1) * gap;
 }
 
-// text may only contain '0'-'9' and ':'.
+// text may only contain '0'-'9', ':', and '-'.
+static int clock_glyph_index(char ch)
+{
+    if (ch == ':') return 10;
+    if (ch == '-') return 11;
+    return ch - '0';   // caller guarantees ch is otherwise '0'-'9'
+}
+
 static void draw_clock_text(const char *text, int cx, int cy, int scale, int gap)
 {
     int x = cx - clock_text_width(text, scale, gap) / 2;
     int y = cy - (CLOCK_GLYPH_ROWS * scale) / 2;
     for (const char *p = text; *p; p++) {
-        draw_clock_glyph(*p == ':' ? 10 : (*p - '0'), x, y, scale);
+        draw_clock_glyph(clock_glyph_index(*p), x, y, scale);
         x += CLOCK_GLYPH_COLS * scale + gap;
     }
 }
@@ -827,9 +848,13 @@ static void draw_clock_rect(int x, int y, int w, int h)
 // design (host/src/render/layout.js's drawBatteryIndicator) -- same visual
 // language, independently drawn since the device can't reach the host to
 // ask it to render anything while showing this screen at all.
+// 3 always-visible divider lines mark the 4 slot boundaries independent of
+// fill state -- an unlit slot needs to read as "an empty slot", not blank
+// icon background (matches the host-side fix in layout.js's
+// drawBatteryIndicator, same bug, same reasoning).
 static void draw_battery_icon(int cx, int y, int litSegments)
 {
-    constexpr int iconW = 40, iconH = 20, nubW = 4, segGap = 2, segCount = 4;
+    constexpr int iconW = 40, iconH = 20, nubW = 4, segCount = 4;
     int x = cx - iconW / 2;
     for (int i = 0; i < iconW; i++) {
         RlcdPort.RLCD_SetPixel(x + i, y, ColorBlack);
@@ -841,25 +866,91 @@ static void draw_battery_icon(int cx, int y, int litSegments)
     }
     draw_clock_rect(x + iconW, y + (iconH - 8) / 2, nubW, 8);
 
-    const int innerW = iconW - 8, innerH = iconH - 8;
-    const float segW = (innerW - segGap * (segCount - 1)) / (float)segCount;
-    for (int i = 0; i < litSegments && i < segCount; i++) {
-        draw_clock_rect(x + 4 + (int)lroundf(i * (segW + segGap)), y + 4, (int)lroundf(segW), innerH);
+    const int innerX = x + 2, innerY = y + 2;
+    const int innerW = iconW - 4, innerH = iconH - 4;
+
+    for (int i = 1; i < segCount; i++) {
+        int dx = innerX + (innerW * i) / segCount;
+        for (int j = 0; j < innerH; j++) RlcdPort.RLCD_SetPixel(dx, innerY + j, ColorBlack);
     }
+
+    int litW = (innerW * (litSegments < segCount ? litSegments : segCount)) / segCount;
+    if (litW > 0) draw_clock_rect(innerX, innerY, litW, innerH);
 }
 
-// battery_pct = BATTERY_UNKNOWN suppresses the icon entirely.
-static void draw_clock_screen(uint8_t hour, uint8_t minute, uint8_t battery_pct)
+// Set by the T_TIME handler in parse_frames (any link, any mode -- this is
+// what keeps the local clock accurate while otherwise disconnected).
+// std::atomic matches this file's existing convention for small
+// cross-task values (g_active_cry, g_volume) rather than a dedicated mutex.
+static std::atomic<bool> g_clock_time_known{false};
+static std::atomic<uint8_t> g_clock_base_hour{0};
+static std::atomic<uint8_t> g_clock_base_minute{0};
+static std::atomic<int64_t> g_clock_base_us{0};   // esp_timer_get_time() at the moment of the last sync
+
+static void handle_time_sync(uint8_t hour, uint8_t minute)
+{
+    if (hour > 23 || minute > 59) return;   // malformed payload -- ignore rather than display garbage
+    g_clock_base_hour.store(hour);
+    g_clock_base_minute.store(minute);
+    g_clock_base_us.store(esp_timer_get_time());
+    g_clock_time_known.store(true);
+}
+
+// Free-runs from the last T_TIME sync using elapsed esp_timer microseconds.
+// Returns false (hour/minute left untouched) if no sync has landed yet.
+static bool compute_current_clock(uint8_t &hour, uint8_t &minute)
+{
+    if (!g_clock_time_known.load()) return false;
+    int64_t elapsed_us = esp_timer_get_time() - g_clock_base_us.load();
+    int elapsed_min = (int)(elapsed_us / 60'000'000LL);
+    int total_min = (int)g_clock_base_hour.load() * 60 + (int)g_clock_base_minute.load() + elapsed_min;
+    total_min %= (24 * 60);
+    if (total_min < 0) total_min += 24 * 60;   // defensive; elapsed_us should never be negative
+    hour = (uint8_t)(total_min / 60);
+    minute = (uint8_t)(total_min % 60);
+    return true;
+}
+
+// time_known = false draws "--:--" (hour/minute ignored) rather than
+// skipping the screen entirely -- lets a viewer tell "no sync yet" apart
+// from "nothing is drawing at all" at a glance. battery_pct = BATTERY_UNKNOWN
+// suppresses the icon entirely.
+static void draw_clock_screen(uint8_t hour, uint8_t minute, bool time_known, uint8_t battery_pct)
 {
     RlcdPort.RLCD_ColorClear(ColorWhite);
-    char buf[12]; // "HH:MM" is 5 chars + NUL, but uint8_t's range is 0-255 so size against the worst case
-    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(hour % 100), (unsigned)(minute % 100));
-    draw_clock_text(buf, W / 2, H / 2 - 10, 8, 10);
+    if (time_known) {
+        char buf[12]; // "HH:MM" is 5 chars + NUL, but uint8_t's range is 0-255 so size against the worst case
+        snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(hour % 100), (unsigned)(minute % 100));
+        draw_clock_text(buf, W / 2, H / 2 - 10, 8, 10);
+    } else {
+        draw_clock_text("--:--", W / 2, H / 2 - 10, 8, 10);
+    }
     if (battery_pct != BATTERY_UNKNOWN) {
         int lit = (int)lroundf((battery_pct / 100.0f) * 4.0f);
         draw_battery_icon(W / 2, H / 2 + 50, lit);
     }
     RlcdPort.RLCD_Display();
+}
+
+// TEMPORARY Phase-B test scaffold: redraws the local-clock screen every 2s,
+// running concurrently with normal operation so a real host connection can
+// be used to verify T_TIME actually lands and the clock free-runs correctly
+// between syncs. Always draws (never skips), so "--:--" vs a stuck boot
+// screen tells apart "task is running but hasn't synced yet" from "task
+// isn't running at all" -- the two very different failure modes that look
+// identical if this just silently skips drawing when time is unknown.
+// This intentionally fights with normal T_FRAME rendering for screen
+// writes (whichever wrote last wins) -- expected for this phase's manual
+// verification; Phase C's real DeviceMode gating replaces this task
+// entirely so the two never race for real.
+static void clock_test_task(void *)
+{
+    for (;;) {
+        uint8_t hour = 0, minute = 0;
+        bool known = compute_current_clock(hour, minute);
+        draw_clock_screen(hour, minute, known, read_battery_percent());
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
 }
 
 extern "C" void app_main(void)
@@ -872,12 +963,6 @@ extern "C" void app_main(void)
         for (int xx = W - 12; xx < W - 4; xx++)
             RlcdPort.RLCD_SetPixel(xx, yy, ColorBlack);
     RlcdPort.RLCD_Display();
-
-    // TEMPORARY Phase-A scaffold: force the local-clock screen up for a fixed
-    // window so it can be checked on real hardware in isolation, before any
-    // real mode-switching exists to trigger it for real. Removed in Phase C.
-    draw_clock_screen(14, 37, 75);
-    vTaskDelay(pdMS_TO_TICKS(15000));
 
     rxbuf     = (uint8_t *) heap_caps_malloc(RX_MAX, MALLOC_CAP_SPIRAM);
     rectbuf   = (uint8_t *) heap_caps_malloc(RECT_MAX, MALLOC_CAP_SPIRAM);
@@ -927,4 +1012,13 @@ extern "C" void app_main(void)
     xTaskCreate(audio_task, "audio", 4096, nullptr, 4, nullptr);
     ESP_LOGI(TAG, "B5: codec up; 3 system + 18 species sounds (KEY=active cry, PLAY=evolve/hour)");
     xTaskCreate(hello_task, "hello", 2048, nullptr, 3, nullptr);
+
+    // clock_test_task (Phase B scaffold) is intentionally NOT started here
+    // anymore -- confirmed working (font, T_TIME sync, free-running clock),
+    // but running it concurrently with normal T_FRAME rendering corrupts the
+    // host's diff-tracking (the host doesn't know the physical screen was
+    // written out-of-band, so its next diffed push can leave stale clock
+    // pixels behind in regions it thinks are unchanged). Real (non-fighting)
+    // local-clock display is Phase C's job, gated by DeviceMode so the two
+    // never draw at the same time.
 }

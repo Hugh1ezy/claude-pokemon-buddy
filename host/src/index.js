@@ -253,6 +253,7 @@ export async function main({
       transport.sendVolume?.(effectiveVolume(config, now));
     };
     sendEffectiveVolume(initialNow);
+    transport.sendTime?.(initialNow.getHours(), initialNow.getMinutes());
     let currentModel = null;
     const animator = createBuddyAnimator({
       transport: hostTransport,
@@ -333,6 +334,7 @@ export async function main({
       await actions.run(async () => {
         const now = nowProvider();
         soundNow = now;
+        transport.sendTime?.(now.getHours(), now.getMinutes()); // keeps the device's local-clock fallback synced
         const quietActive = isQuietNow(config, now);
         if (quietActive !== lastQuietActive) {
           lastQuietActive = quietActive;

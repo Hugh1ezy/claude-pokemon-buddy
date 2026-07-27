@@ -62,6 +62,7 @@ export async function createTransport({
     playSound,
     setActiveCry,
     sendVolume,
+    sendTime,
     onButton,
     onSensor,
     onReconnect,
@@ -208,6 +209,13 @@ export async function createTransport({
   function sendVolume(volume) {
     lastVolume = volumeByte(volume);
     return inner?.sendVolume?.(lastVolume);
+  }
+
+  // No replay-on-reconnect needed (unlike cry/volume, which are state) --
+  // this is periodic, sent fresh every tick, and the device free-runs its
+  // own clock between syncs regardless of when the last one landed.
+  function sendTime(hour, minute) {
+    return inner?.sendTime?.(hour, minute);
   }
 
   function onButton(callback) {
