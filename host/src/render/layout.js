@@ -56,51 +56,37 @@ function drawLeftPanel(g, model) {
   g.fillStyle = INK;
   g.fillRect(LEFT_W - 2, 0, 2, H);
 
-  g.font = `800 12px ${MONO}`;
-  g.fillText("CLAUDE", 10, 26);
   g.font = `700 24px ${MONO}`;
-  const clockLeftX = LEFT_W - 12 - g.measureText(text.clock).width;
   g.textAlign = "right";
   g.fillText(text.clock, LEFT_W - 12, 28);
   g.textAlign = "left";
   if (typeof model.room?.battery === "number") {
-    drawBatteryIndicator(g, clockLeftX, model.room.battery, model.buddy?.animPhase);
+    drawBatteryIndicator(g, 10, model.room.battery, model.buddy?.animPhase);
   }
   line(g, 10, 36, LEFT_W - 12, 36);
 
-  const p5h = clampPct(model.p5h);
-  const p5hText = text.p5h;
-  g.font = `800 48px ${MONO}`;
-  g.fillText(p5hText, 9, 88);
-  if (p5hText !== "--") {
-    const pctX = Math.round(9 + g.measureText(p5hText).width - 2);
-    g.font = `800 24px ${MONO}`;
-    g.fillText("%", pctX, 87);
-  }
-  g.font = `800 12px ${MONO}`;
-  g.fillText("5H", 151, 58);
-  g.fillText("WINDOW", 151, 72);
+  const centerInPanel = (t, y) => {
+    g.fillText(t, Math.round(LEFT_W / 2 - g.measureText(t).width / 2), y);
+  };
 
+  // Row 1: title
+  g.font = `700 12px ${MONO}`;
+  centerInPanel("Pokemon · Clock", 55);
+
+  // Row 2: date
   g.font = `800 14px ${MONO}`;
-  g.fillText(text.resets5h, 11, 115);
+  centerInPanel(text.date, 88);
 
-  if (text.rateNote) {
-    g.font = `700 12px ${MONO}`;
-    g.fillText(text.rateNote, 11, 46);
-  }
+  // Rows 3-4: reserved (future notifications) -- intentionally blank
 
+  // Row 5: WEEK usage bar
   g.font = `800 12px ${MONO}`;
-  g.fillText("WEEK", 11, 140);
-  drawMeter(g, 56, 127, 92, 16, clampPct(model.pweek), { striped: true });
+  g.fillText("WEEK", 11, 188);
+  drawMeter(g, 56, 175, 92, 16, clampPct(model.pweek), { striped: true });
   g.font = `800 14px ${MONO}`;
   g.textAlign = "right";
-  g.fillText(text.pweek === "--" ? "--" : `${text.pweek}%`, LEFT_W - 12, 142);
+  g.fillText(text.pweek === "--" ? "--" : `${text.pweek}%`, LEFT_W - 12, 190);
   g.textAlign = "left";
-
-  g.font = `800 14px ${MONO}`;
-  g.fillText(text.resetsWeek, 11, 167);
-  g.font = fitTodayLineFont(g, text.today);
-  g.fillText(text.today, TODAY_TEXT_X, 192);
 
   line(g, 10, 201, LEFT_W - 12, 201);
   // Weather: condition + temp enlarged to a secondary focal point.
@@ -399,9 +385,10 @@ export function heartCount(rawBond) {
 const BATTERY_SEGMENTS = 4; // one segment = 25%, per design choice (no numeric readout on screen)
 const BATTERY_CRITICAL_PCT = 10;
 
-// Small battery glyph (outline + nub + up to 4 filled segments) placed just
-// left of the clock, right-anchored at `rightX` so it never collides with
-// the clock text regardless of how wide the current time string renders.
+// Small battery glyph (outline + nub + up to 4 filled segments), left-
+// anchored at `x` (top-left corner, where the "CLAUDE" label used to sit --
+// the clock text is right-aligned on the opposite side of the row, so
+// there's no collision to guard against here).
 // No numeric percent is drawn -- only which of the 4 quarters are lit.
 // Below BATTERY_CRITICAL_PCT it blinks: `animPhase` is the buddy animator's
 // free-running counter (increments every ~333ms independent of the main
@@ -427,7 +414,7 @@ function fillRectOutline(g, x, y, w, h) {
 // attempt) merges adjacent lit segments into one blob with no internal
 // structure, and an unlit segment with no border at all is indistinguishable
 // from blank icon background -- both are what this fixes.
-function drawBatteryIndicator(g, rightX, pct, animPhase) {
+function drawBatteryIndicator(g, x, pct, animPhase) {
   const clamped = Math.max(0, Math.min(100, pct));
   const blinkedOut = clamped < BATTERY_CRITICAL_PCT && Math.floor((animPhase ?? 0) / 2) % 2 === 1;
   if (blinkedOut) return;
@@ -442,7 +429,7 @@ function drawBatteryIndicator(g, rightX, pct, animPhase) {
   const iconH = 10;
   const nubW = 2;
   const segGap = 1;
-  const iconX = rightX - 4 - iconW - nubW;
+  const iconX = x;
   const iconY = 11;
 
   g.save();

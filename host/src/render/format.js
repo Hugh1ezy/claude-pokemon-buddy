@@ -7,6 +7,7 @@ export function layoutText(model = {}) {
 
   return {
     clock: formatClock(model.clock, now),
+    date: `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`,
     p5h: percentText(model.p5h),
     pweek: percentText(model.pweek),
     rateNote: model.rateStale ? "stale" : "",
