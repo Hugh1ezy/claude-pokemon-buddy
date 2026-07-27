@@ -56,6 +56,14 @@ export function mergeUsage(ccusageUsage, rateLimits) {
   };
 }
 
+// Days since 1970-01-01, counted from the LOCAL calendar date (not a raw
+// UTC/timezone-shifted epoch division) -- matches the representation the
+// firmware's ganzhi boundary table uses (see gen-ganzhi-table.py), so the
+// device can look up today's date directly with no timezone math of its own.
+export function epochDayFor(date) {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
+}
+
 export function shouldPlaySignature(event, pet) {
   return event?.key === "KEY" && event?.kind === "short" && pet?.readyToEvolve === false;
 }
@@ -253,7 +261,7 @@ export async function main({
       transport.sendVolume?.(effectiveVolume(config, now));
     };
     sendEffectiveVolume(initialNow);
-    transport.sendTime?.(initialNow.getHours(), initialNow.getMinutes());
+    transport.sendTime?.(initialNow.getHours(), initialNow.getMinutes(), epochDayFor(initialNow));
     let currentModel = null;
     const animator = createBuddyAnimator({
       transport: hostTransport,
@@ -334,7 +342,7 @@ export async function main({
       await actions.run(async () => {
         const now = nowProvider();
         soundNow = now;
-        transport.sendTime?.(now.getHours(), now.getMinutes()); // keeps the device's local-clock fallback synced
+        transport.sendTime?.(now.getHours(), now.getMinutes(), epochDayFor(now)); // keeps the device's local-clock fallback synced
         const quietActive = isQuietNow(config, now);
         if (quietActive !== lastQuietActive) {
           lastQuietActive = quietActive;

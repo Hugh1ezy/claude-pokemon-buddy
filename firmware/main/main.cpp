@@ -97,7 +97,7 @@ static constexpr uint8_t PROTO_VER = 1;
 static constexpr uint8_t T_FRAME  = 0x01;
 static constexpr uint8_t T_PLAY   = 0x03;   // host -> device: play sound, payload[0]=id
 static constexpr uint8_t T_CONFIG = 0x04;   // host -> device: set active KEY cry
-static constexpr uint8_t T_TIME   = 0x05;   // host -> device: [hour u8][minute u8], local-clock time sync
+static constexpr uint8_t T_TIME   = 0x05;   // host -> device: [hour u8][minute u8][epoch_day u16 LE], local-clock time+date sync
 static constexpr uint8_t T_VOLUME = 0x25;   // host -> device: set codec volume 0..100
 static constexpr uint8_t T_HELLO  = 0x81;
 static constexpr uint8_t T_BUTTON = 0x82;
@@ -212,7 +212,7 @@ static QueueHandle_t audio_queue = nullptr;       // sound id -> audio_task
 static std::atomic<uint8_t> g_active_cry{SND_BUI};  // KEY-press cry; set by host CONFIG
 static std::atomic<uint8_t> g_volume{80};
 static void play_sound(uint8_t id);               // fwd decl (used by parse_frames)
-static void handle_time_sync(uint8_t hour, uint8_t minute); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
+static void handle_time_sync(uint8_t hour, uint8_t minute, uint16_t epoch_day); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
 static void enter_local_clock_mode(bool user_initiated); // fwd decl (used by sensor_task's timeout watchdog)
 static void exit_local_clock_mode(void);          // fwd decl (used by parse_frames' auto-recovery path)
 
@@ -413,8 +413,9 @@ static void parse_frames(uint8_t *buf, size_t &len_in_buf, Link link)
                 play_sound(f[5]);                  // payload[0] = sound id; fire-and-forget (no ACK)
             } else if (f[1] == T_CONFIG && len >= 1) {
                 if (f[5] < SND_COUNT) g_active_cry.store(f[5]); // 非法 id 拒绝, 不改值
-            } else if (f[1] == T_TIME && len == 2) {
-                handle_time_sync(f[5], f[6]);       // payload = [hour][minute]; malformed values ignored inside
+            } else if (f[1] == T_TIME && len == 4) {
+                uint16_t epoch_day = (uint16_t)(f[7] | (f[8] << 8));
+                handle_time_sync(f[5], f[6], epoch_day); // payload = [hour][minute][epoch_day LE]; malformed values ignored inside
             } else if (f[1] == T_VOLUME && len == 1) {
                 set_volume(f[5]);                   // malformed/oor values are ignored
             }
@@ -977,43 +978,149 @@ static void draw_battery_icon(int cx, int y, int litSegments)
 static std::atomic<bool> g_clock_time_known{false};
 static std::atomic<uint8_t> g_clock_base_hour{0};
 static std::atomic<uint8_t> g_clock_base_minute{0};
+static std::atomic<uint16_t> g_clock_base_epoch_day{0}; // days since 1970-01-01, local calendar date
 static std::atomic<int64_t> g_clock_base_us{0};   // esp_timer_get_time() at the moment of the last sync
 
-static void handle_time_sync(uint8_t hour, uint8_t minute)
+static void handle_time_sync(uint8_t hour, uint8_t minute, uint16_t epoch_day)
 {
     if (hour > 23 || minute > 59) return;   // malformed payload -- ignore rather than display garbage
     g_clock_base_hour.store(hour);
     g_clock_base_minute.store(minute);
+    g_clock_base_epoch_day.store(epoch_day);
     g_clock_base_us.store(esp_timer_get_time());
     g_clock_time_known.store(true);
 }
 
 // Free-runs from the last T_TIME sync using elapsed esp_timer microseconds.
-// Returns false (hour/minute left untouched) if no sync has landed yet.
-static bool compute_current_clock(uint8_t &hour, uint8_t &minute)
+// Returns false (hour/minute/epoch_day left untouched) if no sync has landed
+// yet. Tracks day rollover too (elapsed_min crossing a 24h boundary advances
+// epoch_day) -- matters for a device that's been disconnected across
+// midnight, since the ganzhi date/day-pillar must not silently go stale.
+static bool compute_current_clock(uint8_t &hour, uint8_t &minute, uint16_t &epoch_day)
 {
     if (!g_clock_time_known.load()) return false;
     int64_t elapsed_us = esp_timer_get_time() - g_clock_base_us.load();
-    int elapsed_min = (int)(elapsed_us / 60'000'000LL);
-    int total_min = (int)g_clock_base_hour.load() * 60 + (int)g_clock_base_minute.load() + elapsed_min;
-    total_min %= (24 * 60);
-    if (total_min < 0) total_min += 24 * 60;   // defensive; elapsed_us should never be negative
-    hour = (uint8_t)(total_min / 60);
-    minute = (uint8_t)(total_min % 60);
+    int64_t elapsed_min = elapsed_us / 60'000'000LL;
+    int64_t base_total_min = (int64_t)g_clock_base_hour.load() * 60 + (int64_t)g_clock_base_minute.load();
+    int64_t total_min = base_total_min + elapsed_min;
+    int64_t day_offset = total_min / (24 * 60);
+    int64_t min_of_day = total_min % (24 * 60);
+    if (min_of_day < 0) { min_of_day += 24 * 60; day_offset -= 1; }   // defensive; elapsed_us should never be negative
+    hour = (uint8_t)(min_of_day / 60);
+    minute = (uint8_t)(min_of_day % 60);
+    epoch_day = (uint16_t)(g_clock_base_epoch_day.load() + day_offset);
     return true;
+}
+
+// ---- Ganzhi (stem-branch) date row -----------------------------------
+// Southern-hemisphere-adjusted four-pillar date, shown centered above the
+// clock. Derivation, southern-hemisphere rule, and verification against a
+// user-confirmed reference date are documented in docs/local-clock-mode.md
+// -- summary: year pillar is standard (li-chun anchored, unshifted); month
+// pillar's stem is standard (wu-hu-dun) but its branch is flipped +6 to its
+// seasonal-opposite pair; day and hour pillars are standard/hemisphere-
+// independent pure formulas (day pillar is a simple continuous count, not
+// tied to any calendar reform or season).
+#include "ganzhi_font.inc"
+#include "ganzhi_table.inc"
+
+// Calibrated against 2026-07-27 (epoch_day 20661) = ren-yin day (stem8,
+// branch2) -- see docs/local-clock-mode.md. The double-mod pattern handles
+// C++'s negative-remainder `%` for epoch_day before the anchor.
+static void ganzhi_day_pillar(uint16_t epoch_day, uint8_t &stem, uint8_t &branch)
+{
+    int32_t delta = (int32_t)epoch_day - 20661;
+    stem = (uint8_t)(((delta + 8) % 10 + 10) % 10);
+    branch = (uint8_t)(((delta + 2) % 12 + 12) % 12);
+}
+
+// wu-shu-dun (五鼠遁): day stem -> that day's zi-hour (23:00-00:59) stem.
+// Hemisphere-independent, standard rule.
+static constexpr uint8_t GANZHI_WUSHU_DUN[10] = { 0, 2, 4, 6, 8, 0, 2, 4, 6, 8 };
+
+static void ganzhi_hour_pillar(uint8_t day_stem, uint8_t hour, uint8_t &stem, uint8_t &branch)
+{
+    branch = (uint8_t)(((hour + 1) / 2) % 12);
+    stem = (uint8_t)((GANZHI_WUSHU_DUN[day_stem] + branch) % 10);
+}
+
+// Linear scan (table sorted ascending, ~63 entries -- a binary search isn't
+// worth the complexity at this size) for the boundary active on epoch_day.
+// Returns false if epoch_day falls before the table's first entry (not
+// expected in practice, but the table doesn't cover all of time -- see
+// gen-ganzhi-table.py's RANGE_START/RANGE_END).
+static bool ganzhi_year_month(uint16_t epoch_day, uint8_t &year_stem, uint8_t &year_branch,
+                               uint8_t &month_stem, uint8_t &month_branch)
+{
+    const GanzhiBoundary *active = nullptr;
+    const size_t count = sizeof(GANZHI_TABLE) / sizeof(GANZHI_TABLE[0]);
+    for (size_t i = 0; i < count; i++) {
+        if (GANZHI_TABLE[i].epoch_day <= epoch_day) active = &GANZHI_TABLE[i];
+        else break; // ascending order -- nothing further can match
+    }
+    if (!active) return false;
+    year_stem = active->year_sb >> 4;
+    year_branch = active->year_sb & 0x0F;
+    month_stem = active->month_sb >> 4;
+    month_branch = active->month_sb & 0x0F;
+    return true;
+}
+
+static void draw_ganzhi_glyph(int glyph_idx, int x, int y)
+{
+    for (int r = 0; r < GANZHI_GLYPH_SIZE; r++) {
+        for (int c = 0; c < GANZHI_GLYPH_SIZE; c++) {
+            uint8_t byte = GANZHI_FONT[glyph_idx][r][c >> 3];
+            if ((byte >> (7 - (c & 7))) & 1) RlcdPort.RLCD_SetPixel(x + c, y + r, ColorBlack);
+        }
+    }
+}
+
+// Composes the 15-glyph sequence [stem,branch,label,sep] x4 (no trailing
+// separator) and centers it horizontally at cy. Glyph indices: stem 0-9
+// direct, branch 10-21 (10+branch_idx), labels 22=年 23=月 24=日 25=时,
+// separator 26.
+static constexpr int GANZHI_ROW_GAP = 1;
+static void draw_ganzhi_row(uint8_t ys, uint8_t yb, uint8_t ms, uint8_t mb,
+                             uint8_t ds, uint8_t db, uint8_t hs, uint8_t hb, int cy)
+{
+    const int seq[] = {
+        ys, 10 + yb, 22, 26,
+        ms, 10 + mb, 23, 26,
+        ds, 10 + db, 24, 26,
+        hs, 10 + hb, 25,
+    };
+    constexpr int n = sizeof(seq) / sizeof(seq[0]);
+    const int total_w = n * GANZHI_GLYPH_SIZE + (n - 1) * GANZHI_ROW_GAP;
+    int x = W / 2 - total_w / 2;
+    for (int i = 0; i < n; i++) {
+        draw_ganzhi_glyph(seq[i], x, cy);
+        x += GANZHI_GLYPH_SIZE + GANZHI_ROW_GAP;
+    }
 }
 
 // time_known = false draws "--:--" (hour/minute ignored) rather than
 // skipping the screen entirely -- lets a viewer tell "no sync yet" apart
 // from "nothing is drawing at all" at a glance. battery_pct = BATTERY_UNKNOWN
-// suppresses the icon entirely.
-static void draw_clock_screen(uint8_t hour, uint8_t minute, bool time_known, uint8_t battery_pct)
+// suppresses the icon entirely. The ganzhi row needs both a known time (for
+// the hour pillar and epoch_day) and an epoch_day within GANZHI_TABLE's
+// covered range -- either gap just omits that row rather than showing
+// garbage, same "unknown -> omit, don't guess" spirit as time_known/battery.
+static void draw_clock_screen(uint8_t hour, uint8_t minute, bool time_known, uint16_t epoch_day, uint8_t battery_pct)
 {
     RlcdPort.RLCD_ColorClear(ColorWhite);
     if (time_known) {
         char buf[12]; // "HH:MM" is 5 chars + NUL, but uint8_t's range is 0-255 so size against the worst case
         snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)(hour % 100), (unsigned)(minute % 100));
         draw_clock_text(buf, W / 2, H / 2 - 10, 8, 10);
+
+        uint8_t ys, yb, ms, mb;
+        if (ganzhi_year_month(epoch_day, ys, yb, ms, mb)) {
+            uint8_t ds, db, hs, hb;
+            ganzhi_day_pillar(epoch_day, ds, db);
+            ganzhi_hour_pillar(ds, hour, hs, hb);
+            draw_ganzhi_row(ys, yb, ms, mb, ds, db, hs, hb, 20);
+        }
     } else {
         draw_clock_text("--:--", W / 2, H / 2 - 10, 8, 10);
     }
@@ -1036,8 +1143,9 @@ static void local_clock_task(void *)
     for (;;) {
         if (g_mode.load() == DeviceMode::LOCAL_CLOCK) {
             uint8_t hour = 0, minute = 0;
-            bool known = compute_current_clock(hour, minute);
-            draw_clock_screen(hour, minute, known, read_battery_percent());
+            uint16_t epoch_day = 0;
+            bool known = compute_current_clock(hour, minute, epoch_day);
+            draw_clock_screen(hour, minute, known, epoch_day, read_battery_percent());
         }
         vTaskDelay(pdMS_TO_TICKS(2000));
     }

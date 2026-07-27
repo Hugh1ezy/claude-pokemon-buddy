@@ -214,8 +214,8 @@ export async function createTransport({
   // No replay-on-reconnect needed (unlike cry/volume, which are state) --
   // this is periodic, sent fresh every tick, and the device free-runs its
   // own clock between syncs regardless of when the last one landed.
-  function sendTime(hour, minute) {
-    return inner?.sendTime?.(hour, minute);
+  function sendTime(hour, minute, epochDay) {
+    return inner?.sendTime?.(hour, minute, epochDay);
   }
 
   function onButton(callback) {

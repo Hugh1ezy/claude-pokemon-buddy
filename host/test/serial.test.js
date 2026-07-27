@@ -420,14 +420,14 @@ test("sendVolume writes a VOLUME frame with the configured volume (RM12)", () =>
   assert.deepEqual([...frame.payload], [70]);
 });
 
-test("sendTime writes a TIME frame with hour and minute (local-clock sync)", () => {
+test("sendTime writes a TIME frame with hour, minute, and epoch day (local-clock sync)", () => {
   const port = new FakePort();
   const transport = makeTransport({ port });
-  transport.sendTime(14, 37);
+  transport.sendTime(14, 37, 20661); // 2026-07-27, little-endian: 0x50B5 -> [0xB5, 0x50]
   const frame = decodeFrame(port.writes.at(-1));
   assert.equal(frame.type, T.TIME);
   assert.equal(frame.seq, 0);
-  assert.deepEqual([...frame.payload], [14, 37]);
+  assert.deepEqual([...frame.payload], [14, 37, 0xb5, 0x50]);
 });
 
 test("playSound write error triggers reconnect (M8)", async () => {

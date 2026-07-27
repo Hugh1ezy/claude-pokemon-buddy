@@ -5,3 +5,4 @@ node_modules/
 host/config.json
 *.bin
 start-buddy.vbs
+*.bsp
