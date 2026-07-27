@@ -165,11 +165,13 @@ static size_t   wifi_rxlen = 0;
 static bool     wifi_have_last_acked_frame_seq = false;
 static uint8_t  wifi_last_acked_frame_seq = 0;
 
-// ---- Device mode (Phase C: manual toggle; Phase D adds the auto-timeout
-// path) -- NORMAL processes T_FRAME as always; LOCAL_CLOCK shows the
-// standalone clock screen instead and NACKs T_FRAME immediately rather than
-// silently dropping it, so the host's retry logic fails fast instead of
-// waiting out the full ACK timeout on every attempt. Declared up here
+// ---- Device mode -- NORMAL processes T_FRAME as always; LOCAL_CLOCK shows
+// the standalone clock screen instead. A manually-entered (KEY double-click)
+// LOCAL_CLOCK NACKs T_FRAME immediately -- rather than silently dropping it --
+// so the host's retry logic fails fast instead of waiting out the full ACK
+// timeout on every attempt; only a KEY press exits. An auto-entered (timeout)
+// LOCAL_CLOCK instead exits and processes the very first live T_FRAME that
+// arrives, so connectivity coming back recovers on its own. Declared up here
 // (ahead of its own section further down) because parse_frames reads it.
 enum class DeviceMode : uint8_t { NORMAL, LOCAL_CLOCK };
 static std::atomic<DeviceMode> g_mode{DeviceMode::NORMAL};
@@ -177,6 +179,12 @@ static std::atomic<DeviceMode> g_mode{DeviceMode::NORMAL};
 // auto-timeout path leaves WiFi alone so it keeps retrying in the
 // background. Exit restarts the radio only if this flag says WE stopped it.
 static std::atomic<bool> g_wifi_user_stopped{false};
+// esp_timer_get_time() at the last authenticated T_FRAME (either link). Starts
+// at 0 (boot), so a device that never hears from a host also falls back to
+// the clock after the timeout -- consistent with "show the clock instead of
+// a frozen/blank screen" rather than a special-cased startup state.
+static std::atomic<int64_t> g_last_frame_us{0};
+static constexpr int64_t LOCAL_CLOCK_TIMEOUT_US = 120LL * 1000 * 1000; // 2x the normal ~60s tick
 
 static SemaphoreHandle_t tx_mutex = nullptr;      // serializes USJ writes
 static QueueHandle_t     btn_queue = nullptr;     // button events -> button_task
@@ -205,6 +213,8 @@ static std::atomic<uint8_t> g_active_cry{SND_BUI};  // KEY-press cry; set by hos
 static std::atomic<uint8_t> g_volume{80};
 static void play_sound(uint8_t id);               // fwd decl (used by parse_frames)
 static void handle_time_sync(uint8_t hour, uint8_t minute); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
+static void enter_local_clock_mode(bool user_initiated); // fwd decl (used by sensor_task's timeout watchdog)
+static void exit_local_clock_mode(void);          // fwd decl (used by parse_frames' auto-recovery path)
 
 static uint32_t crc32(const uint8_t *b, size_t n)
 {
@@ -382,16 +392,22 @@ static void parse_frames(uint8_t *buf, size_t &len_in_buf, Link link)
             } else if (!authed) {
                 // Unauthenticated WiFi client sent something other than AUTH -> ignore it.
             } else if (f[1] == T_FRAME) {
-                if (g_mode.load() != DeviceMode::NORMAL) {
-                    send_nack(f[2], link);           // local-clock mode: fail fast rather than the full ACK timeout
-                } else if (have_seq && f[2] == last_seq) {
-                    send_ack(f[2], link);            // duplicate retry: ACK, do not re-blit
-                } else if (handle_frame_payload(f + 5, len)) {
-                    last_seq = f[2];
-                    have_seq = true;
-                    send_ack(f[2], link);            // ACK on success
+                if (g_mode.load() == DeviceMode::LOCAL_CLOCK && g_wifi_user_stopped.load()) {
+                    send_nack(f[2], link);           // manual local-clock mode: only a KEY press exits
                 } else {
-                    send_nack(f[2], link);           // semantic reject: bad rect/RLE shape
+                    // Auto-entered LOCAL_CLOCK (Phase D timeout, not a manual double-click)
+                    // recovers the moment a live frame arrives on either link.
+                    if (g_mode.load() == DeviceMode::LOCAL_CLOCK) exit_local_clock_mode();
+                    g_last_frame_us.store(esp_timer_get_time());
+                    if (have_seq && f[2] == last_seq) {
+                        send_ack(f[2], link);            // duplicate retry: ACK, do not re-blit
+                    } else if (handle_frame_payload(f + 5, len)) {
+                        last_seq = f[2];
+                        have_seq = true;
+                        send_ack(f[2], link);            // ACK on success
+                    } else {
+                        send_nack(f[2], link);           // semantic reject: bad rect/RLE shape
+                    }
                 }
             } else if (f[1] == T_PLAY && len >= 1) {
                 play_sound(f[5]);                  // payload[0] = sound id; fire-and-forget (no ACK)
@@ -487,6 +503,9 @@ static uint8_t read_battery_percent(void)
 
 // Read SHTC3 every SENSOR_PERIOD_MS and uplink a SENSOR frame. First read runs
 // immediately so the host's "room" field stops showing -- within a few seconds.
+// Also piggybacks the Phase D local-clock timeout watchdog: this task already
+// runs continuously regardless of mode, and 30s is fine granularity for a
+// 120s timeout, so a dedicated task isn't worth it.
 static void sensor_task(void *arg)
 {
     for (;;) {
@@ -501,6 +520,13 @@ static void sensor_task(void *arg)
         } else {
             ESP_LOGW(TAG, "sensor read failed");
         }
+
+        if (g_mode.load() == DeviceMode::NORMAL &&
+            esp_timer_get_time() - g_last_frame_us.load() > LOCAL_CLOCK_TIMEOUT_US) {
+            ESP_LOGI(TAG, "local-clock: no frame in %lld s, auto-entering", (long long)(LOCAL_CLOCK_TIMEOUT_US / 1000000));
+            enter_local_clock_mode(false);
+        }
+
         vTaskDelay(pdMS_TO_TICKS(SENSOR_PERIOD_MS));
     }
 }
