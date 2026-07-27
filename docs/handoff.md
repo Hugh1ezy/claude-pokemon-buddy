@@ -44,12 +44,20 @@ Not working, with the reason:
   so the host's own poll path (`pollUsage failed: no-token`) can't work at all.
   Deriving a percentage from ccusage tokens was tried and reverted — cache-read
   tokens run orders of magnitude above quota, so every estimate pegged at 100%.
-- **WiFi not joined.** `wifi_creds.h` does not exist on the home machine yet, so
-  the flashed firmware has placeholder SSIDs. Consequence: pull the USB cable and
-  the device drops to local-clock mode after 120s and cannot come back, because
-  there is no second link for the host's frames. Fix is one file + a reflash.
-- Enabling WiFi also needs a `wifi` block in `host/config.json`:
-  `{ "enabled": true, "token": "<the WIFI_PAIRING_TOKEN literal in main.cpp>" }`.
+**WiFi is live on the home network** as of 2026-07-28 00:10: the device joined,
+took `192.168.1.114`, advertises `cpb-buddy.local` and listens on tcp/7311.
+`host/config.json` has its `wifi` block (`enabled` + the pairing token). Pulling
+the USB cable should now fall back to WiFi instead of stranding the device in
+local-clock mode — untested end to end, since it needs someone to unplug it.
+
+When adding the work network to `wifi_creds.h`, note the trap that cost a
+reflash here: **creating that file for the first time needs `idf.py reconfigure`**
+before `idf.py flash`. Verify before believing the flash:
+
+```powershell
+$t = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes("firmware/build/pokemon_buddy_fw.bin"))
+$t.Contains("YOUR_SSID")   # must be True
+```
 
 ## Test suite on Windows
 
