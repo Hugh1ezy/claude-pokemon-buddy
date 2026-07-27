@@ -18,6 +18,7 @@ import { renderFrame } from "./render/frame.js";
 import { playSignatureAnimation } from "./render/signature-anim.js";
 import { loadBuddySprite } from "./render/sprites.js";
 import { loadState, saveState } from "./state.js";
+import { createSaveSync } from "./save-sync.js";
 import { createTransport } from "./transport/index.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
@@ -271,6 +272,11 @@ export async function main({
   nowProvider = () => new Date(),
 } = {}) {
   let config = loadConfig(configPath);
+  const saveSync = makeSaveSync(config.saveSync, { statePath, logger });
+  // Before anything reads the save -- including the onboarding gate, which
+  // would otherwise hatch a second buddy on a machine that already has one
+  // published.
+  await saveSync.pull();
   const transport = injectedTransport ?? await createTransport({ framePath, wifi: config.wifi });
   try {
     const initialNow = nowProvider();
@@ -310,6 +316,7 @@ export async function main({
     let runtime = {};
     let lastLoadUsageFailureReason = null;
     let lastPollUsageFailureReason = null;
+    let deviceWasAttached = false;
     const actions = createActionQueue();
     const evolutionIntents = createEvolutionIntentQueue();
     const buttonDispatcher = createButtonDispatcher({
@@ -368,6 +375,15 @@ export async function main({
           lastQuietActive = quietActive;
           sendEffectiveVolume(now);
         }
+        // A host that has been idling in mock mode kept simulating a buddy
+        // nobody was looking at. The moment the device turns up here, that
+        // local drift is the wrong save -- re-pull before the tick reads it,
+        // so this machine picks up the buddy that was actually being raised
+        // wherever the device just came from. (loadState re-reads from disk
+        // every tick, so replacing the file is all this takes.)
+        const deviceAttached = Boolean(transport.getKind?.());
+        if (deviceAttached && !deviceWasAttached) await saveSync.pull();
+        deviceWasAttached = deviceAttached;
         animator.pause();
         try {
           const snapshot = await loadUsageSnapshot({ ...config, run: usageRun });
@@ -423,6 +439,9 @@ export async function main({
         } finally {
           animator.resume();
         }
+        // Publish only from the machine holding the device: see save-sync.js's
+        // header for why that guard is the whole safety story.
+        if (deviceAttached) await saveSync.maybePush();
       });
     }
 
@@ -447,9 +466,17 @@ export async function main({
         },
       });
     } finally {
+      // Read before stop() closes the transport. Shutting down while the
+      // device is still attached is the normal end of a session, and the last
+      // few minutes of it are exactly what the debounce would otherwise drop.
+      // Checking "attached right now" rather than "attached at some point"
+      // matters: a host that idled all day in mock mode after the device left
+      // must not publish that drift on its way out.
+      const attachedAtExit = Boolean(transport.getKind?.());
       process.off("SIGINT", stop);
       process.off("SIGTERM", stop);
       if (!stopped) stop();
+      if (attachedAtExit) await saveSync.maybePush({ force: true });
     }
   } catch (error) {
     // mock 模式探测 timer 是 referenced 的；启动期抛出若不释放，会把进程钉成僵尸，launchd 不重启且会在插板瞬间抢走串口。
@@ -676,6 +703,24 @@ function failureReason(result) {
 
 function errorReason(error) {
   return error?.message ? error.message : "error";
+}
+
+// Off unless config.json opts in: this pushes to a git remote, which is not
+// something a host should start doing to someone's repo on its own.
+const SAVE_SYNC_OFF = {
+  pull: async () => ({ status: "disabled" }),
+  maybePush: async () => ({ status: "disabled" }),
+};
+
+function makeSaveSync(settings, { statePath, logger }) {
+  if (!settings?.enabled) return SAVE_SYNC_OFF;
+  return createSaveSync({
+    statePath,
+    remote: settings.remote,
+    branch: settings.branch,
+    pushIntervalMs: settings.pushIntervalMs,
+    logger,
+  });
 }
 
 function localYmd(date) {
