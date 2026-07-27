@@ -27,6 +27,15 @@ machine. So:
   publishing the stale copy it invented while the device was elsewhere.
   (`loadState` re-reads from disk every tick, so replacing the file is all the
   handoff takes — nothing in the loop caches the pet.)
+- **Except when the remote tip is the commit this machine published.** Then
+  nobody else has had the device since, the local save is that commit's
+  continuation, and pulling would roll it back to whenever the last push
+  happened. This is not a corner case: the push is debounced by minutes, and
+  every USB unplug/replug drops the transport to mock and back — which is a
+  re-attach, and therefore a pull. Without the guard, reseating a cable
+  silently reverts an hour's bond credit. The commit we published is recorded
+  in `state.json.sync`; no marker means "never published from here", which
+  correctly makes any remote tip look like someone else's.
 - **While a device is attached**, the save is pushed at most every
   `pushIntervalMs` (default 5 minutes), plus once on shutdown if the device is
   still attached at that moment.

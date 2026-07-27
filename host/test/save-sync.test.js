@@ -139,6 +139,43 @@ test("maybePush debounces on the interval and a rejection does not start the clo
   assert.equal((await sync.maybePush()).status, "push-rejected");
 });
 
+test("a pull will not roll back over the tip this machine itself published", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111", tipTree: "old-tree" });
+  const sync = createSaveSync({ statePath, runGit: git.run, logger: null });
+
+  assert.equal((await sync.push()).status, "pushed");
+  // The remote now holds our own commit. Local has moved on since (the push is
+  // debounced, and a USB reseat re-attaches the transport and triggers a pull).
+  git.setTip("commit-sha");
+  writeFileSync(statePath, JSON.stringify({ ...SAVE, bondHalves: 1 }));
+
+  const result = await sync.pull();
+
+  assert.equal(result.status, "ours-already");
+  assert.equal(JSON.parse(readFileSync(statePath, "utf8")).bondHalves, 1);
+  assert.ok(!existsSync(`${statePath}.presync`), "nothing should have been replaced");
+});
+
+test("a pull still takes a tip that came from the other machine", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111", tipTree: "old-tree" });
+  const sync = createSaveSync({ statePath, runGit: git.run, logger: null });
+
+  assert.equal((await sync.push()).status, "pushed");
+  git.setTip("someone-elses-commit");   // the other machine published since
+
+  assert.equal((await sync.pull()).status, "pulled");
+  assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")), OTHER);
+});
+
+test("with no marker yet, the very first pull still takes the remote", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111" });
+
+  assert.equal((await createSaveSync({ statePath, runGit: git.run, logger: null }).pull()).status, "pulled");
+});
+
 test("no git command may touch the working tree, HEAD, or the index", async (t) => {
   const { statePath } = tempSave(t, SAVE);
   const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111", tipTree: "old-tree" });
@@ -168,6 +205,7 @@ function tempSave(t, save) {
 function fakeGit({ blob = null, tip = null, tipTree = "old-tree", fetchFails = null, pushFails = null } = {}) {
   const calls = [];
   let currentPushFails = pushFails;
+  let currentTip = tip;
 
   const run = async (args) => {
     calls.push(args);
@@ -185,7 +223,7 @@ function fakeGit({ blob = null, tip = null, tipTree = "old-tree", fetchFails = n
         return ok("tree-sha\n");
       case "rev-parse":
         if (fetchFails) return err("fatal: bad revision");
-        return args[1].endsWith("^{tree}") ? ok(`${tipTree}\n`) : ok(`${tip}\n`);
+        return args[1].endsWith("^{tree}") ? ok(`${tipTree}\n`) : ok(`${currentTip}\n`);
       case "commit-tree":
         return ok("commit-sha\n");
       case "push":
@@ -195,5 +233,10 @@ function fakeGit({ blob = null, tip = null, tipTree = "old-tree", fetchFails = n
     }
   };
 
-  return { run, calls, setPushFails: (value) => { currentPushFails = value; } };
+  return {
+    run,
+    calls,
+    setPushFails: (value) => { currentPushFails = value; },
+    setTip: (value) => { currentTip = value; },
+  };
 }

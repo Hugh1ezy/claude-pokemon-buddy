@@ -43,6 +43,9 @@ export function createSaveSync({
 
   const git = (args, options) => runGit(args, { cwd, ...options });
   const remoteRef = `refs/remotes/${remote}/${branch}`;
+  // Which commit WE published. Lives next to the save so it is per-machine and,
+  // in tests, lands in the same temp dir the save does.
+  const markerPath = `${statePath}.sync`;
   let lastPushAt = null;
 
   return { pull, push, maybePush, describe };
@@ -56,6 +59,18 @@ export function createSaveSync({
   async function pull() {
     const fetched = await fetchRemote();
     if (fetched.status !== "ok") return fetched;
+
+    // If the tip is the commit this machine published, nobody else has had the
+    // device since, so the local save is that commit's continuation and pulling
+    // would roll it back to whenever we last pushed. That window is real -- the
+    // push is debounced by minutes, and every USB unplug/replug drops the
+    // transport to mock and back, which is a re-attach and therefore a pull.
+    // Losing an hour's bond credit to a cable being reseated is not a tradeoff
+    // worth making for a sync that only has to handle "the device moved house".
+    const tip = await git(["rev-parse", remoteRef]);
+    if (tip.code === 0 && trim(tip.stdout) === readMarker()) {
+      return { status: "ours-already" };
+    }
 
     const shown = await git(["show", `${remoteRef}:${BLOB_NAME}`]);
     if (shown.code !== 0) {
@@ -141,7 +156,27 @@ export function createSaveSync({
       const rejected = /stale info|non-fast-forward|rejected/i.test(pushed.stderr);
       return fail(rejected ? "push-rejected" : "push-failed", pushed.stderr);
     }
+    writeMarker(commitSha);
     return { status: "pushed" };
+  }
+
+  function readMarker() {
+    try {
+      return JSON.parse(readFileSync(markerPath, "utf8"))?.pushed ?? null;
+    } catch {
+      // No marker means "we have never published from here", which correctly
+      // makes every remote tip look like someone else's.
+      return null;
+    }
+  }
+
+  function writeMarker(sha) {
+    try {
+      writeFileSync(markerPath, JSON.stringify({ pushed: sha }), "utf8");
+    } catch {
+      // Worst case we pull our own save back on the next re-attach, which is
+      // exactly the old behaviour -- not worth failing a good push over.
+    }
   }
 
   async function fetchRemote() {

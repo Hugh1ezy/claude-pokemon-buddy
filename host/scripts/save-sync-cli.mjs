@@ -50,8 +50,10 @@ if (command === "pull") {
   console.log(`before : ${before}`);
   console.log(`after  : ${describeSave(statePath)}`);
 }
-// "already-current" and "no-remote-save" are both fine outcomes, not failures.
-const ok = ["pulled", "pushed", "already-current", "no-remote-save"].includes(result.status);
+// Everything here is a normal outcome: "ours-already" means the remote tip is
+// our own publish and there is nothing to take, "already-current" means the
+// contents match, "no-remote-save" is a first run. None are failures.
+const ok = ["pulled", "pushed", "already-current", "ours-already", "no-remote-save"].includes(result.status);
 process.exit(ok ? 0 : 1);
 
 function describeSave(path) {
