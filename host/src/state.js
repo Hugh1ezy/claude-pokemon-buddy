@@ -9,13 +9,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
-import { PARAMS } from "./pet/sim.js";
+import { MAX_LEVEL_EXP, PARAMS, expToNextLevel } from "./pet/sim.js";
 
 export const SCHEMA_VERSION = 1;
 const STONES = new Set(["water", "thunder", "fire"]);
 const NUMBER_RANGES = {
   level: { min: 1 },
-  exp: { min: 0, maxExclusive: PARAMS.levelExp },
+  // Static outer bound only -- the real ceiling depends on the pet's level and is
+  // applied by clampExpToLevel() once `level` itself has been normalized.
+  exp: { min: 0, maxExclusive: MAX_LEVEL_EXP },
   bond: { min: 0, max: PARAMS.bondSoftCap },
   streak: { min: 0 },
   shield: { min: 0, max: 2 },
@@ -117,7 +119,17 @@ function normalizePet(state) {
   normalizeNumber(out, "todayCreditedExp");
   normalizeNumber(out, "todayCreditedBond");
   normalizeNumber(out, "careCount");
+  clampExpToLevel(out);
   return out;
+}
+
+// A persisted `exp` must sit strictly inside the current level's own bar, which is
+// only knowable after `level` is normalized -- a save carried over from a wider
+// level (or a hand-edited file) would otherwise render a >100% EXP bar.
+function clampExpToLevel(out) {
+  if (typeof out.exp !== "number") return;
+  const ceiling = expToNextLevel(out.level ?? 1);
+  if (out.exp >= ceiling) out.exp = ceiling - 1;
 }
 
 function normalizeDate(out, key) {

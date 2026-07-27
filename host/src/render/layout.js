@@ -134,7 +134,7 @@ function drawBuddyPanel(g, model) {
 
   // Row 2: exp bar, centered (156-wide bar in a 184-wide panel already
   // centers at panelX+14 -- no separate centering math needed)
-  drawMeter(g, panelX + 14, BUDDY_ROW2_Y, 156, 11, clampPct(buddy.expPct ?? 0), { striped: false });
+  drawExpBar(g, panelX + 14, BUDDY_ROW2_Y, 156, 11, buddy);
 
   drawShadow(g, panelX + panelW / 2, 240); // 240 = original 200 shifted by the same +40 as BUDDY_SPRITE_TOP, staying under the sprite's feet
   drawSprite(g, buddy.spriteGray, {
@@ -211,6 +211,64 @@ export function fitTodayLineFont(g, text) {
     ...TODAY_FONT,
     maxWidth: TODAY_TEXT_MAX_X - TODAY_TEXT_X,
   });
+}
+
+// The EXP bar is drawn as one cell per day the current level costs, not as an
+// anonymous percentage: a level that takes longer visibly has more cells, so the
+// growth curve is legible on the device without printing a single number. A
+// completed day is a solid cell, the day in progress is a partially filled one,
+// and days still owed are hollow (same visual grammar as the battery segments).
+//
+// Two guards keep this honest: with no day info in the model (older callers,
+// tests) it degrades to the plain proportional meter, and so does a level whose
+// cells would be too thin to read -- better a smooth bar than 30 slivers that
+// can't be counted.
+const EXP_CELL_GAP = 1;
+const EXP_CELL_MIN_W = 4; // narrower than this and the cells stop being countable
+
+function drawExpBar(g, x, y, w, h, buddy = {}) {
+  const pct = clampPct(buddy.expPct ?? 0);
+  const cells = Math.floor(Number(buddy.expDaysNeeded));
+  const innerW = w - 4;
+
+  if (!Number.isFinite(cells) || cells < 1 || innerW / cells < EXP_CELL_MIN_W) {
+    drawMeter(g, x, y, w, h, pct, { striped: false });
+    return;
+  }
+
+  g.strokeStyle = INK;
+  g.lineWidth = 2;
+  g.strokeRect(x, y, w, h);
+
+  const innerX = x + 2;
+  const innerY = y + 2;
+  const innerH = h - 4;
+  const daysDone = Number.isFinite(buddy.expDaysDone)
+    ? Math.max(0, Math.min(cells, buddy.expDaysDone))
+    : (cells * pct) / 100;
+
+  // Integer cell edges derived from a running fraction rather than a rounded
+  // per-cell width: the battery indicator learned the hard way that rounding each
+  // segment independently accumulates error and silently eats a divider.
+  const edge = (i) => Math.floor((innerW * i) / cells);
+  g.fillStyle = INK;
+  for (let i = 0; i < cells; i += 1) {
+    const cx = innerX + edge(i);
+    const cw = edge(i + 1) - edge(i) - (i < cells - 1 ? EXP_CELL_GAP : 0);
+    if (cw <= 0) continue;
+    const fill = Math.max(0, Math.min(1, daysDone - i));
+    if (fill >= 1) {
+      g.fillRect(cx, innerY, cw, innerH);
+      continue;
+    }
+    fillRectOutline(g, cx, innerY, cw, innerH);
+    const partial = Math.floor(cw * fill);
+    if (partial > 0) g.fillRect(cx, innerY, partial, innerH);
+  }
+
+  g.fillStyle = INK;
+  g.strokeStyle = INK;
+  g.lineWidth = 2;
 }
 
 function drawMeter(g, x, y, w, h, pct, { striped }) {

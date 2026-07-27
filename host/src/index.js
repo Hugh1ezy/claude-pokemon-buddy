@@ -7,7 +7,7 @@ import { cryFor } from "./pet/cries.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { resolveEvolution } from "./pet/evolution.js";
 import { rollPersonality } from "./pet/personality.js";
-import { applyDailyGrowth, deriveMood, PARAMS } from "./pet/sim.js";
+import { applyDailyGrowth, daysToNextLevel, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
 import { buildUsedDays, settleDays } from "./pet/settlement.js";
 import { applyPetTransitions, drainEvolutionIntents, ensurePet, evolutionContext } from "./pet/transitions.js";
 import { runOnboarding, runTutorial } from "./pet/onboarding.js";
@@ -223,7 +223,12 @@ export async function runOneTick({
       species: pet.species,
       readyToEvolve: pet.readyToEvolve,
       bond: pet.bond,
-      expPct: Number.isFinite(pet.exp) ? Math.round((pet.exp / PARAMS.levelExp) * 100) : 0,
+      expPct: Number.isFinite(pet.exp) ? Math.round((pet.exp / expToNextLevel(pet.level)) * 100) : 0,
+      // Day-denominated view of the same progress: the EXP bar draws one cell per
+      // day this level costs, so the curve is something you read off the screen
+      // instead of a flat percentage that hides how far the goalposts moved.
+      expDaysNeeded: daysToNextLevel(pet.level),
+      expDaysDone: Number.isFinite(pet.exp) ? pet.exp / PARAMS.levelExp : 0,
       bubble: sprite.placeholder ? "BUDDY" : cryFor(pet.species, mood),
     },
   };
