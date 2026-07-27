@@ -105,19 +105,11 @@ had, so walking from a workplace network toward a home network (or vice
 versa) reconnects automatically once you're back in range of *any*
 configured SSID — no manual intervention needed.
 
-While disconnected, the screen simply stops updating and stays on
-whatever it last displayed (this is a reflective/memory LCD — it doesn't go
-blank without power, and there's no risk of losing the save, which lives on
-the host computer, not the device). Button presses and sensor readings
-during a disconnected stretch are not queued or replayed — this matches
-existing USB-unplugged behavior, not something new to WiFi.
-
-**Not implemented**: the device doesn't run any logic of its own while
-disconnected (no local clock, no "reconnecting..." indicator) — the "thin
-display" architecture means it fundamentally can't draw anything it wasn't
-told to draw. Giving it that would be a real firmware feature (it has its
-own RTC chip, so a local clock is plausible), not a quick addition — ask if
-you want this scoped out as separate work.
+While disconnected for more than ~2 minutes, the device stops waiting on a
+frozen frame and switches to a standalone clock screen on its own — see
+`docs/local-clock-mode.md` for how that works and what it does and doesn't
+show. Button presses and sensor readings during a disconnected stretch are
+not queued or replayed either way.
 
 ## Known limitations
 

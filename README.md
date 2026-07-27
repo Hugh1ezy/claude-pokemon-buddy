@@ -17,7 +17,7 @@
 - host：`cd host && npm install && node src/index.js`（无板时自动 mock，输出 `out/frame.png`）
 - macOS 自启：`cd host && node scripts/autostart-macos.mjs status|install|uninstall`（写入用户 LaunchAgent，日志 `out/host.log`）
 - 测试：`cd host && npm test`（已固化 `--test-concurrency=4` 和文件过滤，见 `package.json`）
-- 固件：ESP-IDF 项目在 `firmware/`；发布流程见 [`docs/firmware-release.md`](docs/firmware-release.md)；WiFi 传输配置见 [`docs/wifi.md`](docs/wifi.md)
+- 固件：ESP-IDF 项目在 `firmware/`；发布流程见 [`docs/firmware-release.md`](docs/firmware-release.md)；WiFi 传输配置见 [`docs/wifi.md`](docs/wifi.md)；断连自动/手动切换简易时钟见 [`docs/local-clock-mode.md`](docs/local-clock-mode.md)
 - 设计文档：`docs/specs/`（自 2026-05-30 起的全部设计与增量修订）
 
 ## 声明
