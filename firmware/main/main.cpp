@@ -142,7 +142,11 @@ struct WifiCred { const char *ssid; const char *pass; };
 // than a comment asking people to remember. With no wifi_creds.h present the
 // placeholders below still compile; the device simply never joins a network,
 // which is the right failure for anyone who cloned this without their own copy.
-#if __has_include("wifi_creds.h")
+// CPB_HAVE_WIFI_CREDS is set by main/CMakeLists.txt when that file exists.
+// __has_include was tried first and silently evaluated false under this
+// toolchain, which flashed placeholder credentials while looking like it had
+// worked -- a compile definition leaves no room for that.
+#ifdef CPB_HAVE_WIFI_CREDS
 #include "wifi_creds.h"
 #else
 static const WifiCred WIFI_CREDS[] = {
