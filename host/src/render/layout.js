@@ -64,7 +64,7 @@ function drawLeftPanel(g, model) {
   g.fillText(text.clock, LEFT_W - 12, 28);
   g.textAlign = "left";
   if (typeof model.room?.battery === "number") {
-    drawBatteryIndicator(g, clockLeftX, model.room.battery);
+    drawBatteryIndicator(g, clockLeftX, model.room.battery, model.buddy?.animPhase);
   }
   line(g, 10, 36, LEFT_W - 12, 36);
 
@@ -396,21 +396,28 @@ export function heartCount(rawBond) {
   return Math.max(0, Math.min(HEART_MAX, v));
 }
 
-// Small battery glyph (outline + nub + proportional fill) placed just left
-// of the clock, right-anchored at `rightX` so it never collides with the
-// clock text regardless of how wide the current time string renders.
-function drawBatteryIndicator(g, rightX, pct) {
-  const clamped = Math.max(0, Math.min(100, pct));
-  const label = `${Math.round(clamped)}%`;
-  const iconW = 16;
-  const iconH = 9;
-  const nubW = 2;
-  const gap = 4;
+const BATTERY_SEGMENTS = 4; // one segment = 25%, per design choice (no numeric readout on screen)
+const BATTERY_CRITICAL_PCT = 10;
 
-  g.font = `800 12px ${MONO}`;
-  const labelW = g.measureText(label).width;
-  const iconX = rightX - gap - labelW - gap - iconW - nubW;
-  const iconY = 12;
+// Small battery glyph (outline + nub + up to 4 filled segments) placed just
+// left of the clock, right-anchored at `rightX` so it never collides with
+// the clock text regardless of how wide the current time string renders.
+// No numeric percent is drawn -- only which of the 4 quarters are lit.
+// Below BATTERY_CRITICAL_PCT it blinks: `animPhase` is the buddy animator's
+// free-running counter (increments every ~333ms independent of the main
+// 60s tick, see buddy-animator.js), so this needs no timer of its own --
+// every other ~666ms half-cycle the whole icon is simply not drawn.
+function drawBatteryIndicator(g, rightX, pct, animPhase) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const blinkedOut = clamped < BATTERY_CRITICAL_PCT && Math.floor((animPhase ?? 0) / 2) % 2 === 1;
+  if (blinkedOut) return;
+
+  const iconW = 20;
+  const iconH = 10;
+  const nubW = 2;
+  const segGap = 1;
+  const iconX = rightX - 4 - iconW - nubW;
+  const iconY = 11;
 
   g.save();
   g.lineWidth = 1.5;
@@ -418,13 +425,15 @@ function drawBatteryIndicator(g, rightX, pct) {
   g.strokeRect(iconX, iconY, iconW, iconH);
   g.fillStyle = INK;
   g.fillRect(iconX + iconW, iconY + (iconH - 4) / 2, nubW, 4);
-  const innerW = iconW - 4;
-  const fillW = Math.round((clamped / 100) * innerW);
-  if (fillW > 0) g.fillRect(iconX + 2, iconY + 2, fillW, iconH - 4);
-  g.restore();
 
-  g.font = `800 12px ${MONO}`;
-  g.fillText(label, iconX + iconW + nubW + gap, iconY + iconH);
+  const litSegments = Math.round((clamped / 100) * BATTERY_SEGMENTS);
+  const innerH = iconH - 4;
+  const innerW = iconW - 4;
+  const segW = (innerW - segGap * (BATTERY_SEGMENTS - 1)) / BATTERY_SEGMENTS;
+  for (let i = 0; i < litSegments; i++) {
+    g.fillRect(iconX + 2 + i * (segW + segGap), iconY + 2, segW, innerH);
+  }
+  g.restore();
 }
 
 function tempHum(v) {
