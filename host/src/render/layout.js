@@ -20,7 +20,7 @@ const MOOD_ZH = { shocked: "震惊", fainted: "力竭", strained: "吃力", focu
 export const BUDDY_SPRITE_SLOT = 156;
 export const BUDDY_SPRITE_SCALE = 3;
 export const BUDDY_BOB = [0, -1, -2, -1]; // 呼吸浮动（周期 4，幅度 ≤2px）
-const BUDDY_SPRITE_TOP = 46;
+const BUDDY_SPRITE_TOP = 86; // shifted down from its original 46 to leave room for row 3 (mood + bubble) above it
 const BOLD_LINE_SPECIES = new Set();
 export function buddyBold(species) {
   return BOLD_LINE_SPECIES.has(species ?? "eevee");
@@ -106,6 +106,16 @@ function drawLeftPanel(g, model) {
   g.fillText(`室外  ${tempHum(model.out)}`, 11, 295);
 }
 
+// Row y-coordinates for the right (buddy) panel, top to bottom:
+// 1. level + streak (centered)  2. exp bar (centered)  3. mood indicator
+// (left) + status bubble (right), mirrored to opposite edges  [sprite,
+// shifted down to sit below row 3]  4. buddy name + species line
+// 5. 亲密度 hearts (unchanged position)
+const BUDDY_ROW1_Y = 26;   // level/streak baseline
+const BUDDY_ROW2_Y = 34;   // exp bar top
+const BUDDY_ROW3_Y = 52;   // mood square top / bubble top -- the gap between the exp bar and the sprite
+const BUDDY_ROW4_Y = 274;  // name+species line baseline -- close to the 亲密度 row (284/296), no dead gap
+
 function drawBuddyPanel(g, model) {
   const panelX = LEFT_W;
   const panelW = W - LEFT_W;
@@ -115,8 +125,18 @@ function drawBuddyPanel(g, model) {
   const bob = BUDDY_BOB[phase % BUDDY_BOB.length];
   const hop = Number.isInteger(buddy.hop) ? buddy.hop : 0;
 
-  drawBubble(g, W - 8, 11, buddy.bubble ?? EEVEE_IDLE_CRY);
-  drawShadow(g, panelX + panelW / 2, 200);
+  const level = Math.max(1, Number(buddy.level ?? 1));
+  const hearts = heartCount(buddy.bond ?? 0);
+  const streak = Math.max(0, Number(model.streak ?? 0));
+
+  // Row 1: level + streak, centered as one block (24px = Zpix 整数倍，清晰)
+  drawLevelStreakRow(g, panelX, panelW, level, streak, BUDDY_ROW1_Y);
+
+  // Row 2: exp bar, centered (156-wide bar in a 184-wide panel already
+  // centers at panelX+14 -- no separate centering math needed)
+  drawMeter(g, panelX + 14, BUDDY_ROW2_Y, 156, 11, clampPct(buddy.expPct ?? 0), { striped: false });
+
+  drawShadow(g, panelX + panelW / 2, 240); // 240 = original 200 shifted by the same +40 as BUDDY_SPRITE_TOP, staying under the sprite's feet
   drawSprite(g, buddy.spriteGray, {
     x: panelX + Math.floor((panelW - BUDDY_SPRITE_SLOT) / 2),
     y: BUDDY_SPRITE_TOP + bob - hop,
@@ -133,45 +153,55 @@ function drawBuddyPanel(g, model) {
       h: BUDDY_SPRITE_SLOT,
     }, phase);
   }
-  drawSpeciesLine(g, panelX, panelW, buddy);
 
+  // Row 3: mood indicator (left edge) and status bubble (right edge),
+  // mirrored to opposite sides of the panel in the gap between the exp bar
+  // and the sprite.
+  drawBubble(g, W - 8, BUDDY_ROW3_Y, buddy.bubble ?? EEVEE_IDLE_CRY, { size: "small" });
   g.fillStyle = INK;
   g.font = `800 12px ${MONO}`;
-  g.fillRect(panelX + 14, 219, 7, 7);
-  g.fillText(MOOD_ZH[buddy.mood] ?? buddy.mood ?? "专注", panelX + 27, 227);
+  g.fillRect(panelX + 14, BUDDY_ROW3_Y + 11, 7, 7); // +11 vertically centers the 7px square against the bubble's 28px height
+  g.fillText(MOOD_ZH[buddy.mood] ?? buddy.mood ?? "专注", panelX + 25, BUDDY_ROW3_Y + 19);
 
-  const level = Math.max(1, Number(buddy.level ?? 1));
-  const hearts = heartCount(buddy.bond ?? 0);
-  const streak = Math.max(0, Number(model.streak ?? 0));
+  // Row 4: buddy name + species
+  drawSpeciesLine(g, panelX, panelW, buddy);
 
-  // 等级 + 连续天数（24px = Zpix 整数倍，清晰）
-  g.font = `800 24px ${MONO}`;
-  g.fillText(`Lv.${level}`, panelX + 14, 253);
-  drawFlame(g, panelX + 104, 237);
-  g.fillText(`${streak}天`, panelX + 122, 253);
-
-  // 经验条
-  drawMeter(g, panelX + 14, 262, 156, 11, clampPct(buddy.expPct ?? 0), { striped: false });
-
-  // 亲密度
+  // Row 5: 亲密度 -- unchanged
   g.font = `700 12px ${CJK}`;
   g.fillText("亲密度", panelX + 14, 296);
   drawHearts(g, panelX + 58, 284, hearts);
+}
+
+function drawLevelStreakRow(g, panelX, panelW, level, streak, y) {
+  g.font = `800 24px ${MONO}`;
+  const levelText = `Lv.${level}`;
+  const streakText = `${streak}天`;
+  const levelW = g.measureText(levelText).width;
+  const streakW = g.measureText(streakText).width;
+  const flameW = 14; // drawFlame's bezier extent, x-1 to x+13
+  const gap1 = 10;   // level text -> flame
+  const gap2 = 6;    // flame -> streak text
+  const total = levelW + gap1 + flameW + gap2 + streakW;
+  const startX = Math.round(panelX + (panelW - total) / 2);
+  g.fillStyle = INK;
+  g.fillText(levelText, startX, y);
+  drawFlame(g, startX + levelW + gap1, y - 16);
+  g.fillText(streakText, startX + levelW + gap1 + flameW + gap2, y);
 }
 
 function drawSpeciesLine(g, panelX, panelW, buddy) {
   const cx = panelX + panelW / 2;
   g.font = `800 12px ${CJK}`;
   g.textAlign = "left"; // Zpix 12px 过 1-bit 需整数左边缘, 自算 center 再 round (避免半像素碎裂)
-  const centered = (t) => g.fillText(t, Math.round(cx - g.measureText(t).width / 2), 212);
+  const centered = (t) => g.fillText(t, Math.round(cx - g.measureText(t).width / 2), BUDDY_ROW4_Y);
   if (buddy.readyToEvolve) {
     g.fillStyle = INK;
-    g.fillRect(panelX + 18, 198, panelW - 36, 18);
+    g.fillRect(panelX + 18, BUDDY_ROW4_Y - 14, panelW - 36, 18);
     g.fillStyle = PAPER;
     centered("▲ 按 KEY 进化！");
   } else {
     g.fillStyle = INK;
-    centered(zhName(buddy.species ?? "eevee"));
+    centered(`${buddy.name ?? "阿布"}的${zhName(buddy.species ?? "eevee")}`);
   }
   g.fillStyle = INK;
 }
@@ -204,18 +234,32 @@ function drawMeter(g, x, y, w, h, pct, { striped }) {
   g.lineWidth = 2;
 }
 
-function drawBubble(g, rightX, y, text) {
-  g.font = `700 24px ${MONO}`;
-  const w = Math.ceil(g.measureText(text).width) + 22;
+// size "normal" is the original full-size bubble (unused now but kept for
+// callers that want it); "small" is a reduced size -- bigger than a first
+// attempt at "shrunk" turned out to be (illegibly tiny), smaller than
+// "normal" (owner-tuned: a bit smaller than original, clearly legible).
+const BUBBLE_SIZES = {
+  normal: { fontPx: 24, height: 36, padX: 11, radius: 9, lineWidth: 2 },
+  small: { fontPx: 18, height: 28, padX: 9, radius: 7, lineWidth: 1 },
+};
+
+// Returns the bubble's left edge x -- callers position adjacent elements
+// (e.g. the mood indicator) relative to it without duplicating this math.
+function drawBubble(g, rightX, y, text, { size = "normal" } = {}) {
+  const { fontPx, height, padX, radius, lineWidth } = BUBBLE_SIZES[size];
+  g.font = `700 ${fontPx}px ${MONO}`;
+  const w = Math.ceil(g.measureText(text).width) + padX * 2;
   const x = rightX - w;
   g.fillStyle = PAPER;
   g.strokeStyle = INK;
-  g.lineWidth = 2;
-  roundedRect(g, x, y, w, 36, 9);
+  g.lineWidth = lineWidth;
+  roundedRect(g, x, y, w, height, radius);
   g.fill();
   g.stroke();
   g.fillStyle = INK;
-  g.fillText(text, x + 11, y + 27);
+  g.fillText(text, x + padX, y + Math.round(height * 0.75));
+  g.lineWidth = 2; // restore the panel-wide default other drawing relies on
+  return x;
 }
 
 function drawShadow(g, cx, y) {

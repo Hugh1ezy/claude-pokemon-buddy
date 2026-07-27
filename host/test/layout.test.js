@@ -182,7 +182,10 @@ test("buddy ground shadow survives the 1-bit threshold", async () => {
     spriteH: 40,
   }));
 
-  assert.ok(countOnPixels(bitmap, 250, 194, 100, 12) > 0, "shadow region must contain ink pixels");
+  // Shadow moved from center-y 200 to 240 when the sprite shifted down to
+  // make room for row 3 (mood + status bubble) above it -- see layout.js's
+  // BUDDY_SPRITE_TOP comment.
+  assert.ok(countOnPixels(bitmap, 250, 234, 100, 12) > 0, "shadow region must contain ink pixels");
 });
 
 function baseModel(extra) {

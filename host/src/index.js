@@ -162,6 +162,7 @@ export async function runOneTick({
   onRenderModel,
   pendingButtons,
   evolutionIntents,
+  buddyName = "阿布",
 } = {}) {
   if (!usage) throw new Error("usage is required");
   if (!weather) throw new Error("weather is required");
@@ -213,6 +214,7 @@ export async function runOneTick({
       h: weather.humidity ?? 64,
     },
     buddy: {
+      name: buddyName,
       spriteGray: sprite.gray,
       spriteW: sprite.w,
       spriteH: sprite.h,
@@ -387,6 +389,7 @@ export async function main({
               onRenderModel: (model) => { currentModel = model; },
               pendingButtons,
               evolutionIntents,
+              buddyName: config.name,
             });
           } catch (error) {
             buttonDispatcher.requeueForRetry(pendingButtons);
