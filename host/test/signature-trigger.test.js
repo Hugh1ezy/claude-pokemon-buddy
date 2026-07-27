@@ -8,6 +8,7 @@ import {
   createActionQueue,
   createButtonDispatcher,
 } from "../src/index.js";
+import { applyBondTick, heartsFromHalves } from "../src/pet/bond.js";
 
 test("KEY short on a non-evolving pet triggers signature", () => {
   assert.equal(shouldPlaySignature({ key: "KEY", kind: "short" }, { readyToEvolve: false }), true);
@@ -49,7 +50,7 @@ test("action queue serializes: 2nd action starts only after 1st resolves", async
   assert.deepEqual(log, ["a-start", "a-end", "b-start"]);
 });
 
-test("dispatcher routes non-ready KEY-short to signature animation only", async () => {
+test("a greeting press ALSO reaches the tick -- it is the working-day bond credit", async () => {
   const transport = createButtonTransport();
   const model = { buddy: { species: "eevee" } };
   const signatures = [];
@@ -80,7 +81,10 @@ test("dispatcher routes non-ready KEY-short to signature animation only", async 
 
   assert.deepEqual(signatures, [model]);
   assert.deepEqual(lifecycle, ["pause", "resume"]);
-  assert.deepEqual(dispatcher.drainTickEvents(), []);
+  // Swallowing the event here (which this test used to assert) meant
+  // applyBondTick never saw `clicked`, so the hourly half heart could not be
+  // earned on a working day however many times the button was pressed.
+  assert.deepEqual(dispatcher.drainTickEvents(), [{ key: "KEY", kind: "short" }]);
   dispatcher.stop();
   assert.equal(transport.listenerCount(), 0);
 });
@@ -114,9 +118,38 @@ test("dispatcher drops rapid signature presses while one is in flight", async ()
   await Promise.resolve();
 
   assert.equal(signatures.length, 1);
-  assert.deepEqual(dispatcher.drainTickEvents(), []);
+  // Only the ANIMATION is deduped. Every press still reaches the tick: an
+  // animation that happens to be mid-flight must not cost the owner their
+  // bond credit for the hour.
+  assert.equal(dispatcher.drainTickEvents().length, 3);
   release();
   await Promise.all(runs);
+  dispatcher.stop();
+});
+
+test("pressing KEY during an open working-day slot earns the half heart", () => {
+  const transport = createButtonTransport();
+  const dispatcher = createButtonDispatcher({
+    transport,
+    getPet: () => ({ readyToEvolve: false }),   // i.e. the signature path
+    getModel: () => ({ buddy: { species: "bulbasaur" } }),
+    actions: { run: (fn) => Promise.resolve(fn()) },
+    playSignature: async () => {},
+  });
+
+  transport.emitButton({ key: "KEY", kind: "short" });
+  const pendingButtons = dispatcher.drainTickEvents();
+
+  // Exactly what runOneTick derives `clicked` from.
+  const clicked = pendingButtons.some((event) => event?.key === "KEY" && event?.kind === "short");
+  assert.equal(clicked, true);
+
+  const tuesday10am = new Date(2026, 6, 28, 10, 8);
+  const before = { level: 9, exp: 3, bond: 8, bondDay: "2026-07-28", bondHalves: 0, bondSlots: 0 };
+  const after = applyBondTick(before, { now: tuesday10am, today: "2026-07-28", clicked });
+
+  assert.equal(after.bondHalves, 1);
+  assert.equal(heartsFromHalves(after.bondHalves), 0.5);
   dispatcher.stop();
 });
 

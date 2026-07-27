@@ -120,21 +120,25 @@ export function createButtonDispatcher({
   const tickQueue = [];
   let signatureInFlight = false;
   const off = transport?.onButton?.((event) => {
-    if (shouldPlaySignature(event, getPet())) {
-      if (signatureInFlight) return;
-      const pressModel = getModel();
-      if (pressModel) {
-        signatureInFlight = true;
-        actions.run(async () => {
-          animator.pause();
-          try { await playSignature({ transport, model: pressModel }); }
-          finally { animator.resume(); }
-        }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
-      }
-      return;
-    }
-
+    // Queue first, unconditionally. A short KEY press is BOTH the "greet"
+    // gesture and the working-day bond credit (pet/bond.js reads it as
+    // `clicked`), and the signature branch used to return before queueing --
+    // so on a weekday the hourly half heart could never be earned no matter how
+    // many times the button was pressed. The tick's own short-press handling is
+    // gated on readyToEvolve being TRUE, which is exactly when the signature
+    // does not play, so the two can never both act on the same press.
     if (shouldQueueButtonForTick(event)) tickQueue.push(event);
+
+    if (!shouldPlaySignature(event, getPet())) return;
+    if (signatureInFlight) return;
+    const pressModel = getModel();
+    if (!pressModel) return;
+    signatureInFlight = true;
+    actions.run(async () => {
+      animator.pause();
+      try { await playSignature({ transport, model: pressModel }); }
+      finally { animator.resume(); }
+    }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
   });
 
   return {
