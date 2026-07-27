@@ -3,7 +3,7 @@
 一台桌面小设备：**左半屏是你的 Claude 用量仪表盘，右半屏是一只用你的 Claude 用量"养"大的宝可梦**——会表演、会进化、几天不理会蔫（但永远救得回来）。单色 1-bit 反射屏，原生 GB 质感。
 
 - 硬件：Waveshare **ESP32-S3-RLCD-4.2**（4.2" 反射屏 400×300、喇叭、温湿度、RTC、KEY/BOOT 两键、18650 电池、USB-C）
-- 架构：**固件只是"笨显示器"**（收帧/回按键/放音），全部逻辑与存档在电脑侧 Node host（Windows/Mac）
+- 架构：**固件只是"笨显示器"**（收帧/回按键/放音），全部逻辑与存档在电脑侧 Node host（Windows/Mac）。传输默认走 USB 数据线；也可选启用 **WiFi**（设备连本地网、mDNS 广播、host 自动发现），USB 优先、找不到才试 WiFi，两者共用同一套协议，见 [`docs/wifi.md`](docs/wifi.md)
 - 数据源：Claude Code 官方 statusline `rate_limits`（5h/周额度）+ ccusage（费用/token）
 
 ## 我收到了这台设备，怎么装？
@@ -16,8 +16,8 @@
 
 - host：`cd host && npm install && node src/index.js`（无板时自动 mock，输出 `out/frame.png`）
 - macOS 自启：`cd host && node scripts/autostart-macos.mjs status|install|uninstall`（写入用户 LaunchAgent，日志 `out/host.log`）
-- 测试：`cd host && node --test --test-concurrency=4`
-- 固件：ESP-IDF 项目在 `firmware/`；发布流程见 [`docs/firmware-release.md`](docs/firmware-release.md)
+- 测试：`cd host && npm test`（已固化 `--test-concurrency=4` 和文件过滤，见 `package.json`）
+- 固件：ESP-IDF 项目在 `firmware/`；发布流程见 [`docs/firmware-release.md`](docs/firmware-release.md)；WiFi 传输配置见 [`docs/wifi.md`](docs/wifi.md)
 - 设计文档：`docs/specs/`（自 2026-05-30 起的全部设计与增量修订）
 
 ## 声明

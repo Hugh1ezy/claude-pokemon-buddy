@@ -173,6 +173,10 @@ Get-Content $HOME\.claude\cpb-usage.json
 
 对主人说安装完成，然后：**用大木博士的口吻，把仓库里的 `PLAYER-GUIDE.md` 讲给主人听**（按手册第一行的指示讲）。设备屏幕此刻应该正在等主人选蛋——让他跟着屏幕指引，开始孵化。
 
+## 9. WiFi（可选，纯电池运行）
+
+USB 数据线始终是默认、优先的连接方式，这一节完全可跳过。如果主人想让设备脱离数据线、只用 18650 电池供电，见 [`docs/wifi.md`](docs/wifi.md)——需要额外装 ESP-IDF 工具链、改固件源码里的 WiFi 账号密码、重新编译烧录。这是进阶操作，不属于基础装机流程。
+
 ## 排障速查（装完以后出问题看这里）
 
 | 症状 | 处理 |
@@ -180,3 +184,4 @@ Get-Content $HOME\.claude\cpb-usage.json
 | 屏幕不动/黑屏 | 拔插 USB（host 会 ~2s 自动重连）；不行则重启电脑（自启会拉起） |
 | 用量一直 `--` | 在 Claude Code 发一条消息触发 statusline；检查 `settings.json` 的 statusLine 配置还在 |
 | 换了电脑/重装系统 | 重新把顶部那条指令发给 Claude 即可（存档在 `host\out\state.json`，记得先备份拷走） |
+| 装了 WiFi 但连不上/host 找不到设备 | 见 [`docs/wifi.md`](docs/wifi.md) 排障表 |
