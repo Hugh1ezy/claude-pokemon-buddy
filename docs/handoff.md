@@ -93,9 +93,23 @@ Measured, so nobody re-debugs this as "the switch back is broken":
 | | |
 |---|---|
 | USB unplug → running on wifi | **1.4 s**, device never leaving the network (was 15-18 s) |
+| host start → device leaves the clock face | **2.8 s** (was 6.9 s) |
 | push rate while the host is up | every **333 ms** (the buddy animator, not the 60 s tick) |
 | device leaves local-clock mode | on the **first frame** — no timer, no button needed |
 | device enters local-clock mode | after **120 s** with no frame on either link |
+
+Those are two different questions and conflating them wasted an afternoon. The
+first is "the host lost its transport and has to find another"; the second is
+"the panel is showing the clock and the host is starting from cold". Only the
+second one is what someone means by "how long until it switches back", and it
+had nothing to do with the network — over USB, with no discovery involved at
+all, it was the same 6.9 s. The fix was to repaint from disk before the first
+tick goes near ccusage or weather (`paintFromDisk` in `host/src/index.js`), and
+what is left is essentially node's own startup.
+
+> **Do not use ping to decide whether the device is on the network.** ICMP to it
+> is dropped often enough to look like a dead device while mDNS resolves it and
+> TCP connects fine. Probe with the mDNS browse or a connection to tcp/7311.
 
 So "it won't switch back to the networked screen" is almost never the device
 being broken. It means no frames are arriving. Three separate causes turned up

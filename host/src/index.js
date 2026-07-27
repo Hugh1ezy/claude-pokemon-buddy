@@ -229,15 +229,28 @@ export async function runOneTick({
     await playEvolutionAnimation({ transport: activeTransport, ...evolutionAnimation, delay: evolutionDelay });
   }
 
-  const mood = deriveMood(usage);
   const cryId = cryAudioId(pet.species);
   if (cryId != null) activeTransport.setActiveCry?.(cryId);
+  const model = await buildRenderModel({ pet, usage, weather, room: sensor, now, buddyName });
+  onRenderModel?.(model);
+  const { pngBuffer, bitmap } = await renderFrame(model);
+
+  saveState(statePath, pet);
+  await activeTransport.push({ pngBuffer, bitmap });
+
+  return pet;
+}
+
+// Shared by the tick and by the cold-start first paint (paintFromDisk), so the
+// two can never drift into rendering the same buddy differently.
+export async function buildRenderModel({ pet, usage, weather, room, now, buddyName }) {
+  const mood = deriveMood(usage);
   const sprite = await loadBuddySprite(pet.species);
-  const model = {
+  return {
     ...usage,
     now,
     weather,
-    room: sensor,
+    room,
     streak: pet.streak ?? 0,
     out: {
       t: weather.temp ?? 0,
@@ -260,13 +273,6 @@ export async function runOneTick({
       bubble: sprite.placeholder ? "BUDDY" : cryFor(pet.species, mood),
     },
   };
-  onRenderModel?.(model);
-  const { pngBuffer, bitmap } = await renderFrame(model);
-
-  saveState(statePath, pet);
-  await activeTransport.push({ pngBuffer, bitmap });
-
-  return pet;
 }
 
 export async function main({
@@ -284,6 +290,10 @@ export async function main({
   pollUsage = pollUsageOnce,
   logger = console,
   nowProvider = () => new Date(),
+  // Repaint the panel from disk before the first tick fetches anything. Off is
+  // for callers that drive control flow off push counts -- the paint is a push
+  // that is not a tick, which breaks that assumption.
+  firstPaint = true,
 } = {}) {
   let config = loadConfig(configPath);
   const saveSync = makeSaveSync(config.saveSync, { statePath, logger });
@@ -378,6 +388,47 @@ export async function main({
 
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
+
+    // Get *something* on the panel before the first tick goes near a subprocess
+    // or the network. Measured on a cold start: 3.1s of process and module
+    // startup, then 2.7s spawning ccusage twice and polling the usage endpoint,
+    // then weather, and only then the first frame -- so the device sat on its
+    // local-clock fallback for ~7s with the host already attached and healthy,
+    // and the same 7s over USB, which is what proved it was never a network
+    // problem. Everything needed to redraw the last picture is already on disk
+    // (the save, and the usage file the poller writes), so put that up now and
+    // let the first real tick correct it seconds later.
+    //
+    // After the signal handlers on purpose: this pushes, and pushing before
+    // there is a way to stop cleanly is asking for a wedged shutdown.
+    //
+    // Deliberately no settlement, no growth, no save -- a repaint, not a tick.
+    // It must not be able to advance the buddy's day.
+    if (firstPaint) await paintFromDisk();
+
+    async function paintFromDisk() {
+      try {
+        const now = nowProvider();
+        const pet = ensurePet(loadState(statePath), localYmd(now));
+        // usageForDisplay with nothing to show returns the all-null degraded
+        // shape, which renders as "--" -- the honest thing to put up until
+        // ccusage answers. The official percentages come off disk and are
+        // usually still fresh, so the two bars are typically right immediately.
+        const usage = mergeUsage(usageForDisplay(null, null).usage, loadRateLimits());
+        const model = await buildRenderModel({
+          pet, usage, weather: DEFAULT_WEATHER, room: hostTransport.feedSensor?.() ?? null,
+          now, buddyName: config.name,
+        });
+        currentModel = model;
+        const { pngBuffer, bitmap } = await renderFrame(model);
+        await hostTransport.push({ pngBuffer, bitmap });
+        logger?.log?.("first paint from disk");
+      } catch (error) {
+        // A failed first paint costs nothing but the old wait -- the tick loop
+        // is right behind it and renders the real thing regardless.
+        logger?.warn?.(`first paint skipped: ${errorReason(error)}`);
+      }
+    }
 
     let lastHour = initialNow.getHours();
     async function tick() {

@@ -99,6 +99,10 @@ test("main resolves when SIGINT stops the loop during its sleep (RH2)", async ()
     statePath,
     framePath,
     configPath,
+    // This test counts pushes as ticks to decide when to stop. The cold-start
+    // repaint is a push that is not a tick, so it has to be off here or the
+    // stop fires against the wrong frame.
+    firstPaint: false,
     transport: createBitmapMockTransport({
       onPush: () => {
         pushed += 1;
@@ -149,6 +153,7 @@ test("main logs pollUsage failures once per reason transition", async () => {
     statePath,
     framePath,
     configPath,
+    firstPaint: false,   // pushes are counted as ticks here
     transport: createBitmapMockTransport({
       onPush: () => {
         if (pollCalls >= pollResults.length) process.emit("SIGINT");
@@ -202,6 +207,7 @@ test("main logs loadUsageSnapshot failures once per reason transition", async ()
     statePath,
     framePath,
     configPath,
+    firstPaint: false,   // pushes are counted as ticks here
     transport: createBitmapMockTransport({
       onPush: () => {
         if (usageTicks >= usageResults.length) process.emit("SIGINT");
@@ -403,6 +409,7 @@ test("quiet boundary sends VOLUME 0 on entry and restores configured volume on e
       new Date(2026, 0, 1, 22, 0),
       new Date(2026, 0, 2, 7, 1),
     ]),
+    firstPaint: false,   // pushes are counted as ticks here
     transport: createBitmapMockTransport({
       onSendVolume: (volume) => volumes.push(volume),
       onPush: () => {
