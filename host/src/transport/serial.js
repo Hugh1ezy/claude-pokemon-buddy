@@ -160,6 +160,17 @@ export function makeTransport({
     if (frame.type === T.SENSOR) {
       latestSensor = parseSensor(frame.payload);
       if (latestSensor) events.emit("sensor", latestSensor);
+      return;
+    }
+
+    if (frame.type === T.RESYNC) {
+      // Device drew something on its own (e.g. local-clock mode) outside the
+      // host's diff tracking. Reuse the same "reconnect" signal a fresh port
+      // attach emits so transport/index.js resets previousBytes and forces a
+      // full-frame repaint instead of a stale diff that would leave the
+      // device's leftover pixels uncorrected wherever the new frame happens
+      // to match the host's last-known bitmap.
+      events.emit("reconnect");
     }
   }
 

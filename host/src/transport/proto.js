@@ -15,6 +15,7 @@ export const T = {
   ACK: 0x84,
   NACK: 0x85,
   AUTH: 0x86,
+  RESYNC: 0x87,
 };
 
 // Sound ids carried in a PLAY frame's payload[0]. Must match the firmware's

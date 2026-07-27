@@ -105,6 +105,7 @@ static constexpr uint8_t T_SENSOR = 0x83;
 static constexpr uint8_t T_ACK    = 0x84;
 static constexpr uint8_t T_NACK   = 0x85;
 static constexpr uint8_t T_AUTH   = 0x86;   // host -> device (wifi only): pre-shared pairing token
+static constexpr uint8_t T_RESYNC = 0x87;   // device -> host: screen was drawn outside diff tracking, force full redraw
 
 static constexpr size_t RX_MAX   = 48 * 1024;     // > largest valid frame (~30KB)
 static constexpr size_t RECT_MAX = (W * H) / 8;   // 15000B = full-screen 1bpp
@@ -163,6 +164,19 @@ static uint8_t *wifi_rxbuf = nullptr;             // WiFi frame accumulation (PS
 static size_t   wifi_rxlen = 0;
 static bool     wifi_have_last_acked_frame_seq = false;
 static uint8_t  wifi_last_acked_frame_seq = 0;
+
+// ---- Device mode (Phase C: manual toggle; Phase D adds the auto-timeout
+// path) -- NORMAL processes T_FRAME as always; LOCAL_CLOCK shows the
+// standalone clock screen instead and NACKs T_FRAME immediately rather than
+// silently dropping it, so the host's retry logic fails fast instead of
+// waiting out the full ACK timeout on every attempt. Declared up here
+// (ahead of its own section further down) because parse_frames reads it.
+enum class DeviceMode : uint8_t { NORMAL, LOCAL_CLOCK };
+static std::atomic<DeviceMode> g_mode{DeviceMode::NORMAL};
+// Only entry via KEY double-click sets this + stops the radio; the Phase D
+// auto-timeout path leaves WiFi alone so it keeps retrying in the
+// background. Exit restarts the radio only if this flag says WE stopped it.
+static std::atomic<bool> g_wifi_user_stopped{false};
 
 static SemaphoreHandle_t tx_mutex = nullptr;      // serializes USJ writes
 static QueueHandle_t     btn_queue = nullptr;     // button events -> button_task
@@ -368,7 +382,9 @@ static void parse_frames(uint8_t *buf, size_t &len_in_buf, Link link)
             } else if (!authed) {
                 // Unauthenticated WiFi client sent something other than AUTH -> ignore it.
             } else if (f[1] == T_FRAME) {
-                if (have_seq && f[2] == last_seq) {
+                if (g_mode.load() != DeviceMode::NORMAL) {
+                    send_nack(f[2], link);           // local-clock mode: fail fast rather than the full ACK timeout
+                } else if (have_seq && f[2] == last_seq) {
                     send_ack(f[2], link);            // duplicate retry: ACK, do not re-blit
                 } else if (handle_frame_payload(f + 5, len)) {
                     last_seq = f[2];
@@ -489,14 +505,64 @@ static void sensor_task(void *arg)
     }
 }
 
+// user_initiated=true (KEY double-click) additionally stops the WiFi radio
+// for real power savings and remembers to restart it on exit; the Phase D
+// auto-timeout path (user_initiated=false) leaves WiFi alone so the
+// existing credential-cycling reconnect keeps running in the background.
+static void enter_local_clock_mode(bool user_initiated)
+{
+    if (g_mode.load() == DeviceMode::LOCAL_CLOCK) return;
+    g_mode.store(DeviceMode::LOCAL_CLOCK);
+    if (user_initiated) {
+        g_wifi_user_stopped.store(true);
+        esp_wifi_stop();
+        ESP_LOGI(TAG, "local-clock: entered (manual, wifi stopped)");
+    } else {
+        ESP_LOGI(TAG, "local-clock: entered (auto, wifi still retrying)");
+    }
+}
+
+static void exit_local_clock_mode(void)
+{
+    if (g_mode.load() == DeviceMode::NORMAL) return;
+    g_mode.store(DeviceMode::NORMAL);
+    if (g_wifi_user_stopped.load()) {
+        g_wifi_user_stopped.store(false);
+        esp_wifi_start();   // re-triggers WIFI_EVENT_STA_START -> the normal connect flow
+    }
+    // local_clock_task drew directly to the panel while we were away, which the
+    // host's diff tracking never saw. Tell it to treat this like a fresh
+    // connection (previousBytes reset + full-frame repaint) instead of pushing
+    // a normal dirty-rect diff, which would leave clock-screen leftovers in any
+    // region that happens to match the host's last-known pet frame.
+    broadcast_frame(T_RESYNC, 0, nullptr, 0);
+    ESP_LOGI(TAG, "local-clock: exited -> normal");
+}
+
 static void button_task(void *arg)
 {
     uint16_t ev;                                   // (key_id << 8) | kind_id
     for (;;) {
         if (xQueueReceive(btn_queue, &ev, portMAX_DELAY) == pdTRUE) {
-            uint8_t p[2] = { (uint8_t)(ev >> 8), (uint8_t)(ev & 0xff) };
+            uint8_t key_id = (uint8_t)(ev >> 8);
+            uint8_t kind_id = (uint8_t)(ev & 0xff);
+            uint8_t p[2] = { key_id, kind_id };
             broadcast_frame(T_BUTTON, 0, p, sizeof(p));
             ESP_LOGI(TAG, "button key=%u kind=%u", p[0], p[1]);
+
+            // KEY double-click toggles local-clock mode; while in that mode,
+            // ANY KEY press (short or double) wakes it back up -- short is
+            // deliberately excluded as an entry trigger since it already
+            // means "greet" in normal mode and reusing it here risks an
+            // accidental power-save entry from a routine pet interaction.
+            if (key_id == KEY_ID_KEY) {
+                if (g_mode.load() == DeviceMode::NORMAL && kind_id == KIND_DOUBLE) {
+                    enter_local_clock_mode(true);
+                } else if (g_mode.load() == DeviceMode::LOCAL_CLOCK &&
+                           (kind_id == KIND_SHORT || kind_id == KIND_DOUBLE)) {
+                    exit_local_clock_mode();
+                }
+            }
         }
     }
 }
@@ -932,23 +998,21 @@ static void draw_clock_screen(uint8_t hour, uint8_t minute, bool time_known, uin
     RlcdPort.RLCD_Display();
 }
 
-// TEMPORARY Phase-B test scaffold: redraws the local-clock screen every 2s,
-// running concurrently with normal operation so a real host connection can
-// be used to verify T_TIME actually lands and the clock free-runs correctly
-// between syncs. Always draws (never skips), so "--:--" vs a stuck boot
-// screen tells apart "task is running but hasn't synced yet" from "task
-// isn't running at all" -- the two very different failure modes that look
-// identical if this just silently skips drawing when time is unknown.
-// This intentionally fights with normal T_FRAME rendering for screen
-// writes (whichever wrote last wins) -- expected for this phase's manual
-// verification; Phase C's real DeviceMode gating replaces this task
-// entirely so the two never race for real.
-static void clock_test_task(void *)
+// Only draws while g_mode is LOCAL_CLOCK -- this is what makes it safe to
+// run continuously alongside normal T_FRAME handling without the two
+// fighting over the physical screen (the Phase B version of this task drew
+// unconditionally and corrupted the host's diff-tracking; see that commit).
+// 2s redraw cadence is enough for a clock (doesn't need to feel real-time)
+// without redrawing so often it matters for the power savings this mode
+// exists for.
+static void local_clock_task(void *)
 {
     for (;;) {
-        uint8_t hour = 0, minute = 0;
-        bool known = compute_current_clock(hour, minute);
-        draw_clock_screen(hour, minute, known, read_battery_percent());
+        if (g_mode.load() == DeviceMode::LOCAL_CLOCK) {
+            uint8_t hour = 0, minute = 0;
+            bool known = compute_current_clock(hour, minute);
+            draw_clock_screen(hour, minute, known, read_battery_percent());
+        }
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
@@ -1013,12 +1077,8 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "B5: codec up; 3 system + 18 species sounds (KEY=active cry, PLAY=evolve/hour)");
     xTaskCreate(hello_task, "hello", 2048, nullptr, 3, nullptr);
 
-    // clock_test_task (Phase B scaffold) is intentionally NOT started here
-    // anymore -- confirmed working (font, T_TIME sync, free-running clock),
-    // but running it concurrently with normal T_FRAME rendering corrupts the
-    // host's diff-tracking (the host doesn't know the physical screen was
-    // written out-of-band, so its next diffed push can leave stale clock
-    // pixels behind in regions it thinks are unchanged). Real (non-fighting)
-    // local-clock display is Phase C's job, gated by DeviceMode so the two
-    // never draw at the same time.
+    // Safe to run continuously now: local_clock_task only draws while
+    // g_mode is LOCAL_CLOCK, so it and normal T_FRAME rendering never write
+    // to the screen at the same time (see the task's own comment).
+    xTaskCreate(local_clock_task, "local_clock", 3072, nullptr, 2, nullptr);
 }
