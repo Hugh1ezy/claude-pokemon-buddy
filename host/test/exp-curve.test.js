@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 import { applyDailyGrowth, daysToNextLevel, expToNextLevel, PARAMS } from "../src/pet/sim.js";
 import { renderFrame } from "../src/render/frame.js";
-import { LEFT_W } from "../src/render/palette.js";
+import { row1Geometry } from "../src/render/layout.js";
+import { LEFT_W, W } from "../src/render/palette.js";
 
 const FULL_DAY_TOKENS = 99_999_999; // more than enough to hit dailyExpCap
 
@@ -77,9 +78,13 @@ test("EXP stays inside the current level's bar", () => {
 
 // --- the bar itself -------------------------------------------------------
 
-const BAR_X = LEFT_W + 14;
-const BAR_W = 156;
-const BAR_MID_Y = 39; // BUDDY_ROW2_Y (34) + 2px border + mid-height of the 7px interior
+// The bar shares row 1 with the Lv/streak text, so its box depends on how wide
+// those numbers measure -- ask the layout for the same geometry it draws with
+// (baseModel's level/streak below must match).
+const GEO = row1Geometry(LEFT_W, W - LEFT_W, 5, 0);
+const BAR_X = GEO.barX;
+const BAR_W = GEO.barW;
+const BAR_MID_Y = GEO.barY + 2 + Math.floor((GEO.barH - 4) / 2); // mid-height of the interior
 
 test("the EXP bar draws one cell per day the level costs", async () => {
   for (const days of [1, 3, 8]) {
@@ -144,6 +149,7 @@ function baseModel(buddyExtra) {
     p5h: 12,
     pweek: 34,
     todayCost: 1,
+    streak: 0,
     now: new Date(2026, 5, 10, 14),
     weather: { cond: "多云", temp: 12, humidity: 50 },
     room: { t: 21, h: 45 },

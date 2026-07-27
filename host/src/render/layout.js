@@ -107,13 +107,11 @@ function drawLeftPanel(g, model) {
 }
 
 // Row y-coordinates for the right (buddy) panel, top to bottom:
-// 1. level + streak (centered)  2. exp bar (centered)  3. mood indicator
-// (left) + status bubble (right), mirrored to opposite edges  [sprite,
-// shifted down to sit below row 3]  4. buddy name + species line
-// 5. 亲密度 hearts (unchanged position)
-const BUDDY_ROW1_Y = 26;   // level/streak baseline
-const BUDDY_ROW2_Y = 34;   // exp bar top
-const BUDDY_ROW3_Y = 52;   // mood square top / bubble top -- the gap between the exp bar and the sprite
+// 1. level + exp bar + streak, all on one line  2. mood indicator (left) +
+// status bubble (right), mirrored to opposite edges  [sprite, sitting below
+// row 2]  3. buddy name + species line  4. 亲密度 hearts (unchanged position)
+const BUDDY_ROW1_Y = 26;   // shared text baseline for Lv/level/streak/天
+const BUDDY_ROW3_Y = 52;   // mood square top / bubble top -- the gap between row 1 and the sprite
 const BUDDY_ROW4_Y = 274;  // name+species line baseline -- close to the 亲密度 row (284/296), no dead gap
 
 function drawBuddyPanel(g, model) {
@@ -129,12 +127,9 @@ function drawBuddyPanel(g, model) {
   const hearts = heartCount(buddy.bond ?? 0);
   const streak = Math.max(0, Number(model.streak ?? 0));
 
-  // Row 1: level + streak, centered as one block (24px = Zpix 整数倍，清晰)
-  drawLevelStreakRow(g, panelX, panelW, level, streak, BUDDY_ROW1_Y);
-
-  // Row 2: exp bar, centered (156-wide bar in a 184-wide panel already
-  // centers at panelX+14 -- no separate centering math needed)
-  drawExpBar(g, panelX + 14, BUDDY_ROW2_Y, 156, 11, buddy);
+  // Row 1: Lv + level, exp bar, streak + 天 -- one line, the bar taking whatever
+  // horizontal space the two text clusters leave it.
+  drawLevelExpStreakRow(g, panelX, panelW, level, streak, buddy);
 
   drawShadow(g, panelX + panelW / 2, 240); // 240 = original 200 shifted by the same +40 as BUDDY_SPRITE_TOP, staying under the sprite's feet
   drawSprite(g, buddy.spriteGray, {
@@ -172,21 +167,66 @@ function drawBuddyPanel(g, model) {
   drawHearts(g, panelX + 58, 284, hearts);
 }
 
-function drawLevelStreakRow(g, panelX, panelW, level, streak, y) {
-  g.font = `800 24px ${MONO}`;
-  const levelText = `Lv.${level}`;
-  const streakText = `${streak}天`;
-  const levelW = g.measureText(levelText).width;
-  const streakW = g.measureText(streakText).width;
-  const flameW = 14; // drawFlame's bezier extent, x-1 to x+13
-  const gap1 = 10;   // level text -> flame
-  const gap2 = 6;    // flame -> streak text
-  const total = levelW + gap1 + flameW + gap2 + streakW;
-  const startX = Math.round(panelX + (panelW - total) / 2);
+// Row 1 packs three things onto one line: "Lv" + the level number on the left,
+// the streak number + "天" on the right, and the EXP bar filling the gap between
+// them. The two numbers carry the row at 24px while their labels sit at 12px, so
+// what you read first is the pair of numbers, not the words around them. Both
+// sizes are Zpix grid multiples (12/24) -- anything between renders muddy 1-bit.
+const ROW1_BIG_PX = 24;
+const ROW1_SMALL_PX = 12;
+const ROW1_SIDE_MARGIN = 14;
+const ROW1_GAP = 8;        // text cluster -> bar breathing room, both sides
+const ROW1_BAR_Y = 13;     // centres the 11px bar against the 24px numerals
+const ROW1_BAR_H = 11;
+
+// Geometry is computed off a scratch context so the exact same measurements are
+// available to callers that need to know where the bar landed (tests) without
+// re-deriving font metrics that only @napi-rs/canvas can answer.
+const measureCtx = createCanvas(1, 1).getContext("2d");
+
+export function row1Geometry(panelX, panelW, level, streak) {
+  const g = measureCtx;
+  g.font = `800 ${ROW1_SMALL_PX}px ${MONO}`;
+  const lvW = Math.ceil(g.measureText("Lv").width);
+  g.font = `800 ${ROW1_BIG_PX}px ${MONO}`;
+  const levelText = String(level);
+  const streakText = String(streak);
+  const levelW = Math.ceil(g.measureText(levelText).width);
+  const streakW = Math.ceil(g.measureText(streakText).width);
+  g.font = `800 ${ROW1_SMALL_PX}px ${CJK}`;
+  const dayW = Math.ceil(g.measureText("天").width);
+
+  const lvX = panelX + ROW1_SIDE_MARGIN;
+  const levelX = lvX + lvW;
+  const barX = levelX + levelW + ROW1_GAP;
+  const streakX = panelX + panelW - ROW1_SIDE_MARGIN - dayW - streakW;
+  const dayX = streakX + streakW;
+  return {
+    lvX, levelX, levelText, streakX, streakText, dayX,
+    barX,
+    barW: Math.max(0, streakX - ROW1_GAP - barX),
+    barY: ROW1_BAR_Y,
+    barH: ROW1_BAR_H,
+  };
+}
+
+function drawLevelExpStreakRow(g, panelX, panelW, level, streak, buddy) {
+  const geo = row1Geometry(panelX, panelW, level, streak);
   g.fillStyle = INK;
-  g.fillText(levelText, startX, y);
-  drawFlame(g, startX + levelW + gap1, y - 16);
-  g.fillText(streakText, startX + levelW + gap1 + flameW + gap2, y);
+  g.textAlign = "left";
+
+  g.font = `800 ${ROW1_SMALL_PX}px ${MONO}`;
+  g.fillText("Lv", geo.lvX, BUDDY_ROW1_Y);
+  g.font = `800 ${ROW1_BIG_PX}px ${MONO}`;
+  g.fillText(geo.levelText, geo.levelX, BUDDY_ROW1_Y);
+
+  if (geo.barW > 0) drawExpBar(g, geo.barX, geo.barY, geo.barW, geo.barH, buddy);
+
+  g.font = `800 ${ROW1_BIG_PX}px ${MONO}`;
+  g.fillText(geo.streakText, geo.streakX, BUDDY_ROW1_Y);
+  g.font = `800 ${ROW1_SMALL_PX}px ${CJK}`;
+  g.fillText("天", geo.dayX, BUDDY_ROW1_Y);
+  g.fillStyle = INK;
 }
 
 function drawSpeciesLine(g, panelX, panelW, buddy) {
@@ -411,16 +451,6 @@ function drawAsterisk(g, x, y) {
   line(g, x, y - 3, x, y + 3);
   line(g, x - 2, y - 2, x + 2, y + 2);
   line(g, x + 2, y - 2, x - 2, y + 2);
-}
-
-function drawFlame(g, x, y) {
-  g.fillStyle = INK;
-  g.beginPath();
-  g.moveTo(x + 6, y);
-  g.bezierCurveTo(x + 13, y + 7, x + 11, y + 15, x + 6, y + 16);
-  g.bezierCurveTo(x, y + 14, x - 1, y + 8, x + 4, y + 4);
-  g.bezierCurveTo(x + 4, y + 8, x + 8, y + 8, x + 6, y);
-  g.fill();
 }
 
 function drawHearts(g, x, y, filled) {
