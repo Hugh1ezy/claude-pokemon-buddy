@@ -120,6 +120,15 @@ export async function createTransport({
         events.emit("reconnect");
         redrawLastFrame();
       }),
+      // A transport that was already attached (not the initial cold-start
+      // miss) can still be lost later -- e.g. USB unplugged mid-session.
+      // serial.js's own internal reconnect only knows how to retry the SAME
+      // kind of transport (re-scan for a serial port), so without this the
+      // orchestrator would never learn the connection is gone and would
+      // never fall back to mock/re-probe wifi. Treating a warm loss the same
+      // as "never found" here is what lets wifi actually kick in when USB
+      // disappears instead of only on a cold host start.
+      next.onDisconnect?.(() => handleInnerLost(next)),
     ];
     detachInner = () => {
       offs.forEach((off) => off?.());
@@ -128,6 +137,17 @@ export async function createTransport({
     replay();
     events.emit("reconnect");
     redrawLastFrame();
+  }
+
+  // `lost` guards against a stale callback firing after `inner` has already
+  // moved on for some other reason (e.g. close() ran first).
+  function handleInnerLost(lost) {
+    if (closed || inner !== lost) return;
+    inner = null;
+    innerKind = null;
+    closeQuietly(lost); // stops its internal reconnect loop (e.g. serial.js re-scanning for the same port forever)
+    attachMock(mockFactory({ framePath }));
+    scheduleProbe(); // tries serial again, then wifi if enabled -- same path a cold start takes
   }
 
   function replay() {

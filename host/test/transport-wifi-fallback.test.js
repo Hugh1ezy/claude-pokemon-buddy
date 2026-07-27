@@ -109,9 +109,43 @@ test("mock transport upgrades to wifi once a wifi device becomes reachable", asy
   }
 });
 
+test("a warm serial disconnect (not just a cold miss) falls back to mock and re-probes wifi", async () => {
+  const serial = fakeInner();
+  const wifi = fakeInner();
+  let serialStillPlugged = true; // flips to simulate the cable actually being pulled, not just this instance dying
+  let transport;
+  try {
+    transport = await createTransport({
+      serialTransportFactory: async () => (serialStillPlugged ? serial : null),
+      wifiTransportFactory: async () => wifi,
+      mockFactory: () => fakeMock(),
+      wifi: { enabled: true, token: "s3cr3t" },
+      reconnectDelayMs: 5,
+      framePath: null,
+      logger,
+    });
+
+    assert.equal(transport.getKind(), "serial");
+
+    serialStillPlugged = false;
+    serial.emitDisconnect(); // e.g. USB unplugged mid-session
+
+    // Must actually notice -- serial.js's own internal reconnect only knows
+    // how to look for the same kind of transport again, so without wiring
+    // onDisconnect through, the orchestrator would just keep reporting
+    // "serial" forever with a dead transport underneath it.
+    await waitFor(() => transport.getKind() === "mock");
+    assert.equal(serial.closed, true); // old transport's internal retry loop must be stopped, not leaked
+
+    await waitFor(() => transport.getKind() === "wifi");
+  } finally {
+    transport?.close();
+  }
+});
+
 function fakeInner() {
   const events = new EventEmitter();
-  return {
+  const inner = {
     async pushFrame() { return { ok: true }; },
     playSound() {},
     setActiveCry() {},
@@ -119,10 +153,14 @@ function fakeInner() {
     onButton(cb) { events.on("button", cb); return () => events.off("button", cb); },
     onSensor(cb) { events.on("sensor", cb); return () => events.off("sensor", cb); },
     onReconnect(cb) { events.on("reconnect", cb); return () => events.off("reconnect", cb); },
+    onDisconnect(cb) { events.on("disconnect", cb); return () => events.off("disconnect", cb); },
     feedSensor() { return null; },
     getHello() { return null; },
-    close() {},
+    closed: false,
+    close() { inner.closed = true; },
+    emitDisconnect: () => events.emit("disconnect"),
   };
+  return inner;
 }
 
 function fakeMock() {

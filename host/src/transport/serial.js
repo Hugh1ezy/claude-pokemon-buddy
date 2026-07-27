@@ -202,6 +202,7 @@ export function makeTransport({
     latestSensor = null;
     detachPort();
     resolveDisconnected();
+    events.emit("disconnect");
     if (openPort && !stopped) scheduleReconnect();
   }
 
@@ -311,6 +312,10 @@ export function makeTransport({
     onReconnect(callback) {
       events.on("reconnect", callback);
       return () => events.off("reconnect", callback);
+    },
+    onDisconnect(callback) {
+      events.on("disconnect", callback);
+      return () => events.off("disconnect", callback);
     },
     onButton(callback) {
       events.on("button", callback);
