@@ -49,20 +49,43 @@ shell needs the environment sourced before `idf.py` works:
 . "$HOME\esp\esp-idf\export.ps1"
 ```
 
-**2. Edit credentials** in `firmware/main/main.cpp`, the `WIFI_CREDS` array:
+**2. Edit credentials** in `firmware/main/wifi_creds.h` — copy the tracked
+template and fill it in:
+
+```powershell
+cd "$HOME\claude-pokemon-buddy\firmware\main"
+Copy-Item wifi_creds.h.example wifi_creds.h
+```
 
 ```cpp
 static const WifiCred WIFI_CREDS[] = {
-    { "YOUR_HOME_SSID", "YOUR_HOME_PASSWORD" },
     { "YOUR_WORK_SSID", "YOUR_WORK_PASSWORD" },
+    { "YOUR_HOME_SSID", "YOUR_HOME_PASSWORD" },
 };
 ```
 
+The credentials do **not** live in `main.cpp` — that file is tracked and this
+repo is public, so a passphrase edited in there would be one `git add .` away
+from being published. `wifi_creds.h` is gitignored (`.gitignore:9`) and
+`main.cpp` picks it up through the `CPB_HAVE_WIFI_CREDS` define that
+`main/CMakeLists.txt` sets when the file exists.
+
 Add or remove entries freely — the device tries each in turn on boot / on
-disconnect and cycles through all of them indefinitely. **Never commit this
-file with real credentials in it** — revert to placeholders before
-committing (see `git diff firmware/main/main.cpp` shows no real SSID/password
-before you `git add`).
+disconnect and cycles through all of them indefinitely. **List every network
+you move between, in one file.** One image serves home and work; dropping an
+entry silently stops the device joining at that location, and the symptom
+(device sits in local-clock mode and "won't switch back") looks nothing like
+the cause.
+
+> ⚠️ **Creating `wifi_creds.h` for the first time needs `idf.py reconfigure`
+> before `idf.py flash`.** CMake evaluates the `EXISTS` check at configure
+> time, so a first build without it flashes the placeholder credentials and
+> reports success. Verify before believing the flash:
+>
+> ```powershell
+> $t = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes("firmware/build/pokemon_buddy_fw.bin"))
+> $t.Contains("YOUR_SSID")   # must be True, for every network you listed
+> ```
 
 **3. Set the pairing token** in `host/config.json` (gitignored — this file
 never gets committed, so the real token only needs to exist here and in the
