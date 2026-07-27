@@ -121,11 +121,13 @@ you want this scoped out as separate work.
 
 ## Known limitations
 
-- **No battery percentage on screen.** The Waveshare board's ADC (GPIO4,
-  3x voltage divider, 2.5V empty / 4.2V full per the official docs) is
-  hardware-capable but this firmware doesn't read or report it. Adding it
-  needs: an ADC read in firmware, a new field on an existing or new uplink
-  frame, and a render change on the host side. Not done — ask if wanted.
+- **Battery percentage is shown on screen** (next to the clock), read via
+  the board's ADC on GPIO4 through its onboard 3x voltage divider, mapped
+  against a 3.3V empty / 4.2V full window. The divider ratio and thresholds
+  are per Waveshare's board docs, not independently verified against a
+  multimeter — if the displayed number looks off against known battery
+  state, recalibrate `BATTERY_EMPTY_V`/`BATTERY_FULL_V` in `main.cpp`
+  (comment right above them explains why).
 - **Battery life isn't precisely measured.** Continuous WiFi TX draws far
   more current than idle; expect well under a full day of continuous
   WiFi + display + audio use from a typical 18650 (2000-3000mAh), not
