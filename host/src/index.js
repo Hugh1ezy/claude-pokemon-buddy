@@ -116,10 +116,20 @@ export function createButtonDispatcher({
   animator = { pause() {}, resume() {} },
   playSignature = playSignatureAnimation,
   onSignatureError = () => {},
+  logger = null,
 } = {}) {
   const tickQueue = [];
   let signatureInFlight = false;
   const off = transport?.onButton?.((event) => {
+    // The firmware logs every press it sends; the host logged nothing, so
+    // "I pressed KEY and nothing happened" had no evidence on this side at
+    // all -- no way to separate a press that never arrived from one that
+    // arrived and was mishandled. Logged from inside the dispatcher's single
+    // listener on purpose: a second transport.onButton subscription just to
+    // watch traffic would break the one-resident-listener invariant that RH3
+    // pins down.
+    logger?.log?.(`button ${event?.key} ${event?.kind}`);
+
     // Queue first, unconditionally. A short KEY press is BOTH the "greet"
     // gesture and the working-day bond credit (pet/bond.js reads it as
     // `clicked`), and the signature branch used to return before queueing --
@@ -330,6 +340,7 @@ export async function main({
       actions,
       animator,
       onSignatureError: () => {},
+      logger,
     });
     const dashboardServer = dashboard
       ? await startDashboardServer({

@@ -1,12 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   shouldPlaySignature,
   shouldQueueButtonForTick,
   createActionQueue,
   createButtonDispatcher,
+  runOneTick,
 } from "../src/index.js";
 import { applyBondTick, heartsFromHalves } from "../src/pet/bond.js";
 
@@ -189,6 +193,44 @@ test("dispatcher requeues a drained tick snapshot once without adding listeners"
   assert.deepEqual(dispatcher.drainTickEvents(), []);
   dispatcher.stop();
   assert.equal(transport.listenerCount(), 0);
+});
+
+// The unit test above stops at applyBondTick. This one runs a press through
+// runOneTick itself, which is where `clicked` is actually derived from the
+// tick snapshot -- the link that had no coverage while the credit was being
+// silently dropped.
+test("runOneTick turns a queued KEY short press into the hour's bond credit", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "cpb-bond-tick-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const statePath = join(dir, "state.json");
+  const saved = {
+    schemaVersion: 1, hatched: true, species: "bulbasaur", level: 9, exp: 3, bond: 8,
+    streak: 3, shield: 0, lastSettled: "2026-07-28", lastGrowthDay: "2026-07-28",
+    bondDay: "2026-07-28", bondHalves: 0, bondSlots: 0,
+    iv: [0, 1, 20, 5, 0, 13], nature: "慢性子", characteristic: "耐打", tutorialDone: true,
+  };
+
+  const runWith = async (pendingButtons) => {
+    writeFileSync(statePath, JSON.stringify(saved));
+    await runOneTick({
+      usage: { ok: true, todayTokens: 0, todayPeriod: null, activeDays: [] },
+      weather: { cond: "多云", temp: 14, humidity: 70 },
+      room: { t: 20, h: 50 },
+      statePath,
+      framePath: join(dir, "frame.png"),
+      transport: { push: async () => ({ ok: true }), setActiveCry: () => {}, playSound: () => {} },
+      now: new Date(2026, 6, 28, 10, 30),   // Tuesday, inside the 9:00 window
+      today: "2026-07-28",
+      pendingButtons,
+      buddyName: "Hughie",
+    });
+    return JSON.parse(readFileSync(statePath, "utf8"));
+  };
+
+  assert.equal((await runWith([])).bondHalves, 0);
+  const pressed = await runWith([{ key: "KEY", kind: "short" }]);
+  assert.equal(pressed.bondHalves, 1);
+  assert.equal(pressed.bondSlots, 1 << 1);   // slot 1 = the 10:00 hour
 });
 
 function createButtonTransport() {
