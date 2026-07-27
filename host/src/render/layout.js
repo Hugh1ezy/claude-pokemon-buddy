@@ -407,12 +407,38 @@ const BATTERY_CRITICAL_PCT = 10;
 // free-running counter (increments every ~333ms independent of the main
 // 60s tick, see buddy-animator.js), so this needs no timer of its own --
 // every other ~666ms half-cycle the whole icon is simply not drawn.
+// Every element here is drawn with fillRect, never stroke()/strokeRect --
+// confirmed on real hardware that a 1px stroked path (which straddles its
+// coordinate, e.g. a line at x=10 actually paints x=9.5..10.5) anti-aliases
+// into two half-covered pixel columns that read as gray and vanish under
+// this project's 1-bit thresholding. It looked fine in an RGBA preview PNG
+// and was still missing on the device -- fillRect at integer coordinates
+// is the only shape guaranteed to survive threshold with no ambiguity.
+function fillRectOutline(g, x, y, w, h) {
+  g.fillRect(x, y, w, 1);
+  g.fillRect(x, y + h - 1, w, 1);
+  g.fillRect(x, y, 1, h);
+  g.fillRect(x + w - 1, y, 1, h);
+}
+
+// Each of the 4 segments is its own bordered box -- filled solid if lit,
+// outline-only if not -- so the "4 segments" structure is always visible
+// regardless of charge level. A single continuous fill bar (the previous
+// attempt) merges adjacent lit segments into one blob with no internal
+// structure, and an unlit segment with no border at all is indistinguishable
+// from blank icon background -- both are what this fixes.
 function drawBatteryIndicator(g, rightX, pct, animPhase) {
   const clamped = Math.max(0, Math.min(100, pct));
   const blinkedOut = clamped < BATTERY_CRITICAL_PCT && Math.floor((animPhase ?? 0) / 2) % 2 === 1;
   if (blinkedOut) return;
 
-  const iconW = 20;
+  // iconW picked so innerW (iconW-4) minus the 3 inter-segment gaps divides
+  // evenly by 4 -- (23-3)/4 = 5 exactly. A non-integer segW here previously
+  // caused Math.round() to accumulate rounding error across segments and
+  // silently erase the gap before the last segment (confirmed reproducible
+  // on real hardware: same divider missing every time, not random -- which
+  // is what pinned this down as rounding, not a stale-frame/timing issue).
+  const iconW = 27;
   const iconH = 10;
   const nubW = 2;
   const segGap = 1;
@@ -420,18 +446,25 @@ function drawBatteryIndicator(g, rightX, pct, animPhase) {
   const iconY = 11;
 
   g.save();
-  g.lineWidth = 1.5;
-  g.strokeStyle = INK;
-  g.strokeRect(iconX, iconY, iconW, iconH);
   g.fillStyle = INK;
+  fillRectOutline(g, iconX, iconY, iconW, iconH);
   g.fillRect(iconX + iconW, iconY + (iconH - 4) / 2, nubW, 4);
 
-  const litSegments = Math.round((clamped / 100) * BATTERY_SEGMENTS);
+  const innerX = iconX + 2;
+  const innerY = iconY + 2;
+  const innerW = iconW - 4; // 23
   const innerH = iconH - 4;
-  const innerW = iconW - 4;
-  const segW = (innerW - segGap * (BATTERY_SEGMENTS - 1)) / BATTERY_SEGMENTS;
-  for (let i = 0; i < litSegments; i++) {
-    g.fillRect(iconX + 2 + i * (segW + segGap), iconY + 2, segW, innerH);
+  const segW = (innerW - segGap * (BATTERY_SEGMENTS - 1)) / BATTERY_SEGMENTS; // exactly 5, no rounding needed
+  if (!Number.isInteger(segW)) throw new Error(`battery icon segment math must divide evenly, got ${segW}`);
+
+  const litSegments = Math.round((clamped / 100) * BATTERY_SEGMENTS);
+  for (let i = 0; i < BATTERY_SEGMENTS; i++) {
+    const sx = innerX + i * (segW + segGap);
+    if (i < litSegments) {
+      g.fillRect(sx, innerY, segW, innerH);
+    } else {
+      fillRectOutline(g, sx, innerY, segW, innerH);
+    }
   }
   g.restore();
 }
