@@ -1,5 +1,5 @@
 {
-  "charmander": { "stage": 0, "branches": [{ "to": "charmeleon", "needs": { "level": 14 }, "priority": 1 }] },
-  "charmeleon": { "stage": 1, "branches": [{ "to": "charizard",  "needs": { "level": 30 }, "priority": 1 }] },
+  "charmander": { "stage": 0, "branches": [{ "to": "charmeleon", "needs": { "level": 16 }, "priority": 1 }] },
+  "charmeleon": { "stage": 1, "branches": [{ "to": "charizard",  "needs": { "level": 36 }, "priority": 1 }] },
   "charizard":  { "stage": 2, "branches": [] }
 }

@@ -1,4 +1,5 @@
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS_ZH = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 export function layoutText(model = {}) {
   const weather = model.weather ?? {};
@@ -8,6 +9,7 @@ export function layoutText(model = {}) {
   return {
     clock: formatClock(model.clock, now),
     date: `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`,
+    weekday: WEEKDAYS_ZH[now.getDay()],
     p5h: percentText(model.p5h),
     pweek: percentText(model.pweek),
     rateNote: model.rateStale ? "stale" : "",

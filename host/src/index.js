@@ -7,7 +7,8 @@ import { cryFor } from "./pet/cries.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { resolveEvolution } from "./pet/evolution.js";
 import { rollPersonality } from "./pet/personality.js";
-import { applyDailyGrowth, daysToNextLevel, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
+import { applyBondTick, heartsFromHalves } from "./pet/bond.js";
+import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
 import { buildUsedDays, settleDays } from "./pet/settlement.js";
 import { applyPetTransitions, drainEvolutionIntents, ensurePet, evolutionContext } from "./pet/transitions.js";
 import { runOnboarding, runTutorial } from "./pet/onboarding.js";
@@ -44,6 +45,12 @@ const DEFAULT_WEATHER = {
 
 // Overlay official statusline rate-limits (5h/week %/reset) onto the ccusage
 // snapshot, which now only sources cost/token totals.
+//
+// Deliberately no local estimate here: ccusage's totalTokens counts cache reads,
+// which run one to two orders of magnitude above what a plan quota actually
+// charges, so any percentage derived from it would peg at 100% and drag the
+// mood to 力竭 permanently. A "--" that means "unknown" beats a number that
+// means nothing.
 export function mergeUsage(ccusageUsage, rateLimits) {
   return {
     ...ccusageUsage,
@@ -182,6 +189,14 @@ export async function runOneTick({
   const creditedTokens =
     usage.todayPeriod == null || usage.todayPeriod === today ? usage.todayTokens : 0;
   pet = applyDailyGrowth(pet, { todayTokens: creditedTokens, today });
+  // Bond is settled before the transitions below consume the same button events:
+  // a KEY press that pays out this hour's half heart is the same press that may
+  // also trigger an evolution, and both should see it.
+  pet = applyBondTick(pet, {
+    now,
+    today,
+    clicked: buttonEvents.some((event) => event?.key === "KEY" && event?.kind === "short"),
+  });
 
   const transition = applyPetTransitions({
     pet,
@@ -223,12 +238,10 @@ export async function runOneTick({
       species: pet.species,
       readyToEvolve: pet.readyToEvolve,
       bond: pet.bond,
+      // Hearts show TODAY's bond, not the lifetime total the evolution threshold
+      // tracks -- the row is a "did we spend time together today" gauge.
+      bondHearts: heartsFromHalves(pet.bondHalves),
       expPct: Number.isFinite(pet.exp) ? Math.round((pet.exp / expToNextLevel(pet.level)) * 100) : 0,
-      // Day-denominated view of the same progress: the EXP bar draws one cell per
-      // day this level costs, so the curve is something you read off the screen
-      // instead of a flat percentage that hides how far the goalposts moved.
-      expDaysNeeded: daysToNextLevel(pet.level),
-      expDaysDone: Number.isFinite(pet.exp) ? pet.exp / PARAMS.levelExp : 0,
       bubble: sprite.placeholder ? "BUDDY" : cryFor(pet.species, mood),
     },
   };

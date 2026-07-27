@@ -1,4 +1,4 @@
-import { test } from "node:test";
+﻿import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -117,7 +117,7 @@ test("single-candidate auto readiness strips stale pending candidates", async ()
   const framePath = join("out", "test-single-auto-strip-pending-frame.png");
   writeState(statePath, {
     species: "bulbasaur",
-    level: 14,
+    level: 16,
     bond: 0,
     readyToEvolve: true,
     pendingCandidates: [
@@ -193,7 +193,7 @@ test("stone overrides RTC branch when KEY triggers evolution", async () => {
 test("starter reaching its level threshold is ready (table-driven, not bond)", async () => {
   const statePath = join("out", "test-bulba-ready-state.json");
   const framePath = join("out", "test-bulba-ready-frame.png");
-  writeState(statePath, { species: "bulbasaur", level: 14, bond: 0 });
+  writeState(statePath, { species: "bulbasaur", level: 16, bond: 0 });
 
   const state = await runOneTick({
     usage: usageWithTokens(0),
@@ -211,7 +211,7 @@ test("starter reaching its level threshold is ready (table-driven, not bond)", a
 test("KEY evolves a level-ready Bulbasaur to Ivysaur", async () => {
   const statePath = join("out", "test-bulba-evolve-state.json");
   const framePath = join("out", "test-bulba-evolve-frame.png");
-  writeState(statePath, { species: "bulbasaur", level: 14, bond: 0 });
+  writeState(statePath, { species: "bulbasaur", level: 16, bond: 0 });
 
   const state = await runOneTick({
     usage: usageWithTokens(0),
@@ -248,10 +248,10 @@ test("high bond below the level threshold is NOT ready (dead-window regression)"
   assert.equal(state.readyToEvolve, false);
 });
 
-test("KEY evolves a level-30 Ivysaur to Venusaur", async () => {
+test("KEY evolves a level-32 Ivysaur to Venusaur", async () => {
   const statePath = join("out", "test-ivy-evolve-state.json");
   const framePath = join("out", "test-ivy-evolve-frame.png");
-  writeState(statePath, { species: "ivysaur", level: 30, bond: 0 });
+  writeState(statePath, { species: "ivysaur", level: 32, bond: 0 });
 
   const state = await runOneTick({
     usage: usageWithTokens(0),
@@ -334,7 +334,7 @@ function usageWithTokens(todayTokens) {
 
 function weather({ temp, humidity }) {
   return {
-    cond: "多云",
+    cond: "澶氫簯",
     temp,
     feels: temp,
     hi: temp + 2,

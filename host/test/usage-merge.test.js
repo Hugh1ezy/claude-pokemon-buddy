@@ -22,3 +22,13 @@ test("rate-limits 缺失时百分比为 null（UI 显示 --），cost/token 仍�
   assert.equal(u.official, false);
   assert.equal(u.todayCost, 12.3);
 });
+
+test("token 用量再大也不会被换算成百分比顶上去（估算值会永远顶到 100%）", () => {
+  const cc = { activeTokens: 23_766_653, weekTokens: 43_000_000, todayCost: 4 };
+  const rl = { p5h: null, pweek: null, resets5h: null, resetsWeek: null, official: false, stale: true };
+  const u = mergeUsage(cc, rl);
+
+  assert.equal(u.p5h, null);
+  assert.equal(u.pweek, null);
+  assert.equal(u.official, false);
+});

@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { applyDailyGrowth, daysToNextLevel, expToNextLevel, PARAMS } from "../src/pet/sim.js";
+import { applyDailyGrowth, expToNextLevel, gainExp, PARAMS } from "../src/pet/sim.js";
+import { eligibleBranches } from "../src/pet/evolution.js";
 import { renderFrame } from "../src/render/frame.js";
 import { row1Geometry } from "../src/render/layout.js";
 import { LEFT_W, W } from "../src/render/palette.js";
@@ -12,136 +13,151 @@ test("one full day of usage is worth exactly one day of EXP", () => {
   assert.equal(PARAMS.dailyExpCap, PARAMS.levelExp);
 });
 
-test("the level curve never gets cheaper and never exceeds the cap", () => {
+test("the curve never gets cheaper as levels go up", () => {
   let previous = 0;
-  for (let level = 1; level <= 60; level += 1) {
-    const days = daysToNextLevel(level);
-    assert.ok(Number.isInteger(days) && days >= 1, `level ${level} must cost whole days`);
-    assert.ok(days >= previous, `level ${level} must not be cheaper than level ${level - 1}`);
-    assert.ok(days <= PARAMS.levelDaysCap, `level ${level} must stay under the cap`);
-    assert.equal(expToNextLevel(level), days * PARAMS.levelExp);
-    previous = days;
+  for (let level = 1; level < PARAMS.maxLevel; level += 1) {
+    const cost = expToNextLevel(level);
+    assert.ok(Number.isInteger(cost) && cost >= 1, `level ${level} must cost whole EXP`);
+    assert.ok(cost >= previous, `level ${level} must not be cheaper than level ${level - 1}`);
+    previous = cost;
   }
+  assert.ok(expToNextLevel(PARAMS.maxLevel - 1) > expToNextLevel(1) * 3, "the late game must cost meaningfully more");
 });
 
-test("levelling slows down: a later level costs strictly more days than the first", () => {
-  assert.equal(daysToNextLevel(1), 1, "the first level lands after a single day");
-  assert.ok(daysToNextLevel(6) > daysToNextLevel(2), "the curve must actually stretch");
-  assert.equal(daysToNextLevel(PARAMS.levelDaysCap * 10), PARAMS.levelDaysCap, "the tail flattens at the cap");
+test("expToNextLevel survives a garbage level instead of diverging", () => {
+  assert.equal(expToNextLevel(undefined), expToNextLevel(1));
+  assert.equal(expToNextLevel(NaN), expToNextLevel(1));
+  assert.equal(expToNextLevel(-3), expToNextLevel(1));
+  assert.equal(expToNextLevel(9999), expToNextLevel(PARAMS.maxLevel));
 });
 
-test("daysToNextLevel survives a garbage level instead of diverging", () => {
-  assert.equal(daysToNextLevel(undefined), daysToNextLevel(1));
-  assert.equal(daysToNextLevel(NaN), daysToNextLevel(1));
-  assert.equal(daysToNextLevel(-3), daysToNextLevel(1));
+// Pace: full daily usage every day should max the buddy out in roughly a month --
+// slow enough to be worth waiting for, fast enough to finish.
+test("daily full usage reaches the level cap in about a month", () => {
+  let pet = { level: 1, exp: 0, bond: 0, todayCreditedExp: 0, todayCreditedBond: 0, lastGrowthDay: "2026-06-09" };
+  let days = 0;
+  while (pet.level < PARAMS.maxLevel && days < 200) {
+    days += 1;
+    pet = applyDailyGrowth(pet, { todayTokens: FULL_DAY_TOKENS, today: dayString(days) });
+  }
+  assert.ok(days >= 25 && days <= 40, `expected roughly a month of daily use, got ${days} days`);
 });
 
-test("a full day levels Lv.1 but is not enough for a later level", () => {
-  const born = { level: 1, exp: 0, bond: 0, todayCreditedExp: 0, todayCreditedBond: 0, lastGrowthDay: "2026-06-16" };
-  const afterOneDay = applyDailyGrowth(born, { todayTokens: FULL_DAY_TOKENS, today: "2026-06-17" });
-  assert.equal(afterOneDay.level, 2);
-  assert.equal(afterOneDay.exp, 0);
+test("the level 16 / 32 evolution gates land in the first days, not the first hour", () => {
+  const reached = {};
+  let pet = { level: 1, exp: 0, bond: 0, todayCreditedExp: 0, todayCreditedBond: 0, lastGrowthDay: "2026-06-09" };
+  for (let day = 1; day <= 20 && pet.level < 40; day += 1) {
+    pet = applyDailyGrowth(pet, { todayTokens: FULL_DAY_TOKENS, today: dayString(day) });
+    for (const gate of [16, 32]) {
+      if (reached[gate] == null && pet.level >= gate) reached[gate] = day;
+    }
+  }
+  assert.ok(reached[16] >= 2 && reached[16] <= 5, `Lv.16 should take a few days, took ${reached[16]}`);
+  assert.ok(reached[32] > reached[16] && reached[32] <= 12, `Lv.32 should follow later, took ${reached[32]}`);
+});
 
-  const later = { level: 6, exp: 0, bond: 0, todayCreditedExp: 0, todayCreditedBond: 0, lastGrowthDay: "2026-06-16" };
-  const laterAfterOneDay = applyDailyGrowth(later, { todayTokens: FULL_DAY_TOKENS, today: "2026-06-17" });
-  assert.equal(laterAfterOneDay.level, 6, "one day must not be enough at Lv.6");
-  assert.equal(laterAfterOneDay.exp, PARAMS.levelExp, "the day still banks a full day of EXP");
+test("the seed tables gate evolution on the official Pokémon levels", () => {
+  const gateOf = (species, at) => eligibleBranches(species, { level: at }).length;
+  assert.equal(gateOf("bulbasaur", 15), 0);
+  assert.equal(gateOf("bulbasaur", 16), 1);
+  assert.equal(gateOf("ivysaur", 31), 0);
+  assert.equal(gateOf("ivysaur", 32), 1);
+  assert.equal(gateOf("charmeleon", 35), 0);
+  assert.equal(gateOf("charmeleon", 36), 1);
+  assert.equal(gateOf("wartortle", 35), 0);
+  assert.equal(gateOf("wartortle", 36), 1);
 });
 
 test("a carried-over EXP pool pays each level's own rising price", () => {
-  // Hand the pet enough banked EXP for several levels at once: it must spend the
-  // cost of level 1, then of level 2, and so on -- not N * the first level's cost.
   const banked = expToNextLevel(1) + expToNextLevel(2) + expToNextLevel(3);
-  const pet = {
-    level: 1,
-    exp: banked - PARAMS.levelExp, // the last full day arrives via today's usage
-    bond: 0,
-    todayCreditedExp: 0,
-    todayCreditedBond: 0,
-    lastGrowthDay: "2026-06-16",
-  };
-
-  const out = applyDailyGrowth(pet, { todayTokens: FULL_DAY_TOKENS, today: "2026-06-17" });
-
+  const out = gainExp(1, 0, banked);
   assert.equal(out.level, 4);
   assert.equal(out.exp, 0);
 });
 
 test("EXP stays inside the current level's bar", () => {
   let pet = { level: 1, exp: 0, bond: 0, todayCreditedExp: 0, todayCreditedBond: 0, lastGrowthDay: null };
-  for (let i = 0; i < 40; i += 1) {
-    const day = `2026-06-${String(10 + i).padStart(2, "0")}`;
-    pet = applyDailyGrowth(pet, { todayTokens: FULL_DAY_TOKENS, today: day });
-    assert.ok(pet.exp < expToNextLevel(pet.level), `day ${day}: exp ${pet.exp} overflowed level ${pet.level}`);
+  for (let day = 1; day <= 40; day += 1) {
+    pet = applyDailyGrowth(pet, { todayTokens: FULL_DAY_TOKENS, today: dayString(day) });
+    assert.ok(pet.exp <= expToNextLevel(pet.level), `day ${day}: exp ${pet.exp} overflowed level ${pet.level}`);
   }
+});
+
+test("the level cap holds and parks the bar at full", () => {
+  const out = gainExp(PARAMS.maxLevel, 0, 999_999);
+  assert.equal(out.level, PARAMS.maxLevel);
+  assert.equal(out.exp, expToNextLevel(PARAMS.maxLevel));
+
+  const almost = gainExp(PARAMS.maxLevel - 1, 0, 999_999);
+  assert.equal(almost.level, PARAMS.maxLevel);
 });
 
 // --- the bar itself -------------------------------------------------------
 
-// The bar shares row 1 with the Lv/streak text, so its box depends on how wide
-// those numbers measure -- ask the layout for the same geometry it draws with
-// (baseModel's level/streak below must match).
 const GEO = row1Geometry(LEFT_W, W - LEFT_W, 5, 0);
-const BAR_X = GEO.barX;
-const BAR_W = GEO.barW;
-const BAR_MID_Y = GEO.barY + 2 + Math.floor((GEO.barH - 4) / 2); // mid-height of the interior
+const BAR_MID_Y = GEO.barY + 2 + Math.floor((GEO.barH - 4) / 2);
 
-test("the EXP bar draws one cell per day the level costs", async () => {
-  for (const days of [1, 3, 8]) {
-    const { bitmap } = await renderFrame(baseModel({ expDaysNeeded: days, expDaysDone: days, expPct: 100 }));
-    assert.equal(
-      gapsInBarRow(bitmap),
-      days - 1,
-      `a ${days}-day level must show ${days} cells (${days - 1} dividers)`,
-    );
-  }
-});
-
-test("a partially earned level leaves the unearned cells hollow", async () => {
-  const { bitmap } = await renderFrame(baseModel({ expDaysNeeded: 4, expDaysDone: 1, expPct: 25 }));
-  const filled = inkInBarRow(bitmap);
-
-  const { bitmap: full } = await renderFrame(baseModel({ expDaysNeeded: 4, expDaysDone: 4, expPct: 100 }));
-  assert.ok(filled < inkInBarRow(full), "one earned day must paint less ink than four");
-  assert.ok(filled > 0, "the earned day must still be visible");
-});
-
-test("a level too wide to draw as cells falls back to a plain bar", async () => {
-  const { bitmap } = await renderFrame(baseModel({ expDaysNeeded: 999, expDaysDone: 999, expPct: 100 }));
-  assert.equal(gapsInBarRow(bitmap), 0, "the fallback bar is one continuous fill, no dividers");
-});
-
-test("a model with no day info still renders the old proportional bar", async () => {
+test("the EXP bar is one continuous black fill, no dividers", async () => {
   const { bitmap } = await renderFrame(baseModel({ expPct: 100 }));
   assert.equal(gapsInBarRow(bitmap), 0);
-  assert.ok(inkInBarRow(bitmap) > 0);
+  assert.equal(inkInBarRow(bitmap), GEO.barW - 4, "a full bar inks its whole interior");
 });
+
+test("the fill grows from the left with the percentage", async () => {
+  const quarter = inkInBarRow((await renderFrame(baseModel({ expPct: 25 }))).bitmap);
+  const half = inkInBarRow((await renderFrame(baseModel({ expPct: 50 }))).bitmap);
+  const empty = inkInBarRow((await renderFrame(baseModel({ expPct: 0 }))).bitmap);
+
+  assert.equal(empty, 0);
+  assert.ok(quarter > 0 && quarter < half, `expected 25% (${quarter}) to be under 50% (${half})`);
+  assert.ok(firstInkX((await renderFrame(baseModel({ expPct: 25 }))).bitmap) <= GEO.barX + 3, "fill starts at the left edge");
+});
+
+function dayString(index) {
+  const date = new Date(2026, 5, 10);
+  date.setDate(date.getDate() + index);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 function bit(bitmap, x, y) {
   const rowBytes = Math.ceil(bitmap.w / 8);
   return (bitmap.bytes[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1;
 }
 
-// Unlit runs strictly inside the bar's interior == the dividers between cells.
 function gapsInBarRow(bitmap) {
   let gaps = 0;
   let inGap = false;
-  for (let x = BAR_X + 2; x < BAR_X + BAR_W - 2; x += 1) {
+  let seenInk = false;
+  for (let x = GEO.barX + 2; x < GEO.barX + GEO.barW - 2; x += 1) {
     const lit = bit(bitmap, x, BAR_MID_Y) === 1;
-    if (!lit && !inGap) {
+    if (lit) {
+      seenInk = true;
+      inGap = false;
+    } else if (seenInk && !inGap) {
       gaps += 1;
       inGap = true;
-    } else if (lit) {
-      inGap = false;
     }
   }
-  return gaps;
+  // A partly filled bar ends in one trailing unlit run; that is the empty tail,
+  // not a divider, so only interior gaps that are followed by more ink count.
+  return Math.max(0, gaps - (trailingUnlit(bitmap) ? 1 : 0));
+}
+
+function trailingUnlit(bitmap) {
+  return bit(bitmap, GEO.barX + GEO.barW - 3, BAR_MID_Y) === 0;
 }
 
 function inkInBarRow(bitmap) {
   let count = 0;
-  for (let x = BAR_X + 2; x < BAR_X + BAR_W - 2; x += 1) count += bit(bitmap, x, BAR_MID_Y);
+  for (let x = GEO.barX + 2; x < GEO.barX + GEO.barW - 2; x += 1) count += bit(bitmap, x, BAR_MID_Y);
   return count;
+}
+
+function firstInkX(bitmap) {
+  for (let x = GEO.barX + 2; x < GEO.barX + GEO.barW - 2; x += 1) {
+    if (bit(bitmap, x, BAR_MID_Y) === 1) return x;
+  }
+  return Infinity;
 }
 
 function baseModel(buddyExtra) {

@@ -73,9 +73,14 @@ function drawLeftPanel(g, model) {
   g.font = `700 12px ${MONO}`;
   centerInPanel("Pokemon · Clock", 55);
 
-  // Row 2: date
-  g.font = `800 14px ${MONO}`;
-  centerInPanel(text.date, 88);
+  // Row 2: date flush left, weekday flush right -- the same 11/12px margins the
+  // rows above and below use, so the two ends of the row line up with everything
+  // else in the panel rather than floating in the middle.
+  g.font = `800 14px ${CJK}`;
+  g.fillText(text.date, 11, 88);
+  g.textAlign = "right";
+  g.fillText(text.weekday, LEFT_W - 12, 88);
+  g.textAlign = "left";
 
   // Rows 3-4: reserved (future notifications) -- intentionally blank
 
@@ -124,7 +129,9 @@ function drawBuddyPanel(g, model) {
   const hop = Number.isInteger(buddy.hop) ? buddy.hop : 0;
 
   const level = Math.max(1, Number(buddy.level ?? 1));
-  const hearts = heartCount(buddy.bond ?? 0);
+  // Today's hearts when the model carries them; the lifetime-bond mapping stays as
+  // the fallback so older callers (and the dashboard preview) still render.
+  const hearts = Number.isFinite(buddy.bondHearts) ? buddy.bondHearts : heartCount(buddy.bond ?? 0);
   const streak = Math.max(0, Number(model.streak ?? 0));
 
   // Row 1: Lv + level, exp bar, streak + 天 -- one line, the bar taking whatever
@@ -253,62 +260,11 @@ export function fitTodayLineFont(g, text) {
   });
 }
 
-// The EXP bar is drawn as one cell per day the current level costs, not as an
-// anonymous percentage: a level that takes longer visibly has more cells, so the
-// growth curve is legible on the device without printing a single number. A
-// completed day is a solid cell, the day in progress is a partially filled one,
-// and days still owed are hollow (same visual grammar as the battery segments).
-//
-// Two guards keep this honest: with no day info in the model (older callers,
-// tests) it degrades to the plain proportional meter, and so does a level whose
-// cells would be too thin to read -- better a smooth bar than 30 slivers that
-// can't be counted.
-const EXP_CELL_GAP = 1;
-const EXP_CELL_MIN_W = 4; // narrower than this and the cells stop being countable
-
+// One continuous black fill growing left to right -- no day cells, no ticks. How
+// long a level takes is deliberately not readable off the bar; all it says is how
+// far along this one you are.
 function drawExpBar(g, x, y, w, h, buddy = {}) {
-  const pct = clampPct(buddy.expPct ?? 0);
-  const cells = Math.floor(Number(buddy.expDaysNeeded));
-  const innerW = w - 4;
-
-  if (!Number.isFinite(cells) || cells < 1 || innerW / cells < EXP_CELL_MIN_W) {
-    drawMeter(g, x, y, w, h, pct, { striped: false });
-    return;
-  }
-
-  g.strokeStyle = INK;
-  g.lineWidth = 2;
-  g.strokeRect(x, y, w, h);
-
-  const innerX = x + 2;
-  const innerY = y + 2;
-  const innerH = h - 4;
-  const daysDone = Number.isFinite(buddy.expDaysDone)
-    ? Math.max(0, Math.min(cells, buddy.expDaysDone))
-    : (cells * pct) / 100;
-
-  // Integer cell edges derived from a running fraction rather than a rounded
-  // per-cell width: the battery indicator learned the hard way that rounding each
-  // segment independently accumulates error and silently eats a divider.
-  const edge = (i) => Math.floor((innerW * i) / cells);
-  g.fillStyle = INK;
-  for (let i = 0; i < cells; i += 1) {
-    const cx = innerX + edge(i);
-    const cw = edge(i + 1) - edge(i) - (i < cells - 1 ? EXP_CELL_GAP : 0);
-    if (cw <= 0) continue;
-    const fill = Math.max(0, Math.min(1, daysDone - i));
-    if (fill >= 1) {
-      g.fillRect(cx, innerY, cw, innerH);
-      continue;
-    }
-    fillRectOutline(g, cx, innerY, cw, innerH);
-    const partial = Math.floor(cw * fill);
-    if (partial > 0) g.fillRect(cx, innerY, partial, innerH);
-  }
-
-  g.fillStyle = INK;
-  g.strokeStyle = INK;
-  g.lineWidth = 2;
+  drawMeter(g, x, y, w, h, clampPct(buddy.expPct ?? 0), { striped: false });
 }
 
 function drawMeter(g, x, y, w, h, pct, { striped }) {

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadState, SCHEMA_VERSION } from "../src/state.js";
-import { PARAMS } from "../src/pet/sim.js";
+import { expToNextLevel, PARAMS } from "../src/pet/sim.js";
 import { settleDays } from "../src/pet/settlement.js";
 
 test("loadState drops garbage lastSettled so settlement cannot throw", (t) => {
@@ -81,7 +81,7 @@ test("loadState clamps out-of-range fast-path numbers", (t) => {
 
   assert.equal(loaded.level, 1);
   assert.equal(loaded.bond, 0);
-  assert.equal(loaded.exp, PARAMS.levelExp - 1);
+  assert.equal(loaded.exp, expToNextLevel(1) - 1, "exp is clamped to the level's own bar, not a flat constant");
   assert.equal(loaded.streak, 0);
   assert.equal(loaded.shield, 2);
   assert.equal(loaded.careCount, 0);

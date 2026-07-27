@@ -1,5 +1,5 @@
 {
-  "squirtle":  { "stage": 0, "branches": [{ "to": "wartortle", "needs": { "level": 14 }, "priority": 1 }] },
-  "wartortle": { "stage": 1, "branches": [{ "to": "blastoise", "needs": { "level": 30 }, "priority": 1 }] },
+  "squirtle":  { "stage": 0, "branches": [{ "to": "wartortle", "needs": { "level": 16 }, "priority": 1 }] },
+  "wartortle": { "stage": 1, "branches": [{ "to": "blastoise", "needs": { "level": 36 }, "priority": 1 }] },
   "blastoise":  { "stage": 2, "branches": [] }
 }

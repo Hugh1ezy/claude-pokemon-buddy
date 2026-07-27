@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
+import { SLOTS_PER_DAY } from "./pet/bond.js";
 import { MAX_LEVEL_EXP, PARAMS, expToNextLevel } from "./pet/sim.js";
 
 export const SCHEMA_VERSION = 1;
@@ -24,6 +25,8 @@ const NUMBER_RANGES = {
   todayCreditedExp: { min: 0 },
   todayCreditedBond: { min: 0 },
   careCount: { min: 0 },
+  bondHalves: { min: 0, max: SLOTS_PER_DAY },
+  bondSlots: { min: 0, max: (1 << SLOTS_PER_DAY) - 1 },
 };
 
 export function saveState(path, state) {
@@ -90,8 +93,11 @@ function salvageState(state) {
   copyNumber(out, state, "todayCreditedExp");
   copyNumber(out, state, "todayCreditedBond");
   copyNumber(out, state, "careCount");
+  copyNumber(out, state, "bondHalves");
+  copyNumber(out, state, "bondSlots");
   copyString(out, state, "lastSettled");
   copyString(out, state, "lastGrowthDay");
+  copyString(out, state, "bondDay");
   copyBoolean(out, state, "readyToEvolve");
   copyBoolean(out, state, "hatched");
   copyString(out, state, "name");
@@ -111,6 +117,7 @@ function normalizePet(state) {
   const out = { ...state };
   normalizeDate(out, "lastSettled");
   normalizeDate(out, "lastGrowthDay");
+  normalizeDate(out, "bondDay");
   normalizeNumber(out, "level");
   normalizeNumber(out, "exp");
   normalizeNumber(out, "bond");
@@ -119,16 +126,25 @@ function normalizePet(state) {
   normalizeNumber(out, "todayCreditedExp");
   normalizeNumber(out, "todayCreditedBond");
   normalizeNumber(out, "careCount");
+  normalizeNumber(out, "bondHalves");
+  normalizeNumber(out, "bondSlots");
   clampExpToLevel(out);
   return out;
 }
 
-// A persisted `exp` must sit strictly inside the current level's own bar, which is
-// only knowable after `level` is normalized -- a save carried over from a wider
-// level (or a hand-edited file) would otherwise render a >100% EXP bar.
+// A persisted `exp` must sit inside the current level's own bar, which is only
+// knowable after `level` is normalized -- a save carried over from a wider level
+// (or a hand-edited file) would otherwise render a >100% EXP bar. A maxed buddy
+// is the one case allowed to sit exactly at the ceiling: that is what a full bar
+// with nothing left to spend on looks like.
 function clampExpToLevel(out) {
   if (typeof out.exp !== "number") return;
-  const ceiling = expToNextLevel(out.level ?? 1);
+  const level = out.level ?? 1;
+  const ceiling = expToNextLevel(level);
+  if (level >= PARAMS.maxLevel) {
+    if (out.exp > ceiling) out.exp = ceiling;
+    return;
+  }
   if (out.exp >= ceiling) out.exp = ceiling - 1;
 }
 

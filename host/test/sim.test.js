@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deriveMood, applyDailyGrowth, PARAMS } from "../src/pet/sim.js";
+import { deriveMood, applyDailyGrowth, expToNextLevel, PARAMS } from "../src/pet/sim.js";
 
 test("deriveMood maps 5h percentage thresholds and cost spike", () => {
   assert.equal(deriveMood({ p5h: 0, todayCost: 1 }), "happy");
@@ -27,13 +27,13 @@ test("deriveMood treats stale rate utilization as unknown but preserves cost spi
 });
 
 test("applyDailyGrowth caps EXP gain and bond gain per day", () => {
-  const pet = { level: 1, exp: 90, bond: 100, lastGrowthDay: "2026-06-17", todayCreditedExp: 0, todayCreditedBond: 0 };
+  const pet = { level: 1, exp: 0, bond: 100, lastGrowthDay: "2026-06-17", todayCreditedExp: 0, todayCreditedBond: 0 };
 
   const out = applyDailyGrowth(pet, { todayTokens: 99_999_999, today: "2026-06-17" });
 
   assert.equal(out.expGain, PARAMS.dailyExpCap);
-  assert.equal(out.level, 2);
-  assert.equal(out.exp, 90);
+  assert.ok(out.level > pet.level, "a full day of usage must move the level");
+  assert.ok(out.exp < expToNextLevel(out.level), "leftover EXP stays inside the new level's bar");
   assert.ok(out.bond <= pet.bond + PARAMS.bondPerActiveDay);
 });
 
@@ -51,7 +51,7 @@ test("the day AFTER birth, the pet earns exp normally", () => {
   pet = applyDailyGrowth(pet, { todayTokens: 99_999_999, today: "2026-06-17" }); // birth day: anchored
   pet = applyDailyGrowth(pet, { todayTokens: 99_999_999, today: "2026-06-18" }); // next day: fresh budget
   assert.equal(pet.expGain, PARAMS.dailyExpCap);
-  assert.equal(pet.level, 2);
+  assert.ok(pet.level > 1, "the first full day past birth must level the pet");
 });
 
 test("applyDailyGrowth respects the daily bond soft cap", () => {
@@ -65,7 +65,7 @@ test("applyDailyGrowth respects the daily bond soft cap", () => {
 test("applyDailyGrowth treats future lastGrowthDay as same-day date regression", () => {
   const pet = {
     level: 2,
-    exp: 10,
+    exp: 1, // inside level 2's bar, so a no-gain tick must leave it exactly there
     bond: 20,
     lastGrowthDay: "2026-06-18",
     todayCreditedExp: PARAMS.dailyExpCap,
@@ -76,7 +76,7 @@ test("applyDailyGrowth treats future lastGrowthDay as same-day date regression",
 
   assert.equal(out.expGain, 0);
   assert.equal(out.level, 2);
-  assert.equal(out.exp, 10);
+  assert.equal(out.exp, 1);
   assert.equal(out.bond, 20);
   assert.equal(out.lastGrowthDay, "2026-06-18");
   assert.equal(out.todayCreditedExp, PARAMS.dailyExpCap);

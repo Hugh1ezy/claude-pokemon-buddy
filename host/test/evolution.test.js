@@ -88,19 +88,23 @@ test("stone branch overrides when another branch is also eligible", () => {
   );
 });
 
-test("bulbasaur evolves to ivysaur at level 14", () => {
-  assert.equal(resolveEvolution("bulbasaur", { level: 13 }).auto, null);
-  assert.equal(resolveEvolution("bulbasaur", { level: 14 }).auto, "ivysaur");
+test("bulbasaur evolves to ivysaur at level 16, ivysaur to venusaur at 32 (official gates)", () => {
+  assert.equal(resolveEvolution("bulbasaur", { level: 15 }).auto, null);
+  assert.equal(resolveEvolution("bulbasaur", { level: 16 }).auto, "ivysaur");
+  assert.equal(resolveEvolution("ivysaur", { level: 31 }).auto, null);
+  assert.equal(resolveEvolution("ivysaur", { level: 32 }).auto, "venusaur");
 });
 
-test("charmander -> charmeleon at 14, charmeleon -> charizard at 30", () => {
-  assert.equal(resolveEvolution("charmander", { level: 14 }).auto, "charmeleon");
-  assert.equal(resolveEvolution("charmeleon", { level: 29 }).auto, null);
-  assert.equal(resolveEvolution("charmeleon", { level: 30 }).auto, "charizard");
+test("charmander -> charmeleon at 16, charmeleon -> charizard at 36", () => {
+  assert.equal(resolveEvolution("charmander", { level: 15 }).auto, null);
+  assert.equal(resolveEvolution("charmander", { level: 16 }).auto, "charmeleon");
+  assert.equal(resolveEvolution("charmeleon", { level: 35 }).auto, null);
+  assert.equal(resolveEvolution("charmeleon", { level: 36 }).auto, "charizard");
 });
 
 test("squirtle line loads (data-driven, no code per species)", () => {
-  assert.equal(resolveEvolution("squirtle", { level: 14 }).auto, "wartortle");
+  assert.equal(resolveEvolution("squirtle", { level: 16 }).auto, "wartortle");
+  assert.equal(resolveEvolution("wartortle", { level: 36 }).auto, "blastoise");
 });
 
 test("eevee branches still resolve by bond (regression)", () => {

@@ -1,5 +1,5 @@
 {
-  "bulbasaur": { "stage": 0, "branches": [{ "to": "ivysaur",  "needs": { "level": 14 }, "priority": 1 }] },
-  "ivysaur":   { "stage": 1, "branches": [{ "to": "venusaur", "needs": { "level": 30 }, "priority": 1 }] },
+  "bulbasaur": { "stage": 0, "branches": [{ "to": "ivysaur",  "needs": { "level": 16 }, "priority": 1 }] },
+  "ivysaur":   { "stage": 1, "branches": [{ "to": "venusaur", "needs": { "level": 32 }, "priority": 1 }] },
   "venusaur":  { "stage": 2, "branches": [] }
 }
