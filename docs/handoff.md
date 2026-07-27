@@ -92,16 +92,36 @@ Measured, so nobody re-debugs this as "the switch back is broken":
 
 | | |
 |---|---|
-| host cold start → first frame on the panel | **4.5 s** |
+| USB unplug → running on wifi | **2.1 s** (was an erratic 10-18 s — see below) |
 | push rate while the host is up | every **333 ms** (the buddy animator, not the 60 s tick) |
 | device leaves local-clock mode | on the **first frame** — no timer, no button needed |
 | device enters local-clock mode | after **120 s** with no frame on either link |
 
 So "it won't switch back to the networked screen" is almost never the device.
-It means no frames are arriving, and the usual reason is that the **host is not
-running**: `start-buddy.vbs` lives in the Startup folder, which fires **only at
-logon**. The work PC had not rebooted since 2026-07-16 while the entry was added
-on 07-27, so it had never once run. Check that before touching firmware.
+It means no frames are arriving. Two causes accounted for everything seen here:
+
+1. **The host was not running at all.** `start-buddy.vbs` lives in the Startup
+   folder, which fires **only at logon**. The work PC had not rebooted since
+   2026-07-16 while the entry was added on 07-27, so it had never once run.
+   Check this before touching firmware.
+2. **mDNS discovery was losing a race for UDP 5353.** On Windows the DNS Client
+   service owns that port, and `bonjour-service` competes with it for the
+   multicast replies. Measured with an established TCP session to the device the
+   whole time: four `findWifiHost` calls, 4 s each, zero answers; and a 90 s
+   continuous browse that saw the service zero times. Each miss costs a discover
+   timeout plus a reconnect delay, so reconnects landed anywhere in 10-18 s and
+   never measured the same twice. The host now remembers the address that last
+   worked (`host/out/wifi-last.json`) and tries it before browsing, which is
+   what the 2.1 s above is. mDNS is still the fallback for a device that moved.
+
+> The cache is written only after a connection succeeds, so the **first**
+> reconnect on a machine (or after the device changes IP) still pays the old
+> slow path. That is expected, not a regression — measure the second one.
+
+Rejected, with the measurement, so nobody retries it: pinning `cpb-buddy.local`
+in `config.json` to skip discovery. `Resolve-DnsName` resolves it, but node's
+`dns.lookup` — which is what `net.connect` actually uses — returns `ENOTFOUND`
+after burning 2.25 s per attempt on this machine.
 
 `host/out/wifi-probe.mjs` (untracked, work PC) talks the protocol directly over
 TCP — mDNS discovery, `T_AUTH`, one full-screen frame, and it prints the ACK.
@@ -117,8 +137,27 @@ that needs python, and two statusline fan-out tests that need `sh`. A tenth,
 four on both clean and modified trees. Everything else should pass; treat any
 other failure as real.
 
-Baseline on the work PC, 2026-07-28: **477 pass / 9 fail** out of 486, and the 9
-are exactly that documented set.
+Baseline on the work PC, 2026-07-28: **482 pass / 9 fail** out of 492 (the tenth
+failure, when it shows up, is the RM12 flake above), and the 9 are exactly that
+documented set.
+
+## 亲密度 was silently never paid out on weekdays (fixed 2026-07-28)
+
+Worth knowing because the symptom was "I keep pressing KEY and no half heart
+appears", which reads like a dead button. A short KEY press is two things at
+once — the greet gesture that plays the signature animation, and the working-day
+bond credit — and the dispatcher's signature branch returned before queueing the
+event, so `applyBondTick` never saw `clicked`. Weekends were unaffected (those
+windows pay out on their own), which made it look intermittent.
+
+Two existing tests had frozen the swallow into the contract by asserting
+`drainTickEvents()` was empty; both now assert the opposite, plus a runOneTick
+level test for the step that had no coverage at all. Verified on hardware: the
+press now logs `button KEY short` host-side and `bondHalves` goes 0 → 1.
+
+The host also logs every arriving press now. Without it there was no way to tell
+a press that never arrived from one that arrived and was mishandled — which is
+the first thing you need to know when this kind of report comes in.
 
 ## Toolchain
 
