@@ -236,14 +236,17 @@ static bool send_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_
 }
 
 // Fire-and-forget uplink events (HELLO/SENSOR/BUTTON) have no seq semantics
-// the host cares about, so they're safe to send on every currently-live
-// channel rather than picking one -- USB always, WiFi only if a client is
-// connected (a no-op write on an unconnected WiFi link is not an error, see
-// wifi_write_raw, so this never spams tx-drop warnings when WiFi is unused).
+// the host cares about, so they're safe to send on every currently-live,
+// authenticated channel -- USB always (physical possession is the trust
+// boundary there), WiFi only once that connection's T_AUTH has been
+// accepted (an unauthenticated LAN peer shouldn't see sensor/button
+// telemetry any more than it should be able to push frames). A no-op write
+// when WiFi isn't connected/authed is not an error, see wifi_write_raw, so
+// this never spams tx-drop warnings when WiFi is unused.
 static void broadcast_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
 {
     send_frame(type, seq, payload, len, Link::USB);
-    send_frame(type, seq, payload, len, Link::WIFI);
+    if (g_wifi_authenticated) send_frame(type, seq, payload, len, Link::WIFI);
 }
 
 static void send_ack(uint8_t seq, Link link)
