@@ -604,14 +604,15 @@ static void button_task(void *arg)
             // for no reason and never came back". BOOT has no daily function at
             // all, so it cannot be hit while playing with the buddy.
             //
-            // EXIT stays on KEY: waking it up is the thing you reach for without
-            // thinking, and any KEY press doing it is the forgiving behaviour.
-            if (key_id == KEY_ID_BOOT && kind_id == KIND_DOUBLE &&
-                g_mode.load() == DeviceMode::NORMAL) {
+            // EXIT is on BOOT too, so the whole power-save toggle lives on one
+            // button and KEY is purely the buddy's. ANY BOOT press gets you out
+            // -- deliberately more forgiving than entry, since being stuck on
+            // the clock face is the bad state to be in, and someone who has
+            // forgotten which gesture it was will mash the button.
+            if (g_mode.load() == DeviceMode::LOCAL_CLOCK) {
+                if (key_id == KEY_ID_BOOT) exit_local_clock_mode();
+            } else if (key_id == KEY_ID_BOOT && kind_id == KIND_DOUBLE) {
                 enter_local_clock_mode(true);
-            } else if (key_id == KEY_ID_KEY && g_mode.load() == DeviceMode::LOCAL_CLOCK &&
-                       (kind_id == KIND_SHORT || kind_id == KIND_DOUBLE)) {
-                exit_local_clock_mode();
             }
         }
     }

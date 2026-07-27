@@ -170,6 +170,12 @@ export function makeTransport({
       // full-frame repaint instead of a stale diff that would leave the
       // device's leftover pixels uncorrected wherever the new frame happens
       // to match the host's last-known bitmap.
+      //
+      // Logged because this is the only host-side evidence of the moment the
+      // panel stops showing the clock face. "How long until it switches back"
+      // is measured from the transport attaching to this line -- without it
+      // there is nothing to time against except someone watching the screen.
+      logger?.log?.("device left local-clock mode (RESYNC)");
       events.emit("reconnect");
     }
   }
