@@ -89,6 +89,83 @@ test("createWifiTransport returns null when the socket errors before connecting"
   assert.equal(transport, null);
 });
 
+test("a remembered address is tried before browsing, and mDNS is never queried", async () => {
+  const sockets = [];
+  const netConnect = autoConnectStub(sockets);
+  let browsed = false;
+  const BonjourImpl = class { find() { browsed = true; return { stop() {} }; } destroy() {} };
+
+  const transport = await createWifiTransport({
+    netConnect,
+    BonjourImpl,
+    token: "s3cr3t",
+    addressCache: memoryCache({ host: "192.168.1.138", port: 7311 }),
+  });
+
+  assert.ok(transport);
+  assert.equal(browsed, false, "a working remembered address must skip discovery entirely");
+  transport.close();
+});
+
+test("a stale remembered address falls back to mDNS and the new one replaces it", async () => {
+  const attempts = [];
+  const netConnect = (target) => {
+    attempts.push(target);
+    const socket = new FakeSocket();
+    // The remembered host has moved; only the discovered one answers.
+    if (target.host === "192.168.1.7") setImmediate(() => socket.emit("connect"));
+    else setImmediate(() => socket.emitError());
+    return socket;
+  };
+  const BonjourImpl = bonjourStub({ service: { addresses: ["192.168.1.7"], port: 7311 } });
+  const cache = memoryCache({ host: "192.168.1.99", port: 7311 });
+
+  const transport = await createWifiTransport({
+    netConnect, BonjourImpl, token: "s3cr3t", discoverTimeoutMs: 200, cachedConnectTimeoutMs: 20,
+    addressCache: cache,
+  });
+
+  assert.ok(transport);
+  assert.deepEqual(attempts.map((a) => a.host), ["192.168.1.99", "192.168.1.7"]);
+  assert.deepEqual(cache.read(), { host: "192.168.1.7", port: 7311 });
+  transport.close();
+});
+
+test("a remembered address is not written back until the connection actually works", async () => {
+  const BonjourImpl = bonjourStub({ service: { addresses: ["192.168.1.7"], port: 7311 } });
+  const cache = memoryCache(null);
+
+  const transport = await createWifiTransport({
+    netConnect: () => new FakeSocket(), // never connects
+    BonjourImpl, token: "s3cr3t", discoverTimeoutMs: 200, connectTimeoutMs: 20,
+    addressCache: cache,
+  });
+
+  assert.equal(transport, null);
+  assert.equal(cache.read(), null);
+});
+
+test("a corrupt cache entry is ignored rather than tried", async () => {
+  const attempts = [];
+  const netConnect = (target) => {
+    attempts.push(target);
+    const socket = new FakeSocket();
+    setImmediate(() => socket.emit("connect"));
+    return socket;
+  };
+  const BonjourImpl = bonjourStub({ service: { addresses: ["192.168.1.7"], port: 7311 } });
+
+  for (const bad of [{ host: "", port: 7311 }, { host: "x", port: 0 }, { host: "x" }, {}]) {
+    attempts.length = 0;
+    const transport = await createWifiTransport({
+      netConnect, BonjourImpl, token: "s3cr3t", discoverTimeoutMs: 200,
+      addressCache: memoryCache(bad),
+    });
+    assert.deepEqual(attempts.map((a) => a.host), ["192.168.1.7"], `bad entry ${JSON.stringify(bad)}`);
+    transport?.close();
+  }
+});
+
 test("pushFrame over the wifi-connected socket resolves on ACK (reuses makeTransport's queueing)", async () => {
   const sockets = [];
   const netConnect = autoConnectStub(sockets);
@@ -136,6 +213,14 @@ function autoConnectStub(sockets) {
     sockets.push(socket);
     setImmediate(() => socket.emit("connect"));
     return socket;
+  };
+}
+
+function memoryCache(initial) {
+  let value = initial;
+  return {
+    read: () => value,
+    write: (next) => { value = next; },
   };
 }
 

@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import { diffRect } from "./diff.js";
 import { createMockTransport } from "./mock.js";
 import { rleEncode } from "./proto.js";
 import { createSerialTransport, DEFAULT_RECONNECT_DELAY_MS } from "./serial.js";
-import { createWifiTransport } from "./wifi.js";
+import { createWifiTransport, fileAddressCache } from "./wifi.js";
 
 let loggedMockFallback = false;
 
@@ -36,7 +36,19 @@ export async function createTransport({
   let chain = Promise.resolve();
   const probeDelayMs = serialOptions.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS;
   const wifiEnabled = Boolean(wifi?.enabled && wifi?.token);
-  const wifiOptions = wifiEnabled ? { token: wifi.token, host: wifi.host, port: wifi.port, logger } : null;
+  const wifiOptions = wifiEnabled
+    ? {
+        token: wifi.token,
+        host: wifi.host,
+        port: wifi.port,
+        logger,
+        // Lives next to the frame mirror, i.e. in out/ -- machine-local runtime
+        // state, same as everything else there. Callers may pass framePath:
+        // null to mean "no preview file", and that also means nowhere to keep
+        // the cache; discovery still works, it just never gets the shortcut.
+        addressCache: framePath ? fileAddressCache(join(dirname(framePath), "wifi-last.json")) : null,
+      }
+    : null;
 
   const initial = await connectAny();
   if (initial) {
