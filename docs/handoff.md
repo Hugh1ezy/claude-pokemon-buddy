@@ -107,9 +107,14 @@ all, it was the same 6.9 s. The fix was to repaint from disk before the first
 tick goes near ccusage or weather (`paintFromDisk` in `host/src/index.js`), and
 what is left is essentially node's own startup.
 
-> **Do not use ping to decide whether the device is on the network.** ICMP to it
-> is dropped often enough to look like a dead device while mDNS resolves it and
-> TCP connects fine. Probe with the mDNS browse or a connection to tcp/7311.
+> **Probe the device with a TCP connect to 7311, nothing else.** Both of the
+> obvious alternatives lie. ICMP is dropped often enough to look like a dead
+> device. An mDNS browse from node is worse: it returned nothing for a device
+> that a TCP connect reached in 272ms, and it silently missed the device coming
+> back twice in a row during a measurement. Each of those cost a round of
+> chasing a problem that did not exist. A connect is unambiguous — just note the
+> device accepts one client at a time, so do not probe that way while the host
+> is meant to be connecting over wifi.
 
 So "it won't switch back to the networked screen" is almost never the device
 being broken. It means no frames are arriving. Three separate causes turned up

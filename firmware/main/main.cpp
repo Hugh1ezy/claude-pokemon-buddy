@@ -757,15 +757,46 @@ static void start_mdns_once(void)
     ESP_LOGI(TAG, "mdns: advertising _cpb._tcp on port %u", (unsigned)WIFI_TCP_PORT);
 }
 
-static void apply_wifi_credential(int idx)
+// The AP we were last actually associated with. Pinning its BSSID and channel
+// turns the next connect from "scan every channel looking for this SSID" into
+// "talk to this radio on this channel", which is the difference between a few
+// seconds and a few hundred milliseconds. That matters because waking out of
+// power-save stops and restarts the radio, so every wake pays for a full scan:
+// measured ~6s from BOOT press to the buddy reappearing, of which roughly 5s
+// was on the device and the scan is the bulk of it.
+//
+// Held in RAM only. It is a shortcut, not a setting -- a reboot, a moved
+// device, or a router that reassigns channels should all just scan again.
+static uint8_t g_wifi_pin_bssid[6] = {};
+static uint8_t g_wifi_pin_channel = 0;
+static std::atomic<bool> g_wifi_pin_valid{false};
+static std::atomic<bool> g_wifi_pin_in_use{false};
+static std::atomic<int> g_wifi_last_good_idx{-1};
+
+static void apply_wifi_credential(int idx, bool allow_pin = true)
 {
     wifi_config_t wc = {};
     const WifiCred &c = WIFI_CREDS[idx];
     strncpy((char *)wc.sta.ssid, c.ssid, sizeof(wc.sta.ssid) - 1);
     strncpy((char *)wc.sta.password, c.pass, sizeof(wc.sta.password) - 1);
     wc.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
+    // Only pin for the credential the pin was recorded against -- pointing a
+    // different SSID at that BSSID would just fail slowly.
+    const bool pin = allow_pin && g_wifi_pin_valid.load() && idx == g_wifi_last_good_idx.load();
+    if (pin) {
+        memcpy(wc.sta.bssid, g_wifi_pin_bssid, sizeof(wc.sta.bssid));
+        wc.sta.bssid_set = true;
+        wc.sta.channel = g_wifi_pin_channel;
+    }
+    g_wifi_pin_in_use.store(pin);
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
-    ESP_LOGI(TAG, "wifi: trying \"%s\"", c.ssid);
+    if (pin) {
+        ESP_LOGI(TAG, "wifi: trying \"%s\" pinned to ch%u", c.ssid, (unsigned)g_wifi_pin_channel);
+    } else {
+        ESP_LOGI(TAG, "wifi: trying \"%s\"", c.ssid);
+    }
 }
 
 // All retry/fallback logic lives here rather than a separate polling task:
@@ -784,7 +815,6 @@ static void apply_wifi_credential(int idx)
 // was working seconds earlier. Measured as 10-18s of dead screen for what
 // should be an immediate reconnect. With one credential configured this
 // changes nothing (the cycle was already a no-op).
-static std::atomic<int> g_wifi_last_good_idx{-1};
 static std::atomic<bool> g_wifi_retry_last_good{false};
 
 static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -799,6 +829,20 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
         // another event -- which silently kills the retry loop for good, so the
         // device never rejoins even after the radio is started again.
         if (g_wifi_user_stopped.load()) return;
+
+        // A pinned attempt that failed means the shortcut is wrong now (the AP
+        // moved channel, or we are somewhere else entirely). Drop it and retry
+        // the same credential with a normal scan before touching the cycle --
+        // otherwise one stale BSSID would look exactly like the network being
+        // gone and send us off to the other one.
+        if (g_wifi_pin_in_use.exchange(false)) {
+            ESP_LOGI(TAG, "wifi: pinned AP did not answer; rescanning");
+            g_wifi_pin_valid.store(false);
+            vTaskDelay(pdMS_TO_TICKS(200));
+            apply_wifi_credential(g_wifi_cred_idx.load(), false);
+            esp_wifi_connect();
+            return;
+        }
 
         if (g_wifi_retry_last_good.exchange(false)) {
             int same = g_wifi_last_good_idx.load();
@@ -824,6 +868,17 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
         // on the way out of manual local-clock mode.
         g_wifi_last_good_idx.store(g_wifi_cred_idx.load());
         g_wifi_retry_last_good.store(true);
+
+        // And remember which radio on which channel, so the next connect can
+        // skip the scan entirely.
+        wifi_ap_record_t ap = {};
+        if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
+            memcpy(g_wifi_pin_bssid, ap.bssid, sizeof(g_wifi_pin_bssid));
+            g_wifi_pin_channel = ap.primary;
+            g_wifi_pin_valid.store(true);
+            ESP_LOGI(TAG, "wifi: pinned ch%u for next connect", (unsigned)ap.primary);
+        }
+        g_wifi_pin_in_use.store(false);
         start_mdns_once();
     }
 }
