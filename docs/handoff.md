@@ -108,6 +108,28 @@ simulation caught.
 | `start-buddy.vbs` | absolute paths | autostart launcher |
 | `host/seed/sprites/`, `host/seed/oak.png` | Nintendo artwork, public repo | **new 2026-07-28** — run `cd host && node scripts/bake-assets.mjs` once per machine (~156 files, a few minutes). Without it the buddy renders as a checkerboard placeholder and the sprite tests skip themselves. |
 
+### Do not "optimise" the animator pause in the tick loop
+
+`index.js`'s tick holds `animator.pause()` across the usage and weather I/O —
+about three seconds of `npx ccusage` plus a network fetch — and it looks like
+pure dead time on the wake path. It is not. It is load-shedding.
+
+After a wake `previousBytes` is null, so **every** push is a full ~9.4KB frame
+instead of a small dirty rect. Narrowing the pause to just the render lets the
+animator fire into that at 3Hz on top of the tick's own frame; the device stops
+acknowledging frames altogether and the panel never comes back at all. This was
+tried on 2026-07-28, made the switch-back worse than the problem it was aimed
+at, and was reverted along with the firmware built alongside it.
+
+The real fix, when someone gets to it, is upstream of the pause: coalesce
+queued pushes so only the newest frame is ever in flight, instead of sending
+stale frames one by one while newer ones wait behind them. Do that first, then
+the pause can be narrowed safely.
+
+More generally: the wake path was tuned across two full sessions and is the
+thing the owner notices most. Measure before changing it, and change it on its
+own, not as a side quest inside unrelated feature work.
+
 ### wifi_creds.h holds BOTH networks, always
 
 One image serves home and work. **Never flash a build listing only the network
