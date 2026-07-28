@@ -25,10 +25,21 @@ export const DEFAULT_CONNECT_TIMEOUT_MS = 5000;
 export const DEFAULT_CACHED_CONNECT_TIMEOUT_MS = 400;
 // How many times in a row the remembered address may fail before we pay for a
 // full mDNS browse. A device that is merely still booting fails this probe
-// several times, and the 4s browse cannot help with that -- it just makes each
-// retry cycle 4s longer for no information. Discovery is for a device that
+// several times, and the browse cannot help with that -- it just makes that
+// retry cycle longer for no information. Discovery is for a device that
 // actually moved, which is rare and can afford a few cheap retries first.
-export const DEFAULT_DISCOVER_AFTER_CACHED_FAILURES = 4;
+//
+// Raised from 4 once it was clear what a browse costs in practice: while it
+// runs, the cheap check is not running, so the host is blind to the device
+// coming back for the whole of it. Fewer browses means fewer windows in which
+// a device that just reappeared goes unnoticed.
+export const DEFAULT_DISCOVER_AFTER_CACHED_FAILURES = 8;
+// Discovery that follows a remembered address which stopped answering does not
+// need the full budget: we are not lost, we are double-checking a belief. A
+// device that is present answers a browse in well under this. The cold-start
+// case (no remembered address, genuinely nothing to go on) keeps the longer
+// DEFAULT_DISCOVER_TIMEOUT_MS.
+export const DEFAULT_STALE_DISCOVER_TIMEOUT_MS = 1500;
 
 // Browses for the device's mDNS service and resolves its current host:port.
 // Returns null if nothing answers within timeoutMs (mirrors findEspPort's
@@ -64,6 +75,7 @@ export async function createWifiTransport({
   connectTimeoutMs = DEFAULT_CONNECT_TIMEOUT_MS,
   cachedConnectTimeoutMs = DEFAULT_CACHED_CONNECT_TIMEOUT_MS,
   discoverAfterCachedFailures = DEFAULT_DISCOVER_AFTER_CACHED_FAILURES,
+  staleDiscoverTimeoutMs = DEFAULT_STALE_DISCOVER_TIMEOUT_MS,
   // No cache unless the caller wires one (transport/index.js does). Defaulting
   // to a real file here would make every test read whatever the developer's
   // own machine last connected to.
@@ -112,6 +124,11 @@ export async function createWifiTransport({
         return null;
       }
       logger?.warn?.("wifi: remembered address failed repeatedly; falling back to mDNS");
+      const rediscovered = await findWifiHost({ BonjourImpl, timeoutMs: staleDiscoverTimeoutMs });
+      if (!rediscovered) return null;   // back to the cheap loop
+      const socket = await open(rediscovered);
+      if (socket) addressCache?.write(rediscovered);
+      return socket;
     }
 
     const found = await findWifiHost({ BonjourImpl, timeoutMs: discoverTimeoutMs });

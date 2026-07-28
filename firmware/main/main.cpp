@@ -35,6 +35,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -248,6 +249,28 @@ static bool usb_write_raw(const uint8_t *bytes, size_t total)
     int written = usb_serial_jtag_write_bytes(bytes, total, pdMS_TO_TICKS(100));
     xSemaphoreGive(tx_mutex);
     return written == (int)total;
+}
+
+// Diagnostic line straight out the USB-Serial-JTAG channel, prefixed so a
+// reader can pick it out of the protocol bytes it shares the wire with (the
+// host's parser skips anything that is not a frame, so this is safe to leave
+// in). ESP_LOG is NOT usable for this: console output races with
+// usb_serial_jtag_driver_install and is silently lost afterwards, which is
+// exactly what happened the first time this wake path was investigated --
+// a serial reader that captured nothing at all. See CLAUDE.md 8.1.
+static void diag(const char *fmt, ...)
+{
+    char buf[160];
+    int n = snprintf(buf, sizeof(buf), "\n#CPB %lu ", (unsigned long)(esp_timer_get_time() / 1000));
+    if (n < 0 || n >= (int)sizeof(buf)) return;
+    va_list ap;
+    va_start(ap, fmt);
+    int m = vsnprintf(buf + n, sizeof(buf) - n - 2, fmt, ap);
+    va_end(ap);
+    if (m < 0) return;
+    size_t len = strnlen(buf, sizeof(buf) - 2);
+    buf[len++] = '\n';
+    usb_write_raw((const uint8_t *)buf, len);
 }
 
 // Returns true when there's nothing to do (no client connected) as well as on
@@ -569,8 +592,10 @@ static void exit_local_clock_mode(void)
     if (g_mode.load() == DeviceMode::NORMAL) return;
     g_mode.store(DeviceMode::NORMAL);
     if (g_wifi_user_stopped.load()) {
+        diag("WAKE esp_wifi_start()");
         g_wifi_user_stopped.store(false);
         esp_wifi_start();   // re-triggers WIFI_EVENT_STA_START -> the normal connect flow
+        diag("WAKE esp_wifi_start() returned");
     }
     // local_clock_task drew directly to the panel while we were away, which the
     // host's diff tracking never saw. Tell it to treat this like a fresh
@@ -773,6 +798,30 @@ static std::atomic<bool> g_wifi_pin_valid{false};
 static std::atomic<bool> g_wifi_pin_in_use{false};
 static std::atomic<int> g_wifi_last_good_idx{-1};
 
+// The lease that AP handed us, reused instead of re-running DHCP when we come
+// straight back to the same radio. Measured on the wake path: association took
+// 72ms and DHCP took 3.1s, so this is essentially the whole device-side cost.
+//
+// Safe because it is gated on the BSSID pin: reuse only ever happens when we
+// are rejoining the exact AP we just left, which in practice means seconds to
+// hours inside one sitting, well within any lease. Moving between locations
+// changes the BSSID, the pin does not match, and DHCP runs normally. The time
+// cap covers the case nobody plans for -- a device left in power-save for days
+// and woken somewhere the lease has long since been reassigned.
+static esp_netif_t *g_sta_netif = nullptr;
+static esp_netif_ip_info_t g_wifi_lease = {};
+static std::atomic<bool> g_wifi_lease_valid{false};
+static std::atomic<bool> g_wifi_lease_in_use{false};
+static int64_t g_wifi_lease_at_us = 0;
+static constexpr int64_t WIFI_LEASE_MAX_AGE_US = 12LL * 3600 * 1000000; // 12h
+
+static void wifi_restore_dhcp(void)
+{
+    if (!g_sta_netif) return;
+    g_wifi_lease_in_use.store(false);
+    esp_netif_dhcpc_start(g_sta_netif);   // already-started is not an error worth acting on
+}
+
 static void apply_wifi_credential(int idx, bool allow_pin = true)
 {
     wifi_config_t wc = {};
@@ -791,11 +840,25 @@ static void apply_wifi_credential(int idx, bool allow_pin = true)
     }
     g_wifi_pin_in_use.store(pin);
 
+    // Reuse the lease only alongside the pin -- same AP, same router, same
+    // lease. Any other path (moved, rescanning, cold boot) goes back to DHCP.
+    const bool lease_fresh = g_wifi_lease_valid.load() &&
+        (esp_timer_get_time() - g_wifi_lease_at_us) < WIFI_LEASE_MAX_AGE_US;
+    if (pin && lease_fresh && g_sta_netif) {
+        esp_netif_dhcpc_stop(g_sta_netif);
+        esp_netif_set_ip_info(g_sta_netif, &g_wifi_lease);
+        g_wifi_lease_in_use.store(true);
+    } else {
+        wifi_restore_dhcp();
+    }
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
     if (pin) {
         ESP_LOGI(TAG, "wifi: trying \"%s\" pinned to ch%u", c.ssid, (unsigned)g_wifi_pin_channel);
+        diag("connect idx=%d pinned ch=%u", idx, (unsigned)g_wifi_pin_channel);
     } else {
         ESP_LOGI(TAG, "wifi: trying \"%s\"", c.ssid);
+        diag("connect idx=%d scan", idx);
     }
 }
 
@@ -819,16 +882,51 @@ static std::atomic<bool> g_wifi_retry_last_good{false};
 
 static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED) {
+        // Splits the connect->GOT_IP gap into "found and joined the AP" and
+        // "DHCP answered", which are different problems with different fixes.
+        diag("ASSOCIATED");
+        if (g_wifi_lease_in_use.load()) {
+            // DHCP is stopped, so IP_EVENT_STA_GOT_IP will never arrive -- the
+            // interface is already configured. Everything the GOT_IP branch
+            // does has to happen here instead, or the device would be on the
+            // network with no mDNS and no last-good credential recorded.
+            diag("LEASE_REUSED " IPSTR, IP2STR(&g_wifi_lease.ip));
+            g_wifi_last_good_idx.store(g_wifi_cred_idx.load());
+            g_wifi_retry_last_good.store(true);
+            g_wifi_pin_in_use.store(false);
+            start_mdns_once();
+        }
+        return;
+    }
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
+        diag("STA_START");
         apply_wifi_credential(g_wifi_cred_idx.load());
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        // The reason code is the whole point of instrumenting this: it says
+        // whether a failed attempt timed out looking for the AP, was refused,
+        // or was told to go away, which are three different bugs.
+        const auto *d = (const wifi_event_sta_disconnected_t *)data;
+        diag("DISCONNECTED reason=%u pinned=%d", (unsigned)(d ? d->reason : 0),
+             g_wifi_pin_in_use.load() ? 1 : 0);
         // esp_wifi_stop() (manual local-clock mode) raises this too. Reconnecting
         // there would fight the user's own power-save request, and worse, the
         // esp_wifi_connect() below fails on a stopped radio without producing
         // another event -- which silently kills the retry loop for good, so the
         // device never rejoins even after the radio is started again.
+        // Deliberately after the user_stopped check: entering power-save must
+        // NOT throw the lease away, since coming straight back to the same AP
+        // is the whole case it exists for.
         if (g_wifi_user_stopped.load()) return;
+
+        // A session that was riding a reused lease has dropped. Do not assume
+        // the address is still ours -- the next attempt earns a fresh one.
+        if (g_wifi_lease_in_use.exchange(false)) {
+            diag("LEASE_DROPPED");
+            g_wifi_lease_valid.store(false);
+            wifi_restore_dhcp();
+        }
 
         // A pinned attempt that failed means the shortcut is wrong now (the AP
         // moved channel, or we are somewhere else entirely). Drop it and retry
@@ -863,6 +961,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         auto *event = (ip_event_got_ip_t *)data;
         ESP_LOGI(TAG, "wifi: got ip " IPSTR, IP2STR(&event->ip_info.ip));
+        diag("GOT_IP " IPSTR, IP2STR(&event->ip_info.ip));
         // Whatever we are on now is the network that is actually here. Pin it as
         // the one to try first next time, including after the radio is restarted
         // on the way out of manual local-clock mode.
@@ -878,6 +977,11 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
             g_wifi_pin_valid.store(true);
             ESP_LOGI(TAG, "wifi: pinned ch%u for next connect", (unsigned)ap.primary);
         }
+        // Keep the lease too: rejoining this same AP can then skip DHCP, which
+        // measured 3.1s of the 3.7s device-side wake.
+        g_wifi_lease = event->ip_info;
+        g_wifi_lease_at_us = esp_timer_get_time();
+        g_wifi_lease_valid.store(true);
         g_wifi_pin_in_use.store(false);
         start_mdns_once();
     }
@@ -894,7 +998,7 @@ static void wifi_init_sta(void)
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    g_sta_netif = esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_cfg));
