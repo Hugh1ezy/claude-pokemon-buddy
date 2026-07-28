@@ -449,6 +449,11 @@ export async function main({
         // every tick, so replacing the file is all this takes.)
         const deviceAttached = Boolean(transport.getKind?.());
         if (deviceAttached && !deviceWasAttached) await saveSync.pull();
+        // The device just left -- it is on its way to the other machine, and
+        // this is the handoff. Publish now instead of leaving the last stretch
+        // of the session sitting behind the push debounce, where it would be
+        // silently dropped when the machine at the other end pulls.
+        if (!deviceAttached && deviceWasAttached) await saveSync.maybePush({ force: true });
         deviceWasAttached = deviceAttached;
         animator.pause();
         try {
