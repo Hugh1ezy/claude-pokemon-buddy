@@ -17,9 +17,18 @@ const SERVICE_TYPE = "cpb"; // advertised by firmware as _cpb._tcp.local
 export const DEFAULT_DISCOVER_TIMEOUT_MS = 4000;
 export const DEFAULT_CONNECT_TIMEOUT_MS = 5000;
 // The remembered address is tried before browsing, so its timeout is a "is it
-// still there" probe, not a real connect budget -- keep it short enough that a
-// stale entry costs less than the browse it is trying to skip.
-export const DEFAULT_CACHED_CONNECT_TIMEOUT_MS = 1200;
+// there yet" probe, not a real connect budget. A device on the same LAN answers
+// in tens of milliseconds; anything longer is it not being up, and waiting
+// longer does not change the answer. Measured: at 1200ms this was the single
+// biggest component of the wake latency after a device came back from
+// power-save.
+export const DEFAULT_CACHED_CONNECT_TIMEOUT_MS = 400;
+// How many times in a row the remembered address may fail before we pay for a
+// full mDNS browse. A device that is merely still booting fails this probe
+// several times, and the 4s browse cannot help with that -- it just makes each
+// retry cycle 4s longer for no information. Discovery is for a device that
+// actually moved, which is rare and can afford a few cheap retries first.
+export const DEFAULT_DISCOVER_AFTER_CACHED_FAILURES = 4;
 
 // Browses for the device's mDNS service and resolves its current host:port.
 // Returns null if nothing answers within timeoutMs (mirrors findEspPort's
@@ -54,6 +63,7 @@ export async function createWifiTransport({
   discoverTimeoutMs = DEFAULT_DISCOVER_TIMEOUT_MS,
   connectTimeoutMs = DEFAULT_CONNECT_TIMEOUT_MS,
   cachedConnectTimeoutMs = DEFAULT_CACHED_CONNECT_TIMEOUT_MS,
+  discoverAfterCachedFailures = DEFAULT_DISCOVER_AFTER_CACHED_FAILURES,
   // No cache unless the caller wires one (transport/index.js does). Defaulting
   // to a real file here would make every test read whatever the developer's
   // own machine last connected to.
@@ -84,8 +94,24 @@ export async function createWifiTransport({
     const remembered = validAddress(addressCache?.read());
     if (remembered) {
       const viaCache = await open(remembered, cachedConnectTimeoutMs);
-      if (viaCache) return viaCache;
-      logger?.warn?.("wifi: remembered address did not answer; falling back to mDNS");
+      if (viaCache) {
+        addressCache.noteHit?.();
+        return viaCache;
+      }
+      // The miss count lives on the cache, not here: createTransport builds a
+      // fresh createWifiTransport on every probe, so a counter held in this
+      // closure would reset each time and the escalation below would never
+      // fire -- a device that changed IP would then never be rediscovered.
+      // A cache that does not track misses escalates immediately, which is the
+      // old behaviour and the safe default.
+      const misses = addressCache.noteMiss?.() ?? Infinity;
+      if (misses < discoverAfterCachedFailures) {
+        // Cheap miss. Let the caller's normal retry come back around rather
+        // than spending 4s browsing for an address we already believe in --
+        // the usual reason this failed is that the device is still coming up.
+        return null;
+      }
+      logger?.warn?.("wifi: remembered address failed repeatedly; falling back to mDNS");
     }
 
     const found = await findWifiHost({ BonjourImpl, timeoutMs: discoverTimeoutMs });
@@ -173,6 +199,11 @@ export function validAddress(value) {
 }
 
 export function fileAddressCache(path) {
+  // In memory on purpose: "how many probes in a row has this address ignored"
+  // is about the current outage, not something to carry across host restarts.
+  // It lives here rather than in createWifiTransport because the cache is the
+  // object with the right lifetime -- one per host, not one per probe.
+  let consecutiveMisses = 0;
   return {
     read() {
       try {
@@ -182,6 +213,7 @@ export function fileAddressCache(path) {
       }
     },
     write({ host, port }) {
+      consecutiveMisses = 0;
       try {
         mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, JSON.stringify({ host, port }));
@@ -189,5 +221,7 @@ export function fileAddressCache(path) {
         // A cache we cannot persist only costs the next reconnect a browse.
       }
     },
+    noteHit() { consecutiveMisses = 0; },
+    noteMiss() { return (consecutiveMisses += 1); },
   };
 }

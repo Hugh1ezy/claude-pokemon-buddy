@@ -107,6 +107,70 @@ test("a remembered address is tried before browsing, and mDNS is never queried",
   transport.close();
 });
 
+// createTransport builds a FRESH createWifiTransport on every probe, so these
+// drive it the same way: repeated calls sharing one cache. A miss counter held
+// inside the factory would reset on each call and never escalate, which is how
+// a device that changed IP would become permanently unreachable.
+test("a missed remembered address retries cheaply instead of paying for a browse", async () => {
+  let browsed = 0;
+  const BonjourImpl = class { find() { browsed += 1; return { stop() {} }; } destroy() {} };
+  const attempts = [];
+  const cache = memoryCache({ host: "192.168.1.138", port: 7311 });
+  const netConnect = (target) => {
+    attempts.push(target.host);
+    const socket = new FakeSocket();
+    setImmediate(() => socket.emitError());   // device not up yet
+    return socket;
+  };
+  const probe = () => createWifiTransport({
+    netConnect, BonjourImpl, token: "s3cr3t", cachedConnectTimeoutMs: 20,
+    discoverTimeoutMs: 20, discoverAfterCachedFailures: 3, addressCache: cache,
+  });
+
+  assert.equal(await probe(), null);
+  assert.equal(await probe(), null);
+
+  assert.deepEqual(attempts, ["192.168.1.138", "192.168.1.138"]);
+  assert.equal(browsed, 0, "a device that is merely still booting must not cost a discovery each time");
+});
+
+test("consecutive misses eventually escalate to a browse, across probe instances", async () => {
+  let browsed = 0;
+  const BonjourImpl = class { find() { browsed += 1; return { stop() {} }; } destroy() {} };
+  const cache = memoryCache({ host: "192.168.1.138", port: 7311 });
+  const netConnect = () => {
+    const socket = new FakeSocket();
+    setImmediate(() => socket.emitError());
+    return socket;
+  };
+  const probe = () => createWifiTransport({
+    netConnect, BonjourImpl, token: "s3cr3t", cachedConnectTimeoutMs: 20,
+    discoverTimeoutMs: 20, discoverAfterCachedFailures: 3, addressCache: cache,
+  });
+
+  await probe(); await probe();
+  assert.equal(browsed, 0, "still cheap");
+  await probe();
+  assert.equal(browsed, 1, "the third miss gives up on the remembered address");
+});
+
+test("a cache that does not track misses escalates immediately (old behaviour)", async () => {
+  let browsed = 0;
+  const BonjourImpl = class { find() { browsed += 1; return { stop() {} }; } destroy() {} };
+  const netConnect = () => {
+    const socket = new FakeSocket();
+    setImmediate(() => socket.emitError());
+    return socket;
+  };
+
+  await createWifiTransport({
+    netConnect, BonjourImpl, token: "s3cr3t", cachedConnectTimeoutMs: 20, discoverTimeoutMs: 20,
+    addressCache: { read: () => ({ host: "192.168.1.138", port: 7311 }), write: () => {} },
+  });
+
+  assert.equal(browsed, 1, "no miss tracking -> never defer discovery");
+});
+
 test("a stale remembered address falls back to mDNS and the new one replaces it", async () => {
   const attempts = [];
   const netConnect = (target) => {
@@ -122,6 +186,10 @@ test("a stale remembered address falls back to mDNS and the new one replaces it"
 
   const transport = await createWifiTransport({
     netConnect, BonjourImpl, token: "s3cr3t", discoverTimeoutMs: 200, cachedConnectTimeoutMs: 20,
+    // This test is about what happens once we DO give up on the remembered
+    // address, so escalate on the first miss rather than restating the
+    // deferral the tests above already cover.
+    discoverAfterCachedFailures: 1,
     addressCache: cache,
   });
 
@@ -216,11 +284,17 @@ function autoConnectStub(sockets) {
   };
 }
 
+// Mirrors fileAddressCache's shape, miss counting included -- that counter is
+// what makes the deferred-discovery behaviour work, so a stub without it would
+// test a different code path than production uses.
 function memoryCache(initial) {
   let value = initial;
+  let misses = 0;
   return {
     read: () => value,
-    write: (next) => { value = next; },
+    write: (next) => { value = next; misses = 0; },
+    noteHit: () => { misses = 0; },
+    noteMiss: () => (misses += 1),
   };
 }
 

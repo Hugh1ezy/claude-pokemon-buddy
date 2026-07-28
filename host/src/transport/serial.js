@@ -10,7 +10,13 @@ const PORT_GUARDED = Symbol("serialPortErrorsGuarded");
 const DEFAULT_BAUD_RATE = 115200;
 const DEFAULT_TIMEOUT_MS = 250;
 const DEFAULT_MAX_RETRIES = 3;
-export const DEFAULT_RECONNECT_DELAY_MS = 1500;
+// Also the orchestrator's probe interval while it is sitting in mock mode
+// waiting for a device to turn up, which is what makes it a latency floor for
+// "device came back, how long until the screen does". Both things it gates are
+// cheap now -- listing serial ports is 2-4ms, and a miss on the remembered wifi
+// address is one short connect -- so this is a lot lower than the 1500ms it
+// used to be, which was chosen when a miss cost 5s of discovery.
+export const DEFAULT_RECONNECT_DELAY_MS = 600;
 
 export async function findEspPort({ SerialPort = NodeSerialPort } = {}) {
   const ports = await SerialPort.list();
