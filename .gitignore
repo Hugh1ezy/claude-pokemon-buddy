@@ -3,6 +3,9 @@
 node_modules/
 *.log
 host/config.json
+# saveConfig() writes this beside it on every settings change, and it holds the
+# same wifi token. The repo is public; one `git add -A` is all it would take.
+host/config.json.bak
 *.bin
 start-buddy.vbs
 *.bsp
