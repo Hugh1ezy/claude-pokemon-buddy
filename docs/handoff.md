@@ -1,8 +1,10 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-07-28
-(afternoon, work PC)**, after a long session that fixed the wake latency, the
-weekday 亲密度 payout, the half-heart rendering, and added save syncing.
+(evening, work PC)**, at the end of a session that built the first three
+phases of the 151-species pokedex work. The session before it, earlier the
+same day, is the one that fixed the wake latency, the weekday 亲密度 payout,
+the half-heart rendering, and added save syncing.
 
 Three remotes now:
 
@@ -12,42 +14,87 @@ Three remotes now:
 | `upstream` | `aquamarinz/claude-pokemon-buddy` — original, read-only |
 | `save` | `Hugh1ezy/cpb-save` — **private**, holds only `state.json` (`docs/save-sync.md`) |
 
-Buddy as of this note: **妙蛙种子 (bulbasaur) Lv.9, streak 3, 1.5 hearts today**.
+Buddy as of this note: **妙蛙种子 (bulbasaur) Lv.9, streak 3**, pushed to `save`
+and current as of the device leaving the work PC.
 
 ---
 
 ## ▶ What the HOME PC has to do, in order
 
-Nothing here is optional if you want the buddy to carry over.
-
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
-git pull                                    # 16 commits from 2026-07-28
-git remote add save https://github.com/Hugh1ezy/cpb-save.git
+git pull
+cd host
+node scripts/save-sync-cli.mjs status   # local vs remote
+node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save
+node scripts/bake-assets.mjs            # NEW, required -- see below
 ```
 
-1. **Add the `saveSync` block to `host/config.json`** — exact contents in
-   `docs/save-sync.md`. That file is gitignored, so it does not arrive with the
-   pull.
-2. **Take the synced save**, checking first what you are about to lose:
-   ```powershell
-   cd host
-   node scripts/save-sync-cli.mjs status   # local vs remote
-   node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save
-   ```
-   ⚠️ The home machine's own buddy (Bulbasaur Lv.2 / streak 2 as of 07-27) is
-   **discarded** by that pull. The owner has chosen to keep the Lv.9 one. Do not
-   run `push` from home instead — that would overwrite the kept buddy with the
-   Lv.2 one. The replaced file is copied to `state.json.presync` as a one-step
-   undo (deliberately not `.bak`, which `loadState` falls back to).
-3. **Check `firmware/main/wifi_creds.h` lists BOTH networks** (see below), then
-   **reflash** — none of the day's firmware work is on the device until you do:
-   ```powershell
-   . "$HOME\esp\esp-idf\export.ps1"
-   idf.py -C firmware reconfigure    # only needed if wifi_creds.h was just created
-   idf.py -C firmware -p COMx flash
-   ```
+1. **Take the synced save.** The work PC published it before the device left,
+   so `pull` is the right direction. The replaced file is copied to
+   `state.json.presync` as a one-step undo (deliberately not `.bak`, which
+   `loadState` falls back to). Do **not** `push` from home first — that would
+   overwrite the buddy the device has actually been living on all day.
+2. **Bake the sprites.** `seed/sprites/` and `seed/oak.png` are gitignored as
+   of this session (Nintendo artwork, public repo), so a pull brings the baker
+   and not the images. It takes a few minutes and writes 156 files. Skipping it
+   is not fatal — the buddy renders as a checkerboard placeholder and the
+   sprite tests skip themselves with a message pointing back here — but nothing
+   looks right until it is done.
+3. **No reflash needed.** The firmware on the device is built from this
+   commit's `firmware/` tree, flashed and verified on the work PC on 07-28.
+   Nothing in this session changed it.
 4. Restart the host so it picks up the new host-side code.
+
+`host/config.json` and its `saveSync` block already exist on both machines as
+of 07-28; only re-add them if the file has gone missing (contents in
+`docs/save-sync.md`).
+
+---
+
+## The 151-species pokedex work — where it stands
+
+Three phases are in and green; the rest is not started. Everything so far is
+host-side and additive: no firmware change, no change to the wake path, the
+transport, or the animator. The device is running exactly what it ran before.
+
+| Phase | State |
+|---|---|
+| P1 metadata + sprites | **done** — `seed/pokedex.json` (names/types/evolutions/capture rates for 1–151), 156 baked sprites, `species-meta.js` sources all of it |
+| P2 save model | **done** — `pet/dex.js`: 已捕获 count (duplicates included), pokedex count (distinct), and a box holding one pet per species, each with its own level and bond |
+| P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
+| P4 notification row + capture screen | not started — this is the next thing |
+| P5 pokedex screen + swapping the active buddy | not started |
+| P6 real cries | not started — waiting on a microSD card the owner does not have yet |
+
+### Two things to know before touching any of it
+
+**The save schema version was deliberately NOT bumped.** `loadState` accepts a
+save only on an exact `schemaVersion` match and otherwise falls back to a
+whitelist salvage that drops what it does not recognise. Bumping it would make
+any machine still running older code strip the pokedex out of a current save
+and push the stripped copy back through save-sync, silently. The new fields are
+purely additive and old code carries them through untouched — there is a test
+pinning that property (`test/dex.test.js`, "an unrecognised field is carried
+through load and save untouched"). Bump the version when a field changes
+**meaning**, not when one is added.
+
+**Three files are spoilers and the owner has asked not to see them:**
+`host/scripts/gen-encounters.mjs`, `host/seed/encounters.json`, and
+`host/scripts/sim-encounters.mjs` (its output names species). They hold which
+of the 151 appears under which conditions. The runtime engine
+(`src/pet/encounter.js`) is deliberately free of species knowledge so it can be
+read and reviewed without giving anything away, and the tests use invented
+conditions on arbitrary species for the same reason. Keep it that way: no
+species-condition pairs in chat, in commit messages, in this file, or in test
+names.
+
+Pacing is measured, not guessed: `sim-encounters.mjs` runs the real engine over
+a simulated year on the owner's actual routine and Auckland's actual weather.
+40/40 runs complete the dex, median 331 days (~11 months), ~4.7 encounters a
+day. Re-run it after changing any weight or condition — the first version of
+the table looked reasonable and left 16 species unreachable, which only the
+simulation caught.
 
 ---
 
@@ -59,6 +106,7 @@ git remote add save https://github.com/Hugh1ezy/cpb-save.git
 | `host/config.json` | name/location/volume/token/saveSync | `name` is the **owner's name only** (`Hughie`); the panel composes 名字的物种 itself |
 | `host/out/state.json` | the save | synced now, see `docs/save-sync.md` |
 | `start-buddy.vbs` | absolute paths | autostart launcher |
+| `host/seed/sprites/`, `host/seed/oak.png` | Nintendo artwork, public repo | **new 2026-07-28** — run `cd host && node scripts/bake-assets.mjs` once per machine (~156 files, a few minutes). Without it the buddy renders as a checkerboard placeholder and the sprite tests skip themselves. |
 
 ### wifi_creds.h holds BOTH networks, always
 

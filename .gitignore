@@ -7,3 +7,5 @@ host/config.json
 start-buddy.vbs
 *.bsp
 firmware/main/wifi_creds.h
+host/seed/sprites/
+host/seed/oak.png

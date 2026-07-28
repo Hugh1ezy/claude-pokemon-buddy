@@ -1,10 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createCanvas } from "@napi-rs/canvas";
 
 import { ditherSpriteGray, loadBuddySprite, loadSpriteGray } from "../src/render/sprites.js";
+import { SPECIES_ORDER } from "../src/pet/species-meta.js";
 
 test("loadSpriteGray converts PNG to 96x96 grayscale", async (t) => {
   const dir = join("out", "test-sprites");
@@ -53,29 +55,45 @@ test("loadOakSprite loads the committed Oak asset", async () => {
   assert.ok(s.w > 20 && s.h > 30);
 });
 
+// Every species the renderer can be asked to draw: the 151 dex entries plus
+// the five out-of-dex Eeveelutions an existing save can still be sitting on.
 const ALL_SPECIES = [
-  "eevee", "vaporeon", "jolteon", "flareon", "espeon", "umbreon",
-  "leafeon", "glaceon", "sylveon", "bulbasaur", "ivysaur", "venusaur",
-  "charmander", "charmeleon", "charizard", "squirtle", "wartortle", "blastoise",
+  ...SPECIES_ORDER,
+  "espeon", "umbreon", "leafeon", "glaceon", "sylveon",
 ];
 
-for (const species of ALL_SPECIES) {
-  test(`loadBuddySprite loads real ${species} asset (not placeholder)`, async () => {
-    const sprite = await loadBuddySprite(species);
-    assert.equal(sprite.placeholder, false);
-  });
-}
+// seed/sprites/ is gitignored (Nintendo artwork, public repo), so a fresh
+// checkout has none until `node scripts/bake-assets.mjs` has been run. That is
+// a setup step not yet taken, not a defect -- these skip rather than fail, and
+// say which command fixes it. The skip is all-or-nothing on purpose: a
+// half-baked directory IS a real problem and should still fail loudly below.
+const spriteDir = fileURLToPath(new URL("../seed/sprites/", import.meta.url));
+const baked = existsSync(join(spriteDir, "bulbasaur.png"));
+const skipReason = baked ? false : "seed/sprites is empty -- run: node scripts/bake-assets.mjs";
 
-test("re-baked buddy sprites fill the slot without overflowing it", async () => {
+test("every drawable species has a baked sprite", { skip: skipReason }, async () => {
+  const missing = [];
+  for (const species of ALL_SPECIES) {
+    const sprite = await loadBuddySprite(species);
+    if (sprite.placeholder) missing.push(species);
+  }
+  assert.deepEqual(missing, [], `missing sprites: ${missing.join(", ")}`);
+});
+
+test("baked buddy sprites fill the slot without overflowing it", { skip: skipReason }, async () => {
+  const problems = [];
   for (const species of ALL_SPECIES) {
     const s = await loadBuddySprite(species);
     const maxEdge = Math.max(s.w, s.h);
     const ink = s.gray.reduce((count, value) => count + (value < 128 ? 1 : 0), 0);
     const inkRatio = ink / s.gray.length;
-    assert.ok(maxEdge <= 157, `${species} max edge ${maxEdge} must not exceed slot 157`);
-    assert.ok(maxEdge >= 148, `${species} max edge ${maxEdge} should be enlarged (~155)`);
-    assert.ok(inkRatio < 0.34, `${species} ink ratio ${inkRatio.toFixed(3)} must stay below 0.34`);
+    // Collected rather than asserted one at a time: with 156 sprites, failing
+    // on the first bad one means re-running the bake once per problem sprite.
+    if (maxEdge > 157) problems.push(`${species} max edge ${maxEdge} exceeds slot 157`);
+    if (maxEdge < 148) problems.push(`${species} max edge ${maxEdge} is under-sized (~155 expected)`);
+    if (inkRatio >= 0.34) problems.push(`${species} ink ratio ${inkRatio.toFixed(3)} is at or above 0.34`);
   }
+  assert.deepEqual(problems, [], `${problems.length} sprite(s) out of spec:\n  ${problems.join("\n  ")}`);
 });
 
 test("ditherSpriteGray keeps sprite midtones as a 1-bit Bayer pattern", () => {

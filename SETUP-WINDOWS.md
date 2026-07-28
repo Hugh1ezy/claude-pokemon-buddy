@@ -61,6 +61,20 @@ npm ls --depth=0
 预期：`npm ls` 列出 `serialport` 与 `@napi-rs/canvas`，无 `ERR`。
 失败分支：公司代理导致 npm 超时 → `npm config set registry https://registry.npmmirror.com` 后重试。
 
+## 2b. 烘制宝可梦图（必做，仓库里没有图）
+
+```powershell
+node scripts/bake-assets.mjs
+```
+
+预期：打印 156 行 `wrote seed/sprites/<名字>.png`，最后一行 `baked 156 sprite(s)`，中途没有 `FAILED`。耗时几分钟（151 只图鉴 + 5 只非图鉴伊布进化型，逐个从 PokeAPI 下载）。
+
+**为什么不在仓库里**：这些是任天堂/Game Freak 的美术资源，而这个仓库是公开的。仓库里只放"下载并加工"的脚本，成品每台机器自己生成一次。
+
+失败分支：个别几只下载失败（脚本会在最后汇总列出）→ 只重跑那几只，例如 `node scripts/bake-assets.mjs pikachu gengar`；全部失败 → 多半是网络到 `raw.githubusercontent.com` 不通，挂代理后重试。
+
+跳过这一步的后果：宝可梦会显示成占位的棋盘格方块，且 `npm test` 里的图相关测试会**跳过而不是失败**（会打印一行提示叫你回来跑这个命令）。
+
 ## 3. 烧录固件（设备此时是空白的，屏幕不亮属正常）
 
 **3a. 烧前预检**——找到设备的 COM 口：

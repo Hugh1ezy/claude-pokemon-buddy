@@ -10,8 +10,18 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { SLOTS_PER_DAY } from "./pet/bond.js";
+import { normalizeDex } from "./pet/dex.js";
 import { MAX_LEVEL_EXP, PARAMS, expToNextLevel } from "./pet/sim.js";
 
+// Stays at 1 on purpose even though the save gained the pokedex fields.
+// loadState accepts a save only on an exact version match and otherwise falls
+// back to the whitelist salvage -- so bumping this would make every machine
+// still running older code treat a current save as foreign, strip everything
+// it does not recognise, and push the stripped copy back through save-sync.
+// The change is purely additive and old code tolerates it (normalizePet copies
+// the state object and only touches keys it knows), which is precisely the
+// case where a version bump does harm and no good. Bump it when a field
+// changes MEANING, not when one is added. See pet/dex.js.
 export const SCHEMA_VERSION = 1;
 const STONES = new Set(["water", "thunder", "fire"]);
 const NUMBER_RANGES = {
@@ -106,7 +116,22 @@ function salvageState(state) {
   copyString(out, state, "characteristic");
   copyStone(out, state, "stone");
   if (Array.isArray(state.pendingCandidates)) out.pendingCandidates = state.pendingCandidates;
+  copyDex(out, state);
   return out;
+}
+
+// The dex is the one part of the save that cannot be re-earned: a lost level
+// comes back in a day, a lost pokedex is months of encounters. So it is
+// salvaged too rather than left to the whitelist's default of "unknown key,
+// drop it" -- normalizeDex is built to take garbage and return the largest
+// self-consistent dex it can, which is exactly what a salvage wants.
+function copyDex(out, state) {
+  if (!hasDexFields(state)) return;
+  Object.assign(out, normalizeDex(state));
+}
+
+function hasDexFields(state) {
+  return "dexCaught" in state || "capturedCount" in state || "box" in state;
 }
 
 function mergeSalvage(partials) {
@@ -129,6 +154,10 @@ function normalizePet(state) {
   normalizeNumber(out, "bondHalves");
   normalizeNumber(out, "bondSlots");
   clampExpToLevel(out);
+  // Only when the save already carries a dex. A save from before the pokedex
+  // existed stays byte-identical through a load/save round trip, which is what
+  // keeps the other machine's copy from churning in save-sync for no reason.
+  if (hasDexFields(out)) Object.assign(out, normalizeDex(out));
   return out;
 }
 
