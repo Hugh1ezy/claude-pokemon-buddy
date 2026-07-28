@@ -8,6 +8,11 @@ import { loadConfig, saveConfig } from "./config.js";
 import { resolveEvolution } from "./pet/evolution.js";
 import { rollPersonality } from "./pet/personality.js";
 import { applyBondTick, heartsFromHalves } from "./pet/bond.js";
+import { normalizeDex, recordSeen } from "./pet/dex.js";
+import { stepEncounter } from "./pet/encounter.js";
+import { buildEncounterContext } from "./pet/encounter-context.js";
+import { loadEncounterTable } from "./pet/encounter-table.js";
+import { isDexSpecies, zhName } from "./pet/species-meta.js";
 import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
 import { buildUsedDays, settleDays } from "./pet/settlement.js";
 import { applyPetTransitions, drainEvolutionIntents, ensurePet, evolutionContext } from "./pet/transitions.js";
@@ -185,6 +190,8 @@ export async function runOneTick({
   pendingButtons,
   evolutionIntents,
   buddyName = "阿布",
+  encounterRng = Math.random,
+  logger = console,
 } = {}) {
   if (!usage) throw new Error("usage is required");
   if (!weather) throw new Error("weather is required");
@@ -223,6 +230,11 @@ export async function runOneTick({
   });
   pet = transition.pet;
   const evolutionAnimation = transition.evolutionAnimation;
+
+  // Encounters run last, on the pet as it now stands: an evolution this tick
+  // changes the level and the species the conditions are read against, and the
+  // dex entry the new form just earned should count toward this same roll.
+  pet = applyEncounterTick(pet, { usage, weather, room: sensor, now, rng: encounterRng, logger });
 
   if (evolutionAnimation) {
     saveState(statePath, pet);
@@ -274,6 +286,68 @@ export async function buildRenderModel({ pet, usage, weather, room, now, buddyNa
     },
   };
 }
+
+// One tick of the encounter engine, folded into the pet. Returns the pet
+// unchanged when nothing happened, so a save with no encounter history stays
+// byte-identical and save-sync has nothing to publish.
+//
+// Never throws into the tick: a missing or unreadable table means no wild
+// encounters, which is a smaller loss than a buddy that stops rendering. The
+// failure is logged once and by name only -- the table's contents stay out of
+// every message (see pet/encounter-table.js).
+export function applyEncounterTick(pet, { usage, weather, room, now, rng = Math.random, logger = console } = {}) {
+  let next = pet;
+
+  // The starter line is unobtainable in the wild -- deliberately, since you
+  // already have one -- so the only place those dex entries can light up is
+  // here, on whatever the buddy currently is. Idempotent after the first tick.
+  if (typeof pet.species === "string" && isDexSpecies(pet.species)) {
+    const seen = recordSeen(pet, pet.species);
+    if (seen.dexCaught.length !== normalizeDex(pet).dexCaught.length) {
+      next = { ...next, ...seen };
+      logger?.log?.(`pokedex: ${zhName(pet.species)} recorded (owned, not caught)`);
+    }
+  }
+
+  let table;
+  try {
+    table = loadEncounterTable();
+  } catch (error) {
+    if (!encounterTableWarned) {
+      encounterTableWarned = true;
+      logger?.warn?.(`encounters disabled: ${error.message}`);
+    }
+    return next;
+  }
+
+  const ctx = buildEncounterContext({
+    pet: next,
+    usage,
+    weather,
+    room,
+    mood: deriveMood(usage),
+    now,
+  });
+
+  const { state, escaped } = stepEncounter({
+    table,
+    dex: normalizeDex(next),
+    ctx,
+    state: next.encounter ?? null,
+    now: now.getTime(),
+    rng,
+  });
+
+  if (escaped) logger?.log?.(`encounter: ${zhName(escaped)} left`);
+  else if (state?.species && state.species !== next.encounter?.species) {
+    logger?.log?.(`encounter: ${zhName(state.species)} appeared`);
+  }
+
+  if (!state || (state.species == null && next.encounter == null)) return next;
+  return { ...next, encounter: state };
+}
+
+let encounterTableWarned = false;
 
 export async function main({
   once = process.env.CPB_ONCE === "1",
@@ -495,6 +569,7 @@ export async function main({
               pendingButtons,
               evolutionIntents,
               buddyName: config.name,
+              logger,
             });
           } catch (error) {
             buttonDispatcher.requeueForRetry(pendingButtons);

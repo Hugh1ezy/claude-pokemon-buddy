@@ -53,3 +53,32 @@ export function isDexSpecies(species) {
 export function speciesTypes(species) {
   return TYPES[species] ?? LEGACY_TYPES[species] ?? [];
 }
+
+const EVOLVES_FROM = Object.fromEntries(
+  pokedex.species.filter((s) => s.evolvesFrom).map((s) => [s.key, s.evolvesFrom]),
+);
+// The five later-generation Eeveelutions are outside pokedex.json, so their
+// link back to eevee has to be stated here for the same reason their names and
+// types are.
+const LEGACY_EVOLVES_FROM = {
+  espeon: "eevee", umbreon: "eevee", leafeon: "eevee", glaceon: "eevee", sylveon: "eevee",
+};
+
+// The species at the bottom of this one's evolution line -- i.e. what hatched
+// from the egg, given what is on the panel now. The save records only the
+// CURRENT species, so a buddy that has evolved twice has no other memory of
+// what it started as, and "this is not the one you chose" conditions need it.
+//
+// Walks with a visited set rather than trusting the data to be acyclic: a bad
+// generated pokedex would otherwise hang the tick loop rather than fail.
+export function evolutionRoot(species) {
+  let current = species;
+  const seen = new Set();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    const parent = EVOLVES_FROM[current] ?? LEGACY_EVOLVES_FROM[current];
+    if (!parent) break;
+    current = parent;
+  }
+  return current ?? species;
+}

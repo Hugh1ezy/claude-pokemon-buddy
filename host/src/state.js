@@ -11,6 +11,7 @@ import {
 import { dirname } from "node:path";
 import { SLOTS_PER_DAY } from "./pet/bond.js";
 import { normalizeDex } from "./pet/dex.js";
+import { isDexSpecies } from "./pet/species-meta.js";
 import { MAX_LEVEL_EXP, PARAMS, expToNextLevel } from "./pet/sim.js";
 
 // Stays at 1 on purpose even though the save gained the pokedex fields.
@@ -117,7 +118,42 @@ function salvageState(state) {
   copyStone(out, state, "stone");
   if (Array.isArray(state.pendingCandidates)) out.pendingCandidates = state.pendingCandidates;
   copyDex(out, state);
+  copyEncounter(out, state);
   return out;
+}
+
+// The offer standing when the host stopped. Worth salvaging so that restarting
+// mid-encounter does not silently drop the one on screen, but never repaired:
+// a half-readable encounter is discarded outright, because the cooldown clock
+// lives in the same object and a plausible-looking wrong timestamp would either
+// suppress encounters for hours or defeat the cooldown entirely.
+function copyEncounter(out, state) {
+  const encounter = normalizeEncounter(state?.encounter);
+  if (encounter) out.encounter = encounter;
+}
+
+function normalizeEncounter(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+
+  const species = typeof raw.species === "string" && isDexSpecies(raw.species) ? raw.species : null;
+  const offeredAt = epochMs(raw.offeredAt);
+  const lastEndedAt = epochMs(raw.lastEndedAt);
+
+  // An offer without the moment it was made cannot be expired, so it would hang
+  // on the panel forever. Drop the species and keep the cooldown.
+  if (species && offeredAt == null) {
+    return lastEndedAt == null ? null : { species: null, lastEndedAt };
+  }
+  if (species) {
+    return lastEndedAt == null
+      ? { species, offeredAt }
+      : { species, offeredAt, lastEndedAt };
+  }
+  return lastEndedAt == null ? null : { species: null, lastEndedAt };
+}
+
+function epochMs(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 // The dex is the one part of the save that cannot be re-earned: a lost level
@@ -158,6 +194,13 @@ function normalizePet(state) {
   // existed stays byte-identical through a load/save round trip, which is what
   // keeps the other machine's copy from churning in save-sync for no reason.
   if (hasDexFields(out)) Object.assign(out, normalizeDex(out));
+  // Same "only if present" rule as the dex, and for the same reason: a save
+  // that has never seen an encounter must round-trip byte-identical.
+  if ("encounter" in out) {
+    const encounter = normalizeEncounter(out.encounter);
+    if (encounter) out.encounter = encounter;
+    else delete out.encounter;
+  }
   return out;
 }
 

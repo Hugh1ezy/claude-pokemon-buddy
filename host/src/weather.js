@@ -13,6 +13,26 @@ const WMO = {
   95: "雷雨",
 };
 
+// The coarse kind the encounter conditions are written against, resolved here
+// from the WMO code rather than downstream from `cond` -- the panel's label is
+// for a human to read and is free to change wording, while this is a key some
+// species are gated on and must not drift with it.
+//
+// Codes with no entry deliberately produce `kind: null`: 多云 and 雪 are not
+// kinds any condition asks for, and a weather-gated species should then simply
+// not be eligible rather than be forced into the nearest bucket.
+const WMO_KIND = {
+  0: "sun",
+  1: "sun",
+  45: "fog",
+  48: "fog",
+  51: "rain",
+  61: "rain",
+  63: "rain",
+  80: "rain",
+  95: "rain",
+};
+
 const FETCH_TIMEOUT_MS = 10_000;
 
 export function makeWeather({
@@ -60,6 +80,9 @@ function defaultTimeoutSignal(ms) {
   return controller.signal;
 }
 
+// Deliberately partial -- no `feels`, `humidity`, `wind`, and no `kind` either.
+// There is no weather here to classify, and the encounter context reads a
+// missing kind as "no weather-gated species right now", which is the truth.
 function nullWeather() {
   return { cond: "—", temp: null, degraded: true };
 }
@@ -86,6 +109,7 @@ function normalizeWeather(json) {
 
   return {
     cond: WMO[current.weather_code] ?? "—",
+    kind: WMO_KIND[current.weather_code] ?? null,
     temp: rounded(current.temperature_2m),
     feels: rounded(current.apparent_temperature),
     humidity: rounded(current.relative_humidity_2m),
