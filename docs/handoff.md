@@ -63,8 +63,14 @@ not take, and to recommend the `pull`.
    existing `seed/sprites/` is stale for those and *nothing in git will tell
    you*: the images are untracked, and a stale sprite is a valid PNG that simply
    looks wrong. A plain `node scripts/bake-assets.mjs` re-bakes all 156 and is
-   the safe move; re-baking only the 22 is possible by passing their keys. It
-   takes a few minutes.
+   the safe move; re-baking only the 22 is possible by passing their keys
+   (`node scripts/bake-assets.mjs gastly rattata`). It takes a few minutes.
+
+   **The bake is deterministic** — verified on the work PC 07-29 by re-baking
+   two species and diffing the checksums, which came back byte-identical. So a
+   re-bake is safe to run at any time, and `md5sum` against the other machine is
+   a real check that two machines are showing the same buddy. It does need the
+   network: the artwork is fetched from PokeAPI, not stored.
 3. **Restart the host** so it picks up the pulled code. Nothing else: the home
    PC already has its `config.json` and its `wifi_creds.h`.
 4. **No reflash.** Nothing in this session touched `firmware/`.
@@ -131,6 +137,37 @@ cloud folder.
 Also on the home machine: a dead local branch
 `claude/duplicate-save-sync-2026-07-28`, a save-sync implementation written
 before this repo's own was discovered. Never pushed. Safe to delete.
+
+---
+
+## Noticed on the work PC, 2026-07-29 — reported, not acted on
+
+Found while getting the machine ready to hand the device over. None of it was
+touched, because none of it is what the session was for and three of the four
+want a decision rather than a fix.
+
+- **The usage row has no data and never has.** `out/host-autostart.log` has 352
+  `pollUsage failed: no-token` and no successful poll — the very first one is on
+  line 3 — and `out/usage.json` does not exist on this machine at all. The token
+  comes from `readOAuthToken` in `src/usage-poll.mjs`, i.e. Claude Code's own
+  credential store, which a host started from the Startup folder may simply not
+  be able to read. The statusline fan-out bridge is the other way that file gets
+  written and is presumably what has been covering for this.
+- **`wifi: remembered address failed repeatedly; falling back to mDNS` × 896**,
+  plus 662 of the softer `did not answer` variant. That is the discovery path
+  tuned across two sessions and measured at 400 ms remembered-address / browse
+  only after 8 misses. It works — the device is on wifi as this is written — but
+  that much fallback is not what "remembered address first" is supposed to look
+  like. **Unmeasured**: this is a log observation, not a timing, and the wake
+  path's own rule is to measure before changing it and to change it on its own.
+- **`git ls-remote origin` shows five `claude/*` branches.** The 07-28 note says
+  it should show `main` and two tags and nothing else, so that line is now
+  stale. They are somebody's working branches; nobody has said they are dead, so
+  they were left.
+- **`host/nul` is a 466 KB PNG.** A sprite review contact sheet that went to a
+  file literally named `nul` — the Windows redirect trap, `> nul` in a shell
+  that does not treat it as the null device. Untracked, harmless, and left for
+  the owner to delete since it is his review output.
 
 ---
 
