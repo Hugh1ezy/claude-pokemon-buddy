@@ -176,6 +176,55 @@ test("with no marker yet, the very first pull still takes the remote", async (t)
   assert.equal((await createSaveSync({ statePath, runGit: git.run, logger: null }).pull()).status, "pulled");
 });
 
+// peek() is what `save-sync-cli.mjs status` prints. It is the command the
+// handoff tells the other machine to run BEFORE deciding whether to pull, so
+// the one property that matters more than what it reports is that it changes
+// nothing while reporting it.
+test("peek reports the remote save without touching the local one", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111" });
+
+  const result = await createSaveSync({ statePath, runGit: git.run, logger: null }).peek();
+
+  assert.equal(result.status, "ok");
+  assert.deepEqual(result.save, OTHER);
+  assert.equal(result.identical, false);
+  assert.equal(result.ours, false);
+  assert.deepEqual(JSON.parse(readFileSync(statePath, "utf8")), SAVE);
+  assert.ok(!existsSync(`${statePath}.presync`), "peek must not leave an undo copy");
+});
+
+test("peek marks a remote tip this machine published as ours, so status can say do-not-pull", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111", tipTree: "old-tree" });
+  const sync = createSaveSync({ statePath, runGit: git.run, logger: null });
+
+  assert.equal((await sync.push()).status, "pushed");
+  git.setTip("commit-sha");
+
+  const result = await sync.peek();
+
+  assert.equal(result.ours, true);
+  // Same call on a tip from the other machine, to pin that `ours` tracks the
+  // marker and is not just "we have pushed at some point".
+  git.setTip("someone-elses-commit");
+  assert.equal((await sync.peek()).ours, false);
+});
+
+test("peek calls a byte-identical remote identical, which is what status prints as nothing to do", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ blob: JSON.stringify(SAVE), tip: "aaa111" });
+
+  assert.equal((await createSaveSync({ statePath, runGit: git.run, logger: null }).peek()).identical, true);
+});
+
+test("peek reports a branch that does not exist yet as the first run it is", async (t) => {
+  const { statePath } = tempSave(t, SAVE);
+  const git = fakeGit({ fetchFails: "fatal: couldn't find remote ref refs/heads/cpb-save" });
+
+  assert.equal((await createSaveSync({ statePath, runGit: git.run, logger: null }).peek()).status, "no-remote-save");
+});
+
 test("no git command may touch the working tree, HEAD, or the index", async (t) => {
   const { statePath } = tempSave(t, SAVE);
   const git = fakeGit({ blob: JSON.stringify(OTHER), tip: "aaa111", tipTree: "old-tree" });
@@ -183,6 +232,7 @@ test("no git command may touch the working tree, HEAD, or the index", async (t) 
 
   await sync.pull();
   await sync.push();
+  await sync.peek();
 
   const forbidden = new Set([
     "checkout", "switch", "reset", "add", "commit", "merge", "rebase", "stash", "clean", "restore",

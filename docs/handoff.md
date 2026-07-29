@@ -44,10 +44,15 @@ not recur. The home PC's setup is complete and its host is running.
 cd "$HOME\claude-pokemon-buddy"
 git pull
 cd host
-node scripts/save-sync-cli.mjs status   # local vs remote, no writes
+node scripts/save-sync-cli.mjs status   # both saves + which way to sync, no writes
 node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save
 node scripts/bake-assets.mjs            # required this time -- see below
 ```
+
+`status` actually shows the remote's save as of 07-29 — it printed only the
+remote's *name* before, so the "stop if the remote is behind" instruction below
+could not be followed. Expect it to say the remote holds a turn this machine did
+not take, and to recommend the `pull`.
 
 1. **Take the synced save.** The device spent 07-29 on the work PC, which
    published before it left — so `pull` is the right direction and `push` is
@@ -418,6 +423,12 @@ broken hardware rather than a missing SSID. Verification recipe and the
   is tracked in `state.json.sync`), because reseating a USB cable is a detach
   and re-attach and would otherwise revert an hour's bond credit.
 
+`save-sync-cli.mjs status` answers all of this out loud as of 07-29: it prints
+the remote's save beside the local one and names the direction, including the
+do-not-pull case above. It writes nothing, so it is always safe to run first.
+Backed by `sync.peek()`, which shares `pull()`'s fetch and marker check and has
+a test pinning that it leaves the save and the `.presync` copy alone.
+
 ---
 
 ## WiFi and the "it won't switch back" problem
@@ -528,7 +539,8 @@ re-derived:
 | Home PC, `7d2b799` (clean) | 506 pass / **12** fail of 518 | **no — killed at 780 s** |
 | Home PC, `7d2b799` + P4 | 520 pass / 10 fail of 530 | yes |
 | Work PC, `7d2b799` + sprites, 07-29 | 506 pass / **12** fail of 518 | **no — see below** |
-| Work PC, this commit (P4 + sprites), 07-29 | 519 pass / 11 fail of 530 | with `--test-force-exit` |
+| Work PC, P4 + sprites merged, 07-29 | 519 pass / 11 fail of 530 | with `--test-force-exit` |
+| Work PC, this commit (+ `peek`), 07-29 | 523 pass / 11 fail of 534 | with `--test-force-exit` |
 
 The steady 10 are the 9 platform failures plus the RM12 flake. **Two more are
 load-dependent** and appear only sometimes on the home PC:

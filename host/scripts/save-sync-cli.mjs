@@ -33,8 +33,15 @@ const sync = createSaveSync({
 const { remote, branch } = sync.describe();
 
 if (command === "status") {
+  // The whole point of status is answering "which way do I sync?", so it prints
+  // the remote's save, not just the remote's name -- printing the name was all
+  // it did until 2026-07-29, which made the handoff's "stop if the remote is
+  // behind" instruction impossible to follow.
+  const peeked = await sync.peek();
   console.log(`remote : ${remote}/${branch}`);
+  console.log(`         ${describeRemote(peeked)}`);
   console.log(`local  : ${describeSave(statePath)}`);
+  console.log(`         ${verdict(peeked)}`);
   process.exit(0);
 }
 
@@ -60,8 +67,33 @@ function describeSave(path) {
   if (!existsSync(path)) return "(no save file)";
   try {
     const save = JSON.parse(readFileSync(path, "utf8"));
-    return `${save.name ?? "?"} (${save.species}) Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
+    return summarise(save);
   } catch {
     return "(unparseable)";
   }
+}
+
+function summarise(save) {
+  return `${save.name ?? "?"} (${save.species}) Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
+}
+
+function describeRemote(peeked) {
+  if (peeked.status === "ok") return summarise(peeked.save);
+  if (peeked.status === "no-remote-save") return "(nothing published yet)";
+  return `(unreadable: ${peeked.status}${peeked.detail ? ` -- ${String(peeked.detail).trim().split("\n")[0]}` : ""})`;
+}
+
+// Says which way to sync, because that is the decision this command exists to
+// support. It stops short of running anything: the pull is destructive to the
+// local save and stays a separate, deliberate step.
+function verdict(peeked) {
+  if (peeked.status === "no-remote-save") return "→ nothing to pull; push once this machine has the device";
+  if (peeked.status !== "ok") return "→ cannot tell -- fix the error above before syncing";
+  if (peeked.identical) return "→ already the same save, nothing to do";
+  if (peeked.ours) {
+    return "→ the remote tip is this machine's own publish, so local is ahead of it. "
+      + "Do NOT pull (it would roll back); push if the device is attached here.";
+  }
+  return "→ the remote holds someone else's newer turn with the device. "
+    + "Pull if the device is now here; see the two-buddy trap in docs/handoff.md if the species or nature differ.";
 }

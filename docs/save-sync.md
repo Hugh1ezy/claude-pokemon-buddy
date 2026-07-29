@@ -99,9 +99,33 @@ On the other machine, `pull` before its host next runs — that machine's own
 save is overwritten, so check what you are about to lose first:
 
 ```powershell
-node scripts/save-sync-cli.mjs status   # what is local right now
-node scripts/save-sync-cli.mjs pull     # replace it with the remote's
+node scripts/save-sync-cli.mjs status   # both saves, and which way to sync
+node scripts/save-sync-cli.mjs pull     # replace the local one with the remote's
 ```
+
+`status` fetches and prints the remote's save next to the local one, then says
+which direction applies:
+
+```
+remote : save/main
+         Hughie (bulbasaur) Lv.14 exp=8.27 bond=17.2 streak=4
+local  : Hughie (bulbasaur) Lv.14 exp=8.27 bond=17.2 streak=4
+         → already the same save, nothing to do
+```
+
+It writes nothing — not the save, not the `.presync` undo copy. The only thing
+it changes is the remote-tracking ref the fetch updates, which is inside `.git`
+and not the save. Pulling stays a separate, deliberate command because it is the
+destructive one.
+
+The verdict line distinguishes the case that actually costs you a buddy: if the
+remote tip is *this machine's own* publish, the local save is that commit's
+continuation and pulling would roll it back, so status says do not pull. That is
+the same marker test `pull()` itself makes (`state.json.sync`).
+
+**Before 2026-07-29 `status` printed only the remote's *name*** and no part of
+its contents, which made the handoff's "stop if the remote is behind this
+machine" instruction impossible to actually follow.
 
 `status` / `pull` / `push` are the whole CLI. It reads the same config block
 and reports the same statuses the host logs.

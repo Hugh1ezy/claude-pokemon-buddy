@@ -48,10 +48,39 @@ export function createSaveSync({
   const markerPath = `${statePath}.sync`;
   let lastPushAt = null;
 
-  return { pull, push, maybePush, describe };
+  return { pull, push, maybePush, describe, peek };
 
   function describe() {
     return { remote, branch, statePath };
+  }
+
+  // Read-only look at what the remote is holding. Same fetch and same blob read
+  // as pull(), and deliberately nothing else: no backup, no rename, no write to
+  // statePath. This exists because "status" is the command the handoff tells the
+  // other machine to run before deciding which direction to sync, and answering
+  // that needs the remote's save, not just the remote's name.
+  //
+  // `ours` is the same test pull() makes: a tip this machine published means
+  // nobody else has had the device since, so there is nothing to take.
+  async function peek() {
+    const fetched = await fetchRemote();
+    if (fetched.status !== "ok") return fetched;
+
+    const tip = await git(["rev-parse", remoteRef]);
+    const shown = await git(["show", `${remoteRef}:${BLOB_NAME}`]);
+    if (shown.code !== 0) return fail("remote-save-unreadable", shown.stderr);
+
+    const save = parseSave(shown.stdout);
+    if (!save) return fail("remote-save-invalid", "remote blob is not a usable save");
+
+    const localText = existsSync(statePath) ? readFileSync(statePath, "utf8") : null;
+    return {
+      status: "ok",
+      save,
+      tip: tip.code === 0 ? trim(tip.stdout) : null,
+      ours: tip.code === 0 && trim(tip.stdout) === readMarker(),
+      identical: localText === shown.stdout,
+    };
   }
 
   // Fetches the remote save and installs it locally. Returns a status rather
