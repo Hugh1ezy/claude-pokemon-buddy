@@ -1,8 +1,25 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-07-29
-(WORK PC)**, at the end of a session that did nothing but sprite artwork: eight
-review rounds with the owner over the 151 dex images, plus twenty species
+Rolling note between the home PC and the work PC. Last updated **2026-07-30
+(WORK PC)**.
+
+> **The 07-29 handoff never happened.** The device went home on the evening of
+> 07-29 and came back to the work PC on 07-30 without the home PC being touched:
+> no pull, no re-bake, no restart. So **the home checklist below is still
+> outstanding, exactly as written** — it was never consumed, and the home PC is
+> still on pre-`fcd7e60` code with stale sprites. Nothing was lost by the delay;
+> the device never attached to the home host, so no second buddy started
+> accruing.
+
+**What 07-30 actually did on the work PC: restarted the host.** It had been up
+since 07-28 17:51, which is *older than the encounter wiring the home PC pushed
+that evening*, so `applyEncounterTick()` had never once run on this machine —
+the engine was in the repo and not in the process. The first line of the new
+log confirms it fired: `pokedex: 妙蛙种子 recorded (owned, not caught)`. If a
+feature looks dead here, check the host's start time before you check the code.
+
+The session before it, 07-29 on the work PC, did nothing but sprite artwork:
+eight review rounds with the owner over the 151 dex images, plus twenty species
 renamed to their pre-unification Chinese names. **That work is finished and
 signed off** — read the 07-29 section before touching `bake-assets.mjs`, because
 several of its knobs exist to record a decision that was already made and
@@ -30,11 +47,12 @@ Three remotes now:
 | `upstream` | `aquamarinz/claude-pokemon-buddy` — original, read-only |
 | `save` | `Hugh1ezy/cpb-save` — **private**, holds only `state.json` (`docs/save-sync.md`) |
 
-Buddy as of this note: **妙蛙种子 (bulbasaur) 慢性子, Lv.14, exp 8.06, bond 16.4,
-streak 4**, published to `save` from the **work PC** at 14:18 NZ on 07-29 and
-verified against the remote at the time of writing. It is the same lineage the
-home PC pulled on 07-28 — the nature matches, so the two-buddy trap below did
-not recur. The home PC's setup is complete and its host is running.
+Buddy as of this note: **妙蛙种子 (bulbasaur) 慢性子, Lv.18, exp 20.38, bond 21.6,
+streak 5**, published to `save` from the **work PC** on the morning of 07-30 and
+verified identical against the remote. Same lineage throughout — the nature has
+matched at every check, so the two-buddy trap below has not recurred. The home
+PC's setup is complete and its host is running, but it has not held the device
+since 07-28.
 
 ---
 
@@ -54,10 +72,12 @@ remote's *name* before, so the "stop if the remote is behind" instruction below
 could not be followed. Expect it to say the remote holds a turn this machine did
 not take, and to recommend the `pull`.
 
-1. **Take the synced save.** The device spent 07-29 on the work PC, which
-   published before it left — so `pull` is the right direction and `push` is
-   not. The replaced file lands at `state.json.presync` as a one-step undo
-   (deliberately not `.bak`, which `loadState` falls back to).
+1. **Take the synced save — but only once the device is actually at home.** The
+   work PC has held it continuously since 07-28 and publishes on every change,
+   so `pull` is the right direction and `push` is not. The replaced file lands
+   at `state.json.presync` as a one-step undo (deliberately not `.bak`, which
+   `loadState` falls back to). Steps 2-4 do not depend on the device and can be
+   done any time.
 2. **Re-bake the sprites — not optional this time, even though this machine has
    baked before.** The `BOOST` table changed on 07-29 for 22 species, so an
    existing `seed/sprites/` is stale for those and *nothing in git will tell
@@ -71,9 +91,11 @@ not take, and to recommend the `pull`.
    re-bake is safe to run at any time, and `md5sum` against the other machine is
    a real check that two machines are showing the same buddy. It does need the
    network: the artwork is fetched from PokeAPI, not stored.
-3. **Restart the host** so it picks up the pulled code. Nothing else: the home
-   PC already has its `config.json` and its `wifi_creds.h`.
-4. **No reflash.** Nothing in this session touched `firmware/`.
+3. **Restart the host** so it picks up the pulled code — and mean it. The work
+   PC skipped this for two days and spent them running an engine-less tick; see
+   the note at the top. Nothing else is needed: the home PC already has its
+   `config.json` and its `wifi_creds.h`.
+4. **No reflash.** Nothing since 07-28 has touched `firmware/`.
 
 If `status` shows the remote *behind* what is on this machine, stop and read
 "the two-buddy trap" below before running anything.
