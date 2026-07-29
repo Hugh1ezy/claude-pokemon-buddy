@@ -50,7 +50,27 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+// Owner's preference, 2026-07-29: twenty species go by their pre-unification
+// Chinese names rather than the ones PokeAPI now returns. These are the names
+// he grew up with, and the buddy is his, so they win over the official list.
+//
+// This lives here rather than as a hand-edit of seed/pokedex.json precisely so
+// a re-run of this generator does not silently revert them -- which is what
+// would have happened, since PokeAPI is the only other source of the field.
+// Keyed by species key (stable) rather than dex number (also stable, but the
+// key is what every other table in the project joins on).
+const OLD_ZH = {
+  butterfree: "巴大蝴", pidgeot: "比雕", venomoth: "末入蛾",
+  poliwhirl: "蚊香蛙", poliwrath: "快泳蛙", kadabra: "勇吉拉",
+  slowbro: "呆河马", drowzee: "素利普", hypno: "素利柏",
+  voltorb: "雷电球", electrode: "顽皮弹", hitmonlee: "沙瓦郎",
+  hitmonchan: "艾比郎", rhyhorn: "铁甲犀牛", rhydon: "铁甲暴龙",
+  kangaskhan: "袋龙", magmar: "鸭嘴火龙", pinsir: "大甲",
+  lapras: "乘龙", porygon: "3D龙",
+};
+
 function zhName(species) {
+  if (species.name in OLD_ZH) return OLD_ZH[species.name];
   // zh-Hans is what the panel renders (Zpix is a simplified-Chinese pixel
   // font). zh-Hant is the fallback purely so a missing entry surfaces as the
   // wrong script rather than as an English name in the middle of a Chinese UI.

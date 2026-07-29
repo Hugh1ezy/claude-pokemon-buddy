@@ -219,7 +219,7 @@
     {
       "dex": 12,
       "key": "butterfree",
-      "zh": "巴大蝶",
+      "zh": "巴大蝴",
       "types": [
         "bug",
         "flying"
@@ -339,7 +339,7 @@
     {
       "dex": 18,
       "key": "pidgeot",
-      "zh": "大比鸟",
+      "zh": "比雕",
       "types": [
         "normal",
         "flying"
@@ -943,7 +943,7 @@
     {
       "dex": 49,
       "key": "venomoth",
-      "zh": "摩鲁蛾",
+      "zh": "末入蛾",
       "types": [
         "bug",
         "poison"
@@ -1172,7 +1172,7 @@
     {
       "dex": 61,
       "key": "poliwhirl",
-      "zh": "蚊香君",
+      "zh": "蚊香蛙",
       "types": [
         "water"
       ],
@@ -1191,7 +1191,7 @@
     {
       "dex": 62,
       "key": "poliwrath",
-      "zh": "蚊香泳士",
+      "zh": "快泳蛙",
       "types": [
         "water",
         "fighting"
@@ -1230,7 +1230,7 @@
     {
       "dex": 64,
       "key": "kadabra",
-      "zh": "勇基拉",
+      "zh": "勇吉拉",
       "types": [
         "psychic"
       ],
@@ -1543,7 +1543,7 @@
     {
       "dex": 80,
       "key": "slowbro",
-      "zh": "呆壳兽",
+      "zh": "呆河马",
       "types": [
         "water",
         "psychic"
@@ -1859,7 +1859,7 @@
     {
       "dex": 96,
       "key": "drowzee",
-      "zh": "催眠貘",
+      "zh": "素利普",
       "types": [
         "psychic"
       ],
@@ -1878,7 +1878,7 @@
     {
       "dex": 97,
       "key": "hypno",
-      "zh": "引梦貘人",
+      "zh": "素利柏",
       "types": [
         "psychic"
       ],
@@ -1935,7 +1935,7 @@
     {
       "dex": 100,
       "key": "voltorb",
-      "zh": "霹雳电球",
+      "zh": "雷电球",
       "types": [
         "electric"
       ],
@@ -1954,7 +1954,7 @@
     {
       "dex": 101,
       "key": "electrode",
-      "zh": "顽皮雷弹",
+      "zh": "顽皮弹",
       "types": [
         "electric"
       ],
@@ -2051,7 +2051,7 @@
     {
       "dex": 106,
       "key": "hitmonlee",
-      "zh": "飞腿郎",
+      "zh": "沙瓦郎",
       "types": [
         "fighting"
       ],
@@ -2070,7 +2070,7 @@
     {
       "dex": 107,
       "key": "hitmonchan",
-      "zh": "快拳郎",
+      "zh": "艾比郎",
       "types": [
         "fighting"
       ],
@@ -2146,7 +2146,7 @@
     {
       "dex": 111,
       "key": "rhyhorn",
-      "zh": "独角犀牛",
+      "zh": "铁甲犀牛",
       "types": [
         "ground",
         "rock"
@@ -2166,7 +2166,7 @@
     {
       "dex": 112,
       "key": "rhydon",
-      "zh": "钻角犀兽",
+      "zh": "铁甲暴龙",
       "types": [
         "ground",
         "rock"
@@ -2224,7 +2224,7 @@
     {
       "dex": 115,
       "key": "kangaskhan",
-      "zh": "袋兽",
+      "zh": "袋龙",
       "types": [
         "normal"
       ],
@@ -2437,7 +2437,7 @@
     {
       "dex": 126,
       "key": "magmar",
-      "zh": "鸭嘴火兽",
+      "zh": "鸭嘴火龙",
       "types": [
         "fire"
       ],
@@ -2456,7 +2456,7 @@
     {
       "dex": 127,
       "key": "pinsir",
-      "zh": "凯罗斯",
+      "zh": "大甲",
       "types": [
         "bug"
       ],
@@ -2533,7 +2533,7 @@
     {
       "dex": 131,
       "key": "lapras",
-      "zh": "拉普拉斯",
+      "zh": "乘龙",
       "types": [
         "water",
         "ice"
@@ -2648,7 +2648,7 @@
     {
       "dex": 137,
       "key": "porygon",
-      "zh": "多边兽",
+      "zh": "3D龙",
       "types": [
         "normal"
       ],

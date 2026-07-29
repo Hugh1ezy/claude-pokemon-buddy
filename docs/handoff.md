@@ -1,11 +1,26 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-07-28
-(late evening, HOME PC)**, at the end of a session that took the save handoff
-live on the home machine and wired the encounter engine into the tick. Earlier
-the same day, on the work PC: the first three phases of the 151-species pokedex
-work. Before that: the wake latency, the weekday 亲密度 payout, the half-heart
-rendering, and save syncing itself.
+Rolling note between the home PC and the work PC. Last updated **2026-07-29
+(WORK PC)**, at the end of a session that did nothing but sprite artwork: eight
+review rounds with the owner over the 151 dex images, plus twenty species
+renamed to their pre-unification Chinese names. **That work is finished and
+signed off** — read the 07-29 section before touching `bake-assets.mjs`, because
+several of its knobs exist to record a decision that was already made and
+reversed once.
+
+The session before it, on the **home PC** the evening of 07-28, took the save
+handoff live on that machine and wired the encounter engine into the tick; its
+record is kept below in full. Earlier on 07-28, on the work PC: the first three
+phases of the 151-species pokedex work. Before that: the wake latency, the
+weekday 亲密度 payout, the half-heart rendering, and save syncing itself.
+
+**Next up: the visible half of P4 — the row 3 notification and the capture
+screen.** Nothing in the sprite work blocks it.
+
+> Note for whoever reads this next: the work PC spent 07-29 on `7d2b799` and
+> only discovered the home PC's two commits when it went to push. Nothing was
+> lost — the conflict was in this file alone and both sides are merged here —
+> but `git pull` before starting, not before pushing.
 
 Three remotes now:
 
@@ -15,13 +30,15 @@ Three remotes now:
 | `upstream` | `aquamarinz/claude-pokemon-buddy` — original, read-only |
 | `save` | `Hugh1ezy/cpb-save` — **private**, holds only `state.json` (`docs/save-sync.md`) |
 
-Buddy as of this note: **妙蛙种子 (bulbasaur) Lv.9, bond 10.4, streak 3,
-bondHalves 7**, published to `save` from the home PC on the evening of 07-28.
-The home PC's setup is now complete and its host is running.
+Buddy as of this note: **妙蛙种子 (bulbasaur) 慢性子, Lv.14, exp 8.06, bond 16.4,
+streak 4**, published to `save` from the **work PC** at 14:18 NZ on 07-29 and
+verified against the remote at the time of writing. It is the same lineage the
+home PC pulled on 07-28 — the nature matches, so the two-buddy trap below did
+not recur. The home PC's setup is complete and its host is running.
 
 ---
 
-## ▶ What the WORK PC has to do, in order
+## ▶ What the HOME PC has to do, in order
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
@@ -29,15 +46,23 @@ git pull
 cd host
 node scripts/save-sync-cli.mjs status   # local vs remote, no writes
 node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save
+node scripts/bake-assets.mjs            # required this time -- see below
 ```
 
-1. **Take the synced save.** The device spent the evening on the home PC, which
-   published on every meaningful change and again on shutdown — so `pull` is the
-   right direction and `push` is not. The replaced file lands at
-   `state.json.presync` as a one-step undo.
-2. **Restart the host** so it picks up the pulled code. Nothing else: the work
-   PC already has its sprites baked, its `config.json`, and its `wifi_creds.h`.
-3. **No reflash.** Nothing in this session touched `firmware/`.
+1. **Take the synced save.** The device spent 07-29 on the work PC, which
+   published before it left — so `pull` is the right direction and `push` is
+   not. The replaced file lands at `state.json.presync` as a one-step undo
+   (deliberately not `.bak`, which `loadState` falls back to).
+2. **Re-bake the sprites — not optional this time, even though this machine has
+   baked before.** The `BOOST` table changed on 07-29 for 22 species, so an
+   existing `seed/sprites/` is stale for those and *nothing in git will tell
+   you*: the images are untracked, and a stale sprite is a valid PNG that simply
+   looks wrong. A plain `node scripts/bake-assets.mjs` re-bakes all 156 and is
+   the safe move; re-baking only the 22 is possible by passing their keys. It
+   takes a few minutes.
+3. **Restart the host** so it picks up the pulled code. Nothing else: the home
+   PC already has its `config.json` and its `wifi_creds.h`.
+4. **No reflash.** Nothing in this session touched `firmware/`.
 
 If `status` shows the remote *behind* what is on this machine, stop and read
 "the two-buddy trap" below before running anything.
@@ -112,7 +137,7 @@ transport, or the animator. The device is running exactly what it ran before.
 
 | Phase | State |
 |---|---|
-| P1 metadata + sprites | **done** — `seed/pokedex.json` (names/types/evolutions/capture rates for 1–151), 156 baked sprites, `species-meta.js` sources all of it |
+| P1 metadata + sprites | **done** — `seed/pokedex.json` (names/types/evolutions/capture rates for 1–151), 156 baked sprites, `species-meta.js` sources all of it. Sprite ink and 20 species names revised 2026-07-29, below |
 | P2 save model | **done** — `pet/dex.js`: 已捕获 count (duplicates included), pokedex count (distinct), and a box holding one pet per species, each with its own level and bond |
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
 | P4 notification row + capture screen | **half done (2026-07-28, home PC)** — the engine is wired into the tick and encounters now really happen and persist; nothing is drawn yet. See below |
@@ -190,6 +215,150 @@ day. Re-run it after changing any weight or condition — the first version of
 the table looked reasonable and left 16 species unreachable, which only the
 simulation caught.
 
+### Sprite ink and species names, revised 2026-07-29 (work PC)
+
+Owner reviewed all 151 on screen across three passes and flagged 35 sprites
+plus 20 names.
+
+**35 sprites re-baked.** All but two were the same defect the `slowpoke` entry
+already described: a mid-tone body fill sits below the calibrated threshold, the
+sprite arrives as a filled silhouette, and the linework that should define the
+shape is gone. They now carry explicit `BOOST` values (mostly 0 or -10;
+`alakazam` -20, `bellsprout` -20, `dratini` -30, `marowak` -30).
+
+`shellder` went the other way — +80, because its pupils are small dark dots
+inside already-dark eyes and threshold away entirely below +45, leaving it
+staring blankly.
+
+`rattata` is the one to learn from: -10 cleared its body and took its front
+teeth and mouth line with it, and that only surfaced on the owner's next review
+pass. On a sprite whose detail is drawn in thin mid-tones, judge the face, not
+just the body. It sits at 0.
+
+**gastly gets its own bake path** (`BANDS` + `bakeDWBands`), because one
+threshold provably cannot do what was asked: the gas should be black and the
+head should not be a solid disc, but the gas is *lighter* than the head, so any
+cut that reaches the gas has already filled the head. Measured levels in the
+rendered grey are 48 linework / 68–74 head fill / 87 gas / 255 paper and eye
+whites (`out/gastly-bands.mjs` dumps this), so inking the darkest band plus the
+gas band and leaving the head fill white gives a white line-art head inside a
+solid cloud. Those cuts are absolute and tied to this specific artwork.
+
+An earlier attempt at gastly used a `MAX_INK` override instead. That is gone —
+it produced the solid black disc the owner rejected. Do not reintroduce it.
+
+The 0.34 blob guard in `test/sprites.test.js` is unchanged for everything else;
+gastly gets a two-sided window (0.22–0.36, it lands at 0.298) rather than an
+exemption, so a clipped cloud and a re-filled head both still fail.
+
+Values were chosen by sweeping each species and looking at the output, not by
+reasoning about the artwork — the ladder is not monotonic, because past a point
+the outlines themselves break into dashes. The sweep helper is untracked at
+`host/out/boost-sweep.mjs` (with `review-sheet.mjs`, which composites the
+black-on-transparent PNGs onto PAPER white so they can be judged at all).
+
+**20 species renamed to their pre-unification Chinese names** — owner's
+preference, `OLD_ZH` in `scripts/gen-pokedex.mjs`. It lives in the generator
+rather than as a hand-edit of `seed/pokedex.json` precisely so a re-run does not
+silently revert them; PokeAPI is the only other source of that field. A full
+regenerate was done and diffed: exactly 40 lines changed, all of them `zh`.
+All 20 were rendered through Zpix at 12/24px and checked — `3D龙` is the only
+name in the dex mixing ASCII with CJK and it renders fine (27px wide at 12px,
+narrower than a three-hanzi name); the longest is still 52px, unchanged.
+
+**Bold was tried and rejected — do not bring it back casually.** Pulling a
+threshold down also thins every stroke, and past a point that reads as washed
+out (the owner's word: 过度曝光). One pixel of dilation at bake time fixed that,
+but it closed up the fine detail on zubat, venomoth and kabutops and the owner
+rejected it outright. Two lessons, and the second is the real one:
+
+- it was applied to **all 41 species with a lowered threshold**, not the six
+  actually reported as washed out. Fixing more than was reported is how a fix
+  turns into a regression on sprites nobody had complained about — kabutops was
+  the one he noticed, and he was right to ask why it had changed at all.
+- `dilate1bpp` and `drawSprite`'s `bold` option still exist for their original
+  purpose. `BOLD_LINE_SPECIES` is still empty. If bold ever comes back it needs
+  a per-species list somebody has looked at, not "everything I touched".
+
+A **half-weight** version was then approved and is live: `dilateHalf` +
+`HALF_BOLD`, currently eleven species. Half grows ink right and down only, so a
+1px stroke becomes 2px instead of 3px and a gap closes only if it was 1px wide
+*and* on the growth side — the faux-bold trick, not a morphological dilation.
+Measured on zubat that is ink 0.130 → 0.195 → 0.225. `out/bold-levels.mjs`
+renders none / half / full side by side; use it before adding to the set, and
+keep the set to sprites somebody has looked at both ways.
+
+**The bake draws a few things the artwork does not contain** — `PUPILS` +
+`stampDot` for pupils, `STROKES` + `stampLine` for linework. These species are
+drawn with an eye ring and nothing darker inside it, so no threshold and no band
+can produce a pupil (`out/bands.mjs` shows the level is simply not there), and
+rattata's incisor has no left or top edge at its threshold so the tooth runs
+into the muzzle. The owner asked for both rather than move to artwork he liked
+less. Final set: pupils on magikarp, koffing, kingler; the tooth edges on
+rattata. Tried and **rejected**: butterfree, hitmonlee, beedrill — on hitmonlee
+the white inside the eye is only 3x5px, so the dot filled it and changed
+nothing visible.
+
+Coordinates come from the **colour source at bake scale**, via
+`out/eye-locate.mjs` (renders the artwork with a grid and clusters a colour) or
+`out/eye-measure.mjs` (finds the enclosed hole an eye ring makes). Do not read
+them off the 1-bit render: the first pair was done that way, landed low and
+right of both eyes, and missed butterfree's second eye entirely because at
+1-bit it is a 10px sliver that reads as a stray line. `stampDot` and
+`stampLine` throw on an out-of-bounds coordinate, but neither can tell that a
+reworked upstream drawing moved the feature — **re-measure if a sprite with an
+entry here is ever re-sourced.**
+
+*Replacement artwork.* `ALT_ART` moves ten species off the dream-world set,
+because no threshold fixes something that is not in the source file:
+`weepinbell` has no body spots there; `vulpix`'s eye is an empty ring at every
+threshold from +100 down; `pidgey` has no linework layer at all, just two flat
+fills; `rattata` is gradient-shaded rather than flat, so its front teeth never
+resolve. `pikachu`, `raichu`, `persian`, `diglett`, `dugtrio` and `dratini` were
+owner preference rather than a defect in the file. `out/alt-art.mjs` renders a
+species across every set PokeAPI carries.
+
+`jigglypuff` and `butterfree` joined `BANDS` for the same reason as parasect,
+applied to eyes: their pupils are a distinct level *lighter* than the linework
+(137-140 and 121), so any single cut that keeps the body white loses them.
+`koffing` was checked the same way and has no pupil level in any set — its
+dream-world art draws narrowed smiling eyes, so there is nothing to recover.
+
+`blastoise` was moved to the gen-5 game sprite and moved straight back — pixel
+art next to 150 illustrations was rejected on sight. It is on dream-world at the
+default and no illustration set does better. Known-mediocre, leave it.
+
+`parasect` joined `gastly` in `BANDS`, from the other direction: its cap spots
+are *lighter* than the cap, so one cut gives either a black cap with white spots
+or a white cap with no spots. Inking the linework and the spot band gives a
+white cap with black spots. `out/bands.mjs` dumps any species' paint levels and
+is the tool for deciding whether a species needs this.
+
+**Three species have no good answer from any source, and that is a finding.**
+`out/bands.mjs` is what settles it: if a species' art has no dark plateau, there
+is no linework layer in the file and no threshold will invent one.
+
+- `pidgey` and `magmar` are flat fills with no outline layer at all. pidgey was
+  fixable by switching art; magmar is not — every set is worse, official-artwork
+  most of all (heavy painted shadow turns to blotches and dashed contours). It
+  sits on dream-world at +10, which is legible with a solid black crest. Best
+  available, not good. Owner has been told.
+- `rattata` is gradient-shaded (one band spanning grey 67-105), so its front
+  teeth never resolved at any threshold. Fixed by artwork, not by tuning.
+- `blastoise`: see above.
+
+**Still open, not acted on.** The same filled-body look is visible on others the
+owner has not ruled on — most clearly `tauros`, `drowzee`, `weezing`, `krabby`,
+`kingler`, `rapidash`, `moltres`. Left alone deliberately: several of these are
+genuinely dark in the source art, and this list only grows when a sprite is
+looked at and judged wrong.
+
+**Asked and answered once, so do not re-litigate it:** the owner asked whether
+the whole dex had been given a global exposure change. It had not — the default
+is still `boost 25` / `maxInkRatio 0.30`, untouched, and only species with an
+explicit table entry differ. Of #122 and up, eight were tuned; the other
+nineteen are exactly as first baked.
+
 ---
 
 ## Per-machine setup that git does NOT carry
@@ -201,7 +370,7 @@ simulation caught.
 | `host/out/state.json` | the save | synced now, see `docs/save-sync.md` |
 | `start-buddy.vbs` | absolute paths | autostart launcher |
 | **git `user.name` / `user.email`** | not a file, but git does not carry it either | **required for save-sync to publish at all.** `git commit-tree` refuses without an identity and the failure only shows up in `out/host-autostart.log`. Set it repo-local; see the 07-28 session record above |
-| `host/seed/sprites/`, `host/seed/oak.png` | Nintendo artwork, public repo | **new 2026-07-28** — run `cd host && node scripts/bake-assets.mjs` once per machine (~156 files, a few minutes). Without it the buddy renders as a checkerboard placeholder and the sprite tests skip themselves. |
+| `host/seed/sprites/`, `host/seed/oak.png` | Nintendo artwork, public repo | **new 2026-07-28** — run `cd host && node scripts/bake-assets.mjs` once per machine (~156 files, a few minutes). Without it the buddy renders as a checkerboard placeholder and the sprite tests skip themselves. **Re-bake after 2026-07-29**: the ink table changed for 22 species and a stale sprite is a valid PNG that just looks wrong, so nothing warns you |
 
 ### Do not "optimise" the animator pause in the tick loop
 
@@ -358,6 +527,8 @@ re-derived:
 | Work PC, `7d2b799` | 491 pass / 10 fail of 501 | yes |
 | Home PC, `7d2b799` (clean) | 506 pass / **12** fail of 518 | **no — killed at 780 s** |
 | Home PC, `7d2b799` + P4 | 520 pass / 10 fail of 530 | yes |
+| Work PC, `7d2b799` + sprites, 07-29 | 506 pass / **12** fail of 518 | **no — see below** |
+| Work PC, this commit (P4 + sprites), 07-29 | 519 pass / 11 fail of 530 | with `--test-force-exit` |
 
 The steady 10 are the 9 platform failures plus the RM12 flake. **Two more are
 load-dependent** and appear only sometimes on the home PC:
@@ -368,6 +539,11 @@ load-dependent** and appear only sometimes on the home PC:
 Both pass when `main-orchestration.test.js` runs on its own, and fail under
 `--test-concurrency=4` on a machine slow enough to lose the race. Anything
 outside these twelve is real.
+
+The last row is the merged tree — the home PC's P4 work and the work PC's sprite
+work together, run on the work PC. The count matches the home PC's 530 exactly,
+and the eleven are the nine platform failures plus those two; RM12 happened to
+pass that run. So the two sessions do not interact: nothing here is new.
 
 ### …and sometimes `npm test` will not exit
 
@@ -393,6 +569,37 @@ const result = await Promise.race([running.then(() => "settled"), sleep(500).the
 where `running` is `main()`: when the timeout arm wins, the assertion fails but
 that promise is still pending, holding the tick loop, its timer and the
 transport alive behind it. Unconfirmed, but the correlation is measured.
+
+**Work PC, 07-29 — the same hang, one degree worse, plus a workaround.** It
+reproduced here exactly as described, including both load-dependent failures and
+the identical 506/12 of 518, which is now measured independently on two machines
+and two trees. Two things to add:
+
+- **It can eat the rest of the suite, not just the exit.** On this machine the
+  runner never started any file after `main-orchestration` alphabetically —
+  `mock` through `wifi`, more than half the suite — so there was no summary at
+  all, just silence. "Hangs after printing the summary" is the mild version;
+  do not read a stalled run as "nearly done".
+- **`--test-force-exit` makes the suite usable today**, and is what the 506/12
+  above was measured with:
+
+  ```powershell
+  node --test --test-concurrency=4 --test-force-exit "test/*.test.js"
+  ```
+
+  Same file run alone with that flag: **13/13 pass in 4 s**, which is the other
+  half of the evidence that this is an unclosed handle and not a stuck test.
+
+Two dead ends, so nobody repeats them: the `createServer` bound by the
+EADDRINUSE test is closed in a `finally` and is not it, and importing the test
+file in-process (to read `process.getActiveResourcesInfo()`) does not reproduce
+the hang at all, so the handle belongs to the runner's child process.
+
+One consequence worth knowing: an abandoned run leaves `node --test` alive
+holding the tree. One was found here still running **five hours** after it
+started. `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` lists them —
+kill those, and leave the one whose command line is `src\index.js`, which is the
+buddy host.
 
 ---
 

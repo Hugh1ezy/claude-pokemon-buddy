@@ -80,6 +80,23 @@ test("every drawable species has a baked sprite", { skip: skipReason }, async ()
   assert.deepEqual(missing, [], `missing sprites: ${missing.join(", ")}`);
 });
 
+// An ink ratio this high means the calibrated threshold swallowed the body and
+// the sprite arrived as a filled silhouette with its linework gone.
+const INK_MAX = 0.34;
+
+// gastly is baked by luminance bands rather than one threshold (BANDS in
+// bake-assets.mjs): its gas is inked and its head deliberately is not, so the
+// figure is a white line-art head inside a solid cloud. That lands at ~0.30,
+// and both directions out of this window are regressions that were actually
+// seen on 2026-07-29:
+//   below ~0.22  the gas band has been clipped and only the head linework and
+//                a few detached crumbs survive (a bare sphere, ink ~0.05)
+//   above ~0.36  the head fill has been inked along with the gas and the whole
+//                thing is one black disc again (ink ~0.51)
+// A two-sided window rather than an exemption, because the 0.34 guard alone
+// would let the clipped-gas version through silently.
+const INK_WINDOW = { gastly: [0.22, 0.36] };
+
 test("baked buddy sprites fill the slot without overflowing it", { skip: skipReason }, async () => {
   const problems = [];
   for (const species of ALL_SPECIES) {
@@ -87,11 +104,13 @@ test("baked buddy sprites fill the slot without overflowing it", { skip: skipRea
     const maxEdge = Math.max(s.w, s.h);
     const ink = s.gray.reduce((count, value) => count + (value < 128 ? 1 : 0), 0);
     const inkRatio = ink / s.gray.length;
+    const [inkMin, inkMax] = INK_WINDOW[species] ?? [0, INK_MAX];
     // Collected rather than asserted one at a time: with 156 sprites, failing
     // on the first bad one means re-running the bake once per problem sprite.
     if (maxEdge > 157) problems.push(`${species} max edge ${maxEdge} exceeds slot 157`);
     if (maxEdge < 148) problems.push(`${species} max edge ${maxEdge} is under-sized (~155 expected)`);
-    if (inkRatio >= 0.34) problems.push(`${species} ink ratio ${inkRatio.toFixed(3)} is at or above 0.34`);
+    if (inkRatio >= inkMax) problems.push(`${species} ink ratio ${inkRatio.toFixed(3)} is at or above ${inkMax}`);
+    if (inkRatio < inkMin) problems.push(`${species} ink ratio ${inkRatio.toFixed(3)} is below ${inkMin}`);
   }
   assert.deepEqual(problems, [], `${problems.length} sprite(s) out of spec:\n  ${problems.join("\n  ")}`);
 });
