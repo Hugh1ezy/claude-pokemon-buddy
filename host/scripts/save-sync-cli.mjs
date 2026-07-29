@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { loadConfig } from "../src/config.js";
 import { createSaveSync } from "../src/save-sync.js";
+import { zhName } from "../src/pet/species-meta.js";
 
 const command = process.argv[2] ?? "status";
 const statePath = process.env.CPB_STATE_PATH ?? "out/state.json";
@@ -73,8 +74,14 @@ function describeSave(path) {
   }
 }
 
+// The species' own name, resolved from `species` rather than read out of the
+// save's `name` field. `name` is set at hatch and never follows an evolution,
+// so it printed as "妙蛙种子 (ivysaur)" once the buddy evolved -- a line that
+// reads exactly like the two-buddy trap in the one command that exists to rule
+// the two-buddy trap in or out.
 function summarise(save) {
-  return `${save.name ?? "?"} (${save.species}) Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
+  const species = save.species ? `${zhName(save.species)} (${save.species})` : "?";
+  return `${species} Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
 }
 
 function describeRemote(peeked) {
