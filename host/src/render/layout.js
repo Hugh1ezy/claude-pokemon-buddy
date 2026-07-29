@@ -82,7 +82,12 @@ function drawLeftPanel(g, model) {
   g.fillText(text.weekday, LEFT_W - 12, 88);
   g.textAlign = "left";
 
-  // Rows 3-4: reserved (future notifications) -- intentionally blank
+  // Row 3: the wild encounter notification, drawn only while one is on offer.
+  drawEncounterRow(g, model);
+
+  // Row 4: pokedex progress -- always drawn, since "how far along am I" is the
+  // question the whole 151-species build exists to answer.
+  drawDexRow(g, model);
 
   // Row 5: WEEK usage bar
   g.font = `800 12px ${MONO}`;
@@ -109,6 +114,66 @@ function drawLeftPanel(g, model) {
   g.font = `700 12px ${CJK}`;
   g.fillText(`室内  ${tempHum(model.room)}`, 11, 278);
   g.fillText(`室外  ${tempHum(model.out)}`, 11, 295);
+}
+
+// Left-panel rows 3 and 4, in the band the layout has kept blank since the
+// panel was first drawn: below the date/weekday row (baseline 88) and above the
+// WEEK meter (top 175).
+const ENC_ROW_Y = 100;      // alert box top
+const ENC_ROW_H = 30;
+const DEX_ROW_Y = 155;      // text baseline, 20px clear of the WEEK meter above it
+const PANEL_LEFT = 10;      // matches the separator lines and the 11px text margin
+const PANEL_RIGHT = LEFT_W - 12;
+
+// Inverted while "on", outlined while "off" -- NOT drawn-then-blank. A row that
+// vanishes for half its cycle is a row you can miss entirely by glancing at the
+// wrong moment, and this one has five minutes to be noticed in. Both phases
+// carry the same text at the same place; only the polarity moves.
+export const ENCOUNTER_BLINK_PERIOD = 6;   // animator frames (333ms each) -- 1s inverted, 1s outlined
+
+export function encounterBlinkOn(animPhase) {
+  if (!Number.isInteger(animPhase)) return true;   // a still frame shows the loud one
+  return animPhase % ENCOUNTER_BLINK_PERIOD < ENCOUNTER_BLINK_PERIOD / 2;
+}
+
+function drawEncounterRow(g, model) {
+  const encounter = model.encounter;
+  if (!encounter?.zh) return;
+
+  const w = PANEL_RIGHT - PANEL_LEFT;
+  const on = encounterBlinkOn(model.buddy?.animPhase);
+
+  g.fillStyle = on ? INK : PAPER;
+  g.fillRect(PANEL_LEFT, ENC_ROW_Y, w, ENC_ROW_H);
+  if (!on) {
+    g.fillStyle = INK;
+    g.fillRect(PANEL_LEFT, ENC_ROW_Y, w, 2);
+    g.fillRect(PANEL_LEFT, ENC_ROW_Y + ENC_ROW_H - 2, w, 2);
+    g.fillRect(PANEL_LEFT, ENC_ROW_Y, 2, ENC_ROW_H);
+    g.fillRect(PANEL_RIGHT - 2, ENC_ROW_Y, 2, ENC_ROW_H);
+  }
+
+  g.fillStyle = on ? PAPER : INK;
+  g.font = `800 14px ${CJK}`;
+  const label = `野生的 ${encounter.zh}`;
+  const textW = g.measureText(label).width;
+  g.fillText(label, Math.round(PANEL_LEFT + (w - textW) / 2), ENC_ROW_Y + 20);
+  g.fillStyle = INK;
+}
+
+// 图鉴 counts distinct species (the collection), 捕捉 counts throws that landed
+// (duplicates included). They are deliberately different numbers -- see
+// dexProgress() -- so they are labelled rather than run together.
+function drawDexRow(g, model) {
+  const dex = model.dex;
+  if (!dex) return;
+
+  g.fillStyle = INK;
+  g.font = `800 12px ${CJK}`;
+  g.fillText(`图鉴 ${dex.dexCaught}/${dex.dexTotal}`, 11, DEX_ROW_Y);
+  g.textAlign = "right";
+  g.fillText(`捕捉 ${dex.capturedCount}`, PANEL_RIGHT, DEX_ROW_Y);
+  g.textAlign = "left";
 }
 
 // Row y-coordinates for the right (buddy) panel, top to bottom:

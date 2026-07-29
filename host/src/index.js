@@ -8,7 +8,7 @@ import { loadConfig, saveConfig } from "./config.js";
 import { resolveEvolution } from "./pet/evolution.js";
 import { rollPersonality } from "./pet/personality.js";
 import { applyBondTick, heartsFromHalves } from "./pet/bond.js";
-import { normalizeDex, recordSeen } from "./pet/dex.js";
+import { dexProgress, normalizeDex, recordSeen } from "./pet/dex.js";
 import { stepEncounter } from "./pet/encounter.js";
 import { buildEncounterContext } from "./pet/encounter-context.js";
 import { loadEncounterTable } from "./pet/encounter-table.js";
@@ -268,6 +268,13 @@ export async function buildRenderModel({ pet, usage, weather, room, now, buddyNa
       t: weather.temp ?? 0,
       h: weather.humidity ?? 64,
     },
+    // Left panel rows 3 and 4. The species name is resolved here rather than in
+    // the layout so the renderer keeps taking strings it can draw and not keys
+    // it has to look up -- the same split the rest of the panel already uses.
+    dex: dexProgress(pet),
+    encounter: pet.encounter?.species
+      ? { species: pet.encounter.species, zh: zhName(pet.encounter.species) }
+      : null,
     buddy: {
       name: buddyName,
       spriteGray: sprite.gray,

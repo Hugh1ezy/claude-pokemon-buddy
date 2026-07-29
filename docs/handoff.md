@@ -204,7 +204,7 @@ transport, or the animator. The device is running exactly what it ran before.
 | P1 metadata + sprites | **done** — `seed/pokedex.json` (names/types/evolutions/capture rates for 1–151), 156 baked sprites, `species-meta.js` sources all of it. Sprite ink and 20 species names revised 2026-07-29, below |
 | P2 save model | **done** — `pet/dex.js`: 已捕获 count (duplicates included), pokedex count (distinct), and a box holding one pet per species, each with its own level and bond |
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
-| P4 notification row + capture screen | **half done (2026-07-28, home PC)** — the engine is wired into the tick and encounters now really happen and persist; nothing is drawn yet. See below |
+| P4 notification row + capture screen | **rows 3-4 drawn (2026-07-30)** — the engine has been wired into the tick since 07-28 and encounters persist; the left panel now shows the offer and the dex counts. The capture screen is the remaining piece. See below |
 | P5 pokedex screen + swapping the active buddy | not started |
 | P6 real cries | not started — waiting on a microSD card the owner does not have yet |
 
@@ -240,9 +240,72 @@ anything — the engine existed and could not fire. Now:
 A save that has never seen an encounter still round-trips byte-identical, so
 save-sync has nothing new to publish until something actually happens.
 
-**What is left is all of the visible half**: the row 3 notification, the capture
-screen, and the button that answers it. Nothing draws an encounter yet, so today
-they appear in the save and the log and nowhere else.
+**The left panel's rows 3 and 4 are in as of 07-30.** They went into the band
+`drawLeftPanel` had kept blank and commented `reserved (future notifications)`
+since the panel was first drawn, which is where the owner asked for them:
+
+- **Row 3** is the encounter notification, drawn only while an offer is live. It
+  alternates between an inverted box and an outlined one rather than between
+  drawn and blank — a row that vanishes for half its cycle can be missed
+  entirely by glancing at the wrong moment, and this one has `offerMs` (5
+  minutes) to be noticed in. `encounterBlinkOn()` keys off the animator's
+  `animPhase`, so it needs no timer of its own and a still frame (paintFromDisk,
+  the dashboard preview) shows the loud phase.
+- **Row 4** is `图鉴 n/151` and `捕捉 n`, always drawn. They are deliberately two
+  numbers, not one: `dexCaught` is distinct species and `capturedCount` counts
+  duplicates, so a duplicate catch moves the second and not the first. A test
+  pins exactly that.
+
+**The blink was measured before it shipped, and the worry was wrong.** The
+concern was the one the animator section below raises: row 3 sits in the left
+panel and the buddy is on the right, so a blink toggle would union the two into
+a near-full-frame push at 3Hz. Measured with `out/enc-row-probe.mjs` (untracked,
+renders both phases and runs the real `diffRect` over them):
+
+| Frame | Rect | Bytes |
+|---|---|---|
+| idle, buddy bob only | 152x150 | 2850 |
+| encounter up, same blink phase | 152x150 | 2850 |
+| **the blink toggle frame** | 312x40 | **1560** |
+| full frame, for scale | 400x300 | 15000 |
+
+The toggle frame is *cheaper* than an ordinary animator frame — it is a short
+wide band, not a tall union — so the blink costs the transport nothing worth
+having. Re-measure with that script if the row ever moves vertically, since the
+whole result depends on row 3 and the sprite's top edge sharing a y range.
+
+**What is left is the capture screen** and the button that answers it. Until it
+exists, an offer can appear and expire and the only thing that ever happens is
+row 3 blinking — nothing can be caught yet, so `捕捉` stays at 0.
+
+### The capture screen, as the owner specified it on 2026-07-30
+
+Written down because it came from him in conversation and nothing else records
+it. The order he asked for is **rows 3-4 (done) → the pokedex screen → the
+capture screen**, so the pokedex screen comes first even though this is the more
+interesting one.
+
+*The animation*: a ball is thrown, hits the pokemon, the ball wobbles on the
+ground, and stars come off it on a success. Explicitly the classic GBA look —
+early-generation pixel art is the reference, not something new.
+
+*The mechanic*, which is his own rather than the games':
+
+- A horizontal bar spans the bottom of the screen.
+- A vertical line **A** sits at a random position in it, and does not move.
+- A segment **B** slides left and right inside the bar. **C** is B extended
+  symmetrically on both sides; B and C slide together as one piece.
+- **Length and speed vary by species** — this is where a rare one is made hard,
+  rather than by a hidden capture rate.
+- KEY stops the slider. Then, by where A falls in the stopped piece:
+  - **inside B** → caught.
+  - **inside C** → the throw fails, but the pokemon does **not** flee: you go
+    again, and keep going until A lands in B.
+  - **outside both** → it escapes immediately and the encounter is over.
+
+Note what this does to `seed/pokedex.json`'s capture rates: they stop being the
+mechanism. Either they become the input that sets B and C's width and speed, or
+they go unused — worth deciding deliberately rather than leaving both in.
 
 One stale comment worth knowing about: `ENCOUNTER_DEFAULTS.perTickChance` is
 `0.0065`, but the comment above it still describes `0.0028` and "near 2.5 a day".
