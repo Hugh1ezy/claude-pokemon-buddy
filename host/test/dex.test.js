@@ -11,6 +11,7 @@ import {
   emptyDex,
   normalizeDex,
   recordCapture,
+  recordSeen,
 } from "../src/pet/dex.js";
 import { loadState, saveState, SCHEMA_VERSION } from "../src/state.js";
 
@@ -110,8 +111,29 @@ test("normalizeDex repairs junk instead of trusting or crashing on it", () => {
   assert.deepEqual(repaired.dexCaught, ["bulbasaur", "pikachu"]);
   assert.equal(repaired.box.length, 1);
   assert.equal(repaired.box[0].level, 5);
-  // capturedCount can exceed the distinct count but must never sit below it.
-  assert.equal(repaired.capturedCount, 2);
+  // A negative count is junk and gets floored -- at the BOX size, not the dex
+  // size. See the seen-vs-caught test below for why those differ.
+  assert.equal(repaired.capturedCount, 1);
+});
+
+// The bug row 4 exposed the day it was first drawn: the panel read 捕捉 2 on a
+// buddy that had merely hatched and evolved once, with an empty box and no
+// capture flow implemented at all. normalizeDex was flooring capturedCount at
+// dexCaught.length, and recordSeen puts entries in dexCaught that are
+// explicitly not captures.
+test("recordSeen unlocks dex entries without inventing captures", () => {
+  let dex = emptyDex();
+  dex = recordSeen(dex, "bulbasaur");
+  dex = recordSeen(dex, "ivysaur");
+
+  const progress = dexProgress(dex);
+  assert.equal(progress.dexCaught, 2, "both are owned and belong in the dex");
+  assert.equal(progress.capturedCount, 0, "neither was caught");
+  assert.equal(progress.boxCount, 0);
+
+  // And it must survive the normalize a save round-trip puts it through, which
+  // is where the invented captures were actually coming from.
+  assert.equal(normalizeDex(dex).capturedCount, 0);
 });
 
 test("normalizeDex keeps a legitimately higher capturedCount", () => {

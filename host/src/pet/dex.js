@@ -49,14 +49,19 @@ export function normalizeDex(raw) {
   }
 
   // capturedCount counts duplicates, so it can exceed the number of distinct
-  // species -- but it can never be BELOW it, and a save claiming otherwise is
-  // repaired upward rather than trusted. (Hand-edited saves and interrupted
-  // writes both produce this; the alternative is a panel reading "已捕获 3 只 ·
-  // 图鉴 7/151", which is nonsense on its face.)
+  // species. It used to be floored at dexCaught.length on the reasoning that a
+  // dex entry implies a capture -- but recordSeen() exists precisely to add dex
+  // entries that are NOT captures (the starter line, which is unobtainable in
+  // the wild), so that floor was false by construction. It silently invented
+  // captures: a fresh save whose buddy had merely evolved once read 捕捉 2 with
+  // an empty box, which is what the panel showed the day row 4 was first drawn.
+  //
+  // The floor that is actually true is the box: every entry in it came from a
+  // capture, and nothing else puts one there.
   const claimed = Number(raw?.capturedCount);
   const capturedCount = Number.isInteger(claimed) && claimed >= 0
-    ? Math.max(claimed, dexCaught.length)
-    : dexCaught.length;
+    ? Math.max(claimed, box.length)
+    : box.length;
 
   return { dexCaught, capturedCount, box };
 }

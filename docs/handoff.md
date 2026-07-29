@@ -274,9 +274,25 @@ wide band, not a tall union — so the blink costs the transport nothing worth
 having. Re-measure with that script if the row ever moves vertically, since the
 whole result depends on row 3 and the sprite's top edge sharing a y range.
 
+**Drawing row 4 immediately found a bug, which is the argument for drawing
+things.** The panel came up reading `图鉴 2/151 · 捕捉 2` on a buddy that had
+hatched and evolved once, with an empty box and no capture flow implemented at
+all — `recordCapture` has no caller outside `sim-encounters.mjs`. `normalizeDex`
+was flooring `capturedCount` at `dexCaught.length`, on the reasoning that a dex
+entry implies a capture. `recordSeen` exists precisely to break that: it unlocks
+the starter line's entries, which are owned and explicitly *not* caught. The
+floor is now `box.length`, which is true by construction — nothing but a capture
+puts anything in the box.
+
+The number had already been persisted, so the live save on the work PC was
+corrected by hand once (`capturedCount` → `box.length`, undo copy left at
+`out/state.json.precapfix`). That is a one-off, deliberately **not** a
+migration: once capture ships, resetting the count on load would be a bug of its
+own.
+
 **What is left is the capture screen** and the button that answers it. Until it
 exists, an offer can appear and expire and the only thing that ever happens is
-row 3 blinking — nothing can be caught yet, so `捕捉` stays at 0.
+row 3 blinking — nothing can be caught yet, so `捕捉` correctly stays at 0.
 
 ### The capture screen, as the owner specified it on 2026-07-30
 
