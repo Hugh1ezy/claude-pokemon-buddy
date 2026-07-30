@@ -213,6 +213,47 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 If `status` shows the remote *behind* what is on this machine, stop and read "the
 two-buddy trap" below before running anything.
 
+## Session record: 2026-07-31 morning, work PC — the RTC now works
+
+`components/port_bsp/pcf85063.{h,cpp}`, on the same I2C bus as the SHTC3 and the
+ES8311 (SDA 13 / SCL 14, address 0x51), backed by the 18650. The chip has been
+on the board the whole time; only the driver was missing, and `main.cpp:1155`'s
+"No RTC chip driver exists in this codebase" was read once as "the board has no
+RTC", which it never said.
+
+`rtc_seed_clock()` seeds the RAM clock from the chip at boot; `rtc_maintain()`
+on the 30s sensor cadence keeps the chip agreeing with whatever the host last
+sent. Three decisions worth not undoing:
+
+- **The oscillator-stop flag (seconds bit 7) makes `read()` fail.** That flag
+  means the backup rail dropped: the registers still hold digits, and they are
+  not a time. Absent beats plausible-but-wrong, which is the same rule the
+  encounter context follows.
+- **Control_1 is read-modify-written**, clearing only 12/24 and STOP. Bit 0
+  selects the crystal's load capacitance (7pF vs 12.5pF) and is a property of
+  this board that is not visible from software — writing a flat `0x00` would
+  quietly pick one and pay for it in accuracy.
+- **The one-minute deadband in `rtc_maintain` is load-bearing.** Writing on
+  every disagreement rewrites the chip constantly, and every write zeroes the
+  seconds register, so a device with a host attached would be dragged
+  permanently tens of seconds late — which is exactly the reading offline
+  亲密度 depends on.
+
+Dates use Hinnant's civil-calendar algorithms and touch no libc time zone:
+`epoch_day` is a **local** calendar day count, so a timezone conversion here
+would be the bug, not the fix.
+
+Measured on hardware:
+
+    (first boot after flashing)  #CPB 642 rtc: no valid time
+    (host up 45s, then reset with no host)
+                                 #CPB 622 rtc: seeded 10:46 epoch_day=20665
+                                 offline-bond: restored day=20665 hours=0x000400
+
+PC clock at that moment was 10:47:10, epochDay 20665 — hour and date both
+agree. The second line also proves the offline mask survives a **reflash** and a
+reboot, since `0x400` is the hour-10 press made before the firmware was rebuilt.
+
 ## Session record: 2026-07-31 morning, work PC — offline 亲密度
 
 Presses made away from a PC used to be worth nothing: the hourly slot is
@@ -275,10 +316,8 @@ property, just invisible. It has unit tests (`test/offline-bond.test.js`, 13 of
 them). To see it for real, press KEY with no host during an hour whose slot is
 still unpaid and watch for `bond: credited N offline half-heart(s)`.
 
-**Known gap: a press after a reboot with no host since is dropped**, because
-time comes from the host's `T_TIME` and lives only in RAM. Absent, not guessed.
-The board's **PCF85063 RTC** closes this and has no driver yet — it is the
-obvious next piece.
+~~**Known gap: a press after a reboot with no host since is dropped**~~ —
+**closed the same morning, see the PCF85063 section below.**
 
 Two testing traps, both of which cost a round here: the `diag()` line at press
 time is lost unless a reader is already attached (see the USB-JTAG note in the
