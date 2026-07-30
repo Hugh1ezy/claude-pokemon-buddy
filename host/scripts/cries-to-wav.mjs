@@ -13,7 +13,7 @@
 // device will play, so the maths must not be "improved" -- if it diverges from
 // the firmware the tool is worse than useless, because it would audition a sound
 // that does not exist. Any change to synth_tone has to be mirrored here.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const AUDIO_SR = 16000;
@@ -81,26 +81,48 @@ const isCli = process.argv[1] && fileURLToPath(import.meta.url) === process.argv
 if (isCli) {
   const data = JSON.parse(
     readFileSync(fileURLToPath(new URL("../seed/species-cries.json", import.meta.url)), "utf8"));
+  const { loadReadings, pinyinOf } = await import("./species-pinyin.mjs");
+  const readings = await loadReadings();
   const all = [
     ...SYSTEM_SOUNDS,
-    ...data.species.map((s, i) => ({ id: data.soundBase + i, name: s.key, notes: s.notes })),
+    ...data.species.map((s, i) => ({
+      id: data.soundBase + i,
+      name: s.key,
+      pinyin: s.zh ? pinyinOf(s.zh, readings) : null,
+      notes: s.notes,
+    })),
   ];
 
+  // Matches pinyin as well as the English key, because the files are named in
+  // pinyin now and typing `miaowacao` to get miaowacao.wav is the obvious thing to
+  // try. Matching only the key would reject it.
   const wanted = process.argv.slice(2).map((a) => a.toLowerCase());
   const picked = wanted.length === 0
     ? all
-    : all.filter((s) => wanted.some((w) => s.name.toLowerCase().includes(w)));
+    : all.filter((s) => wanted.some((w) => s.name.toLowerCase().includes(w) || (s.pinyin ?? "").includes(w)));
   if (picked.length === 0) {
-    console.error(`no sound matched ${wanted.join(" ")} -- names: ${all.map((s) => s.name).join(" ")}`);
+    console.error(`no sound matched ${wanted.join(" ")} -- see: node scripts/species-pinyin.mjs`);
     process.exit(2);
   }
 
   const dir = fileURLToPath(new URL("../out/cries/", import.meta.url));
+  // A full render clears the directory first. Without this a rename leaves the old
+  // file sitting next to the new one -- which happened on 2026-07-30 when the
+  // naming scheme changed and produced both 00-bui-idle.wav and 000-bui-idle.wav.
+  // For a tool whose entire job is making sounds identifiable, stale files with
+  // plausible names are the worst possible output. A filtered render leaves the
+  // directory alone, because it is deliberately only touching part of it.
+  if (wanted.length === 0) rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   for (const sound of picked) {
     const pcm = synthTone(sound.notes);
     const ms = sound.notes.reduce((t, n) => t + n.ms, 0);
-    const file = `${dir}${String(sound.id).padStart(2, "0")}-${sound.name}.wav`;
+    // Named in pinyin, the owner's rule 2026-07-30: an English key like `ivysaur`
+    // does not tell him whose cry he is looking at. The id stays as a prefix so
+    // the directory sorts into firmware sound-table order, which is the order that
+    // matters when checking a mapping. The three system sounds have no Chinese
+    // name and keep their descriptive ones.
+    const file = `${dir}${String(sound.id).padStart(3, "0")}-${sound.pinyin ?? sound.name}.wav`;
     writeFileSync(file, wavFile(pcm));
     console.log(`id ${String(sound.id).padStart(2, " ")}  ${String(ms).padStart(4, " ")}ms  ${sound.name}`);
   }
