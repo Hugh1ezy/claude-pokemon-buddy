@@ -207,6 +207,23 @@ static std::atomic<bool> g_wifi_user_stopped{false};
 static std::atomic<int64_t> g_last_frame_us{0};
 static constexpr int64_t LOCAL_CLOCK_TIMEOUT_US = 120LL * 1000 * 1000; // 2x the normal ~60s tick
 
+// "Is anybody driving this panel right now" -- asked in the only direction that
+// can be answered honestly, which is INBOUND. A live host pushes a frame about
+// three times a second (the animator), so 30 seconds of silence is unambiguous,
+// and it bounds how much of a commute's start can be missed.
+//
+// Not the same question as LOCAL_CLOCK_TIMEOUT_US, which is "has it been gone
+// long enough to put the clock face up" and can afford to be slow.
+//
+// g_last_frame_us starts at 0, so a device that has never been drawn to counts
+// as absent, which is what it is.
+static constexpr int64_t HOST_SILENT_US = 30LL * 1000 * 1000;
+
+static bool host_is_absent(void)
+{
+    return esp_timer_get_time() - g_last_frame_us.load() > HOST_SILENT_US;
+}
+
 static SemaphoreHandle_t tx_mutex = nullptr;      // serializes USJ writes
 static QueueHandle_t     btn_queue = nullptr;     // button events -> button_task
 static std::atomic<uint32_t> g_tx_drop_count{0};
@@ -344,25 +361,15 @@ static bool send_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_
 // when WiFi isn't connected/authed is not an error, see wifi_write_raw, so
 // this never spams tx-drop warnings when WiFi is unused.
 //
-// Returns whether a host was actually there to receive it. USB answers that
-// honestly -- usb_serial_jtag_write_bytes only completes while something is
-// reading the port, so an unplugged or un-hosted cable fails the write. WiFi
-// cannot answer it through send_frame, because wifi_write_raw deliberately
-// reports "no client connected" as success; g_wifi_authenticated is the real
-// signal there, since a client only reaches that state by completing T_AUTH.
-//
-// One known false positive: a PC with the port open but the buddy host not
-// running (a serial reader, say) makes the USB write succeed. Nothing is lost
-// by it -- see offline_bond_note_press, the only caller that cares.
-static bool broadcast_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
+// Do NOT try to read "did a host receive this" out of the return values here.
+// That was tried on 2026-07-31 and is measurably wrong on both links:
+// usb_serial_jtag_write_bytes completes as soon as the bytes fit the driver's
+// 1KB TX ring buffer, whether or not anything is draining it, and wifi_write_raw
+// deliberately reports "no client connected" as success. Use host_is_absent().
+static void broadcast_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
 {
-    bool usb_ok = send_frame(type, seq, payload, len, Link::USB);
-    bool wifi_ok = false;
-    if (g_wifi_authenticated) {
-        send_frame(type, seq, payload, len, Link::WIFI);
-        wifi_ok = true;
-    }
-    return usb_ok || wifi_ok;
+    send_frame(type, seq, payload, len, Link::USB);
+    if (g_wifi_authenticated) send_frame(type, seq, payload, len, Link::WIFI);
 }
 
 static void send_ack(uint8_t seq, Link link)
@@ -651,16 +658,22 @@ static void button_task(void *arg)
             uint8_t key_id = (uint8_t)(ev >> 8);
             uint8_t kind_id = (uint8_t)(ev & 0xff);
             uint8_t p[2] = { key_id, kind_id };
-            const bool delivered = broadcast_frame(T_BUTTON, 0, p, sizeof(p));
+            broadcast_frame(T_BUTTON, 0, p, sizeof(p));
             ESP_LOGI(TAG, "button key=%u kind=%u", p[0], p[1]);
 
-            // A KEY short press that reached no host is the one the owner
+            // A KEY short press made with no host listening is the one the owner
             // otherwise loses -- it is both the greet gesture and the 亲密度
             // credit, and away from a PC nothing was there to count it. Record
             // the hour so the host can credit it on reconnect. Only KEY short:
             // every other gesture is answered by a screen the host draws, and
             // means nothing with no host to draw it.
-            if (!delivered && key_id == KEY_ID_KEY && kind_id == KIND_SHORT) {
+            //
+            // A false positive here is harmless by construction. The host
+            // suppresses pushes while the pokedex or capture screen is up, so a
+            // press then looks "absent" -- but those screens only exist because
+            // a host is rendering them, so the same press is credited live and
+            // the recorded hour replays as a no-op.
+            if (key_id == KEY_ID_KEY && kind_id == KIND_SHORT && host_is_absent()) {
                 offline_bond_note_press();
             }
 
