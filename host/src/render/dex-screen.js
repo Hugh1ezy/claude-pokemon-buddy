@@ -56,10 +56,28 @@ async function cellFor(species, caught) {
 // keeps every stroke at the cost of thickening it, which is the right trade at
 // this size.
 //
+// How much of a source box has to be ink before the cell pixel is ink.
+//
+// The two paths want opposite things, which is why this is a parameter and not
+// a constant. A LIT cell wants thin strokes: "any ink at all" (0) fattens every
+// 1px line into a 1:4 box and the grid reads as bold, which is what the owner
+// asked to fix on 2026-07-30. A SILHOUETTE wants the opposite -- fillOutline
+// below can only work on a closed outline, and the fattening is exactly what
+// seals the hairline gaps that open at this scale.
+//
+// 0.18 was chosen by looking, not derived: out/dex-thin-sweep.mjs renders a
+// spread of body types across a range of values. It is visibly thinner than 0
+// with nothing broken; damage starts around 0.26, where dratini and magikarp
+// begin dropping strokes. Nothing outside this file is affected -- the BOOST
+// table, HALF_BOLD, dilateHalf and the full-size buddy sprite are untouched.
+export const LIT_COVERAGE = 0.18;
+const SHADOW_COVERAGE = 0;
+
 function downsample(sprite, box, caught) {
   const scale = Math.min(box / sprite.w, box / sprite.h);
   const w = Math.max(1, Math.round(sprite.w * scale));
   const h = Math.max(1, Math.round(sprite.h * scale));
+  const coverage = caught ? LIT_COVERAGE : SHADOW_COVERAGE;
   const bits = new Uint8Array(w * h);
 
   for (let y = 0; y < h; y += 1) {
@@ -68,14 +86,15 @@ function downsample(sprite, box, caught) {
     for (let x = 0; x < w; x += 1) {
       const sx0 = Math.floor((x / w) * sprite.w);
       const sx1 = Math.max(sx0 + 1, Math.floor(((x + 1) / w) * sprite.w));
-      let on = 0;
-      outer:
+      let ink = 0;
+      let total = 0;
       for (let sy = sy0; sy < sy1; sy += 1) {
         for (let sx = sx0; sx < sx1; sx += 1) {
-          if (sprite.gray[sy * sprite.w + sx] < 128) { on = 1; break outer; }
+          total += 1;
+          if (sprite.gray[sy * sprite.w + sx] < 128) ink += 1;
         }
       }
-      bits[y * w + x] = on;
+      bits[y * w + x] = coverage > 0 ? (ink / total >= coverage ? 1 : 0) : (ink > 0 ? 1 : 0);
     }
   }
   return caught ? { bits, w, h } : { bits: fillOutline(bits, w, h), w, h };

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   DEX_PAGE_SIZE,
+  LIT_COVERAGE,
   clearDexCellCache,
   dexPageCount,
   renderDexPage,
@@ -52,6 +53,27 @@ test("an uncaught entry is a filled shadow and a caught one is not", async () =>
   assert.ok(shadow > 0.30, `a shadow should be mostly ink, got ${shadow.toFixed(3)}`);
   assert.ok(art < shadow * 0.75, `line art should be markedly lighter than a shadow (${art.toFixed(3)} vs ${shadow.toFixed(3)})`);
   assert.ok(art > 0.02, `line art should still draw something, got ${art.toFixed(3)}`);
+});
+
+// The owner asked for the lit cells to be thinner on 2026-07-30. They are thin
+// because the box filter demands LIT_COVERAGE of a source box before inking,
+// where the silhouette path demands only "any ink at all" -- and it has to keep
+// demanding that, because fillOutline can only work on an outline the fattening
+// has sealed. Losing this distinction is a one-character edit, so it is pinned.
+test("lit cells are drawn thinner than the silhouette rule would draw them", async () => {
+  clearDexCellCache();
+  assert.ok(LIT_COVERAGE > 0, "a coverage of 0 is the fat 'any ink' rule the owner rejected");
+  assert.ok(LIT_COVERAGE < 0.26, "0.26 and up starts dropping strokes on the delicate species");
+
+  const first = SPECIES_ORDER[0];
+  const cell = { x0: 2, y0: 32, x1: 40, y1: 68 };
+  const lit = await renderDexPage({ dex: dexOf([first]), page: 0, progress: { dexCaught: 1, dexTotal: 151 } });
+  const shadow = await renderDexPage({ dex: dexOf([]), page: 0, progress: { dexCaught: 0, dexTotal: 151 } });
+
+  assert.ok(
+    inkRatio(lit.bitmap, cell) < inkRatio(shadow.bitmap, cell),
+    "a lit cell must never carry as much ink as the shadow it replaced",
+  );
 });
 
 test("catching something changes only its own cell", async () => {

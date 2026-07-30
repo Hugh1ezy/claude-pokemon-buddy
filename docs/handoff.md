@@ -380,6 +380,21 @@ than nearest-neighbour: it thickens every stroke and seals the hairline gaps
 that open when a 155px drawing is sampled to 36. A figure that still leaks comes
 out as line art instead of a shadow — wrong, but visibly wrong.
 
+**The lit cells are thinner than the shadows are, on purpose and by a different
+rule.** The owner asked for this the same day: the first version fattened every
+1px line into a 1:4 box and the grid read as bold. `LIT_COVERAGE` (0.18) is how
+much of a source box must be ink before a lit pixel is ink; the silhouette path
+keeps demanding only *any* ink, because that fattening is precisely what seals
+the outline `fillOutline` needs. 0.18 was chosen by looking —
+`out/dex-thin-sweep.mjs` renders a spread of body types across a range, and
+damage starts around 0.26 where dratini and magikarp begin dropping strokes.
+
+**This lives entirely in `dex-screen.js`.** It is not the `BOOST` table, not
+`HALF_BOLD`, not `dilateHalf`, and not the full-size buddy sprite — all of which
+were tuned over eight review rounds and stay exactly as they were. Anything that
+wants to change how a pokemon looks *at 36px in the grid* belongs here; anything
+that changes how one looks anywhere else does not.
+
 **Cell size was chosen by looking.** `out/dex-grid-probe.mjs` renders a page at
 several sizes; at 30px the line art collapses into blobs, at 36px the species
 stay apart. 10x6 also makes the grid position readable as the dex number — row 1
