@@ -8,7 +8,7 @@ import { loadConfig, saveConfig } from "./config.js";
 import { resolveEvolution } from "./pet/evolution.js";
 import { rollPersonality } from "./pet/personality.js";
 import { applyBondTick, heartsFromHalves } from "./pet/bond.js";
-import { dexProgress, normalizeDex, recordSeen } from "./pet/dex.js";
+import { dexProgress, normalizeDex, recordCapture, recordSeen } from "./pet/dex.js";
 import { stepEncounter } from "./pet/encounter.js";
 import { buildEncounterContext } from "./pet/encounter-context.js";
 import { loadEncounterTable } from "./pet/encounter-table.js";
@@ -25,8 +25,12 @@ import { loadBuddySprite } from "./render/sprites.js";
 import { loadState, saveState } from "./state.js";
 import { createSaveSync } from "./save-sync.js";
 import { createTransport } from "./transport/index.js";
+import { captureParams } from "./pet/capture-tuning.js";
+import { runCaptureSession } from "./pet/capture-session.js";
 import { ageDexView, isDexOpenGesture, stepDexView } from "./pet/dex-view.js";
+import { ENCOUNTER_DEFAULTS } from "./pet/encounter.js";
 import { resolvePlace } from "./place.js";
+import { PHASE, PHASE_MS, renderCaptureFrame } from "./render/capture-screen.js";
 import { dexPageCount, renderDexPage } from "./render/dex-screen.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
@@ -131,11 +135,20 @@ export function createButtonDispatcher({
   // same reason.
   dexSource = null,           // () => ({ dex, progress }) -- null disables the screen
   renderDex = renderDexPage,
+  // The capture minigame. Results are queued rather than applied: the tick owns
+  // the pet, and a second writer to the save is exactly the kind of thing that
+  // loses a buddy. Same shape as the evolution intents.
+  captureResults = null,
+  renderCapture = renderCaptureFrame,
+  captureSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  captureNow = () => Date.now(),
   logger = null,
 } = {}) {
   const tickQueue = [];
   let signatureInFlight = false;
   let dexView = null;
+  let captureActive = false;
+  let capturePress = false;
   const off = transport?.onButton?.((event) => {
     // The firmware logs every press it sends; the host logged nothing, so
     // "I pressed KEY and nothing happened" had no evidence on this side at
@@ -154,6 +167,24 @@ export function createButtonDispatcher({
     // gated on readyToEvolve being TRUE, which is exactly when the signature
     // does not play, so the two can never both act on the same press.
     if (shouldQueueButtonForTick(event)) tickQueue.push(event);
+
+    // A capture in progress owns KEY entirely: the press IS the throw, and the
+    // session loop reads this flag rather than being called, so a press during
+    // the throw animation cannot start a second one.
+    if (captureActive) {
+      if (event?.key === "KEY") capturePress = true;
+      return;
+    }
+
+    // KEY double is context-sensitive, and row 3 says which it will be: with a
+    // wild pokemon on offer it goes to the capture screen, otherwise to the
+    // pokedex. One gesture, because there is only one spare -- BOOT belongs to
+    // power-save and KEY short/long are already the greet and the evolution
+    // confirm.
+    if (captureResults && isDexOpenGesture(event) && liveEncounter()) {
+      startCapture();
+      return;
+    }
 
     // The pokedex takes KEY over completely while it is up -- short turns the
     // page instead of greeting, long returns instead of confirming. Checked
@@ -175,6 +206,51 @@ export function createButtonDispatcher({
       finally { animator.resume(); }
     }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
   });
+
+  function liveEncounter() {
+    const pet = getPet();
+    const species = pet?.encounter?.species;
+    if (typeof species !== "string" || !isDexSpecies(species)) return null;
+    const offeredAt = Number(pet.encounter.offeredAt);
+    if (!Number.isFinite(offeredAt)) return null;
+    const left = offeredAt + ENCOUNTER_DEFAULTS.offerMs - captureNow();
+    return left > 0 ? { species, offerMsLeft: left } : null;
+  }
+
+  function startCapture() {
+    const offer = liveEncounter();
+    if (!offer || captureActive) return;
+    captureActive = true;
+    capturePress = false;
+
+    actions.run(async () => {
+      animator.pause();
+      try {
+        const result = await runCaptureSession({
+          species: offer.species,
+          zh: zhName(offer.species),
+          params: captureParams(offer.species),
+          offerMsLeft: offer.offerMsLeft,
+          render: renderCapture,
+          push: (frame) => transport.push(frame),
+          now: captureNow,
+          sleep: captureSleep,
+          pressed: () => capturePress,
+          takePress: () => { capturePress = false; },
+          phases: PHASE_MS,
+          PHASE,
+          logger,
+        });
+        captureResults.push({ species: offer.species, outcome: result.outcome });
+        logger?.log?.(`capture: ${zhName(offer.species)} ${result.outcome}${result.reason ? ` (${result.reason})` : ""}`);
+      } finally {
+        captureActive = false;
+        animator.resume();
+      }
+    }).catch((error) => {
+      logger?.warn?.(`capture screen failed: ${errorReason(error)}`);
+    });
+  }
 
   function handleDexButton(event) {
     const source = dexSource();
@@ -203,7 +279,7 @@ export function createButtonDispatcher({
 
   return {
     isDexOpen() {
-      return dexView != null;
+      return dexView != null || captureActive;
     },
     // Driven by the tick, which is the only clock this state has. Closing on
     // its own matters because an open screen holds the animator paused and
@@ -256,6 +332,7 @@ export async function runOneTick({
   // settlement, encounters and the save all matter whether or not anyone is
   // looking -- it just does not push its frame over the screen.
   shouldPush = () => true,
+  captureResults,
   logger = console,
 } = {}) {
   if (!usage) throw new Error("usage is required");
@@ -299,6 +376,11 @@ export async function runOneTick({
   // Encounters run last, on the pet as it now stands: an evolution this tick
   // changes the level and the species the conditions are read against, and the
   // dex entry the new form just earned should count toward this same roll.
+  // Before the encounter tick, so a capture clears the offer the same tick it
+  // lands -- otherwise the engine would see the offer still standing and the
+  // notification would blink for a pokemon already in the box.
+  pet = applyCaptureResults(pet, captureResults, logger);
+
   pet = applyEncounterTick(pet, { usage, weather, room: sensor, now, rng: encounterRng, logger });
 
   if (evolutionAnimation) {
@@ -419,6 +501,35 @@ export function applyEncounterTick(pet, { usage, weather, room, now, rng = Math.
   return { ...next, encounter: state };
 }
 
+// Folds what the capture screen decided into the pet. The screen itself never
+// writes the save -- it hands back a verdict and the tick applies it here, so
+// there is exactly one writer no matter how the minigame ends.
+export function applyCaptureResults(pet, captureResults, logger = console) {
+  const results = Array.isArray(captureResults)
+    ? captureResults.splice(0)
+    : typeof captureResults?.drain === "function" ? captureResults.drain() : [];
+  let next = pet;
+
+  for (const result of results) {
+    if (!result || typeof result.species !== "string") continue;
+    // Every outcome ends the encounter -- caught, fled, or timed out. Clearing
+    // it here rather than only on a catch is what stops a missed throw from
+    // leaving the offer up to be thrown at again.
+    if (next.encounter?.species === result.species) {
+      next = { ...next, encounter: null };
+    }
+    if (result.outcome !== "caught" || !isDexSpecies(result.species)) continue;
+
+    const recorded = recordCapture(next, { species: result.species, level: 5 });
+    next = { ...next, ...recorded.dex };
+    logger?.log?.(
+      `pokedex: ${zhName(result.species)} caught`
+      + `${recorded.isNewToDex ? " (new)" : ""}${recorded.keptInBox ? "" : " (box full)"}`,
+    );
+  }
+  return next;
+}
+
 let encounterTableWarned = false;
 
 export async function main({
@@ -489,6 +600,9 @@ export async function main({
     let deviceWasAttached = false;
     const actions = createActionQueue();
     const evolutionIntents = createEvolutionIntentQueue();
+    // Same queue shape, carrying capture verdicts from the button path to the
+    // tick, which is the only thing that writes the pet.
+    const captureResults = createEvolutionIntentQueue();
     const buttonDispatcher = createButtonDispatcher({
       transport: hostTransport,
       getPet: () => runtime.pet,
@@ -499,6 +613,7 @@ export async function main({
       // Read at press time, not captured: the dex grows while the screen is
       // closed, and a stale snapshot would show yesterday's collection.
       dexSource: () => ({ dex: runtime.pet, progress: dexProgress(runtime.pet ?? {}) }),
+      captureResults,
       logger,
     });
     const dashboardServer = dashboard
@@ -657,6 +772,7 @@ export async function main({
               buddyName: config.name,
               place,
               shouldPush: () => !buttonDispatcher.isDexOpen(),
+              captureResults,
               logger,
             });
           } catch (error) {

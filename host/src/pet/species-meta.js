@@ -29,6 +29,12 @@ export const SPECIES_DEX = Object.fromEntries(pokedex.species.map((s) => [s.key,
 // that "how complete is the pokedex" may ever be measured against.
 export const SPECIES_ORDER = pokedex.species.map((s) => s.key);
 export const DEX_MAX = pokedex.dexMax;
+// PokeAPI's 3 (hardest) to 255 (easiest). Exposed as a plain lookup so the one
+// thing that consumes it -- capture-tuning.js, which is a spoiler file -- can
+// stay the only place that knows what it is used FOR.
+export const SPECIES_CAPTURE_RATE = Object.fromEntries(
+  pokedex.species.map((s) => [s.key, s.captureRate]),
+);
 
 const TYPES = Object.fromEntries(pokedex.species.map((s) => [s.key, s.types]));
 // Eeveelution typing, for the same reason as the names above. Not from PokeAPI

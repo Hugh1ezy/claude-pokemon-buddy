@@ -204,7 +204,7 @@ transport, or the animator. The device is running exactly what it ran before.
 | P1 metadata + sprites | **done** — `seed/pokedex.json` (names/types/evolutions/capture rates for 1–151), 156 baked sprites, `species-meta.js` sources all of it. Sprite ink and 20 species names revised 2026-07-29, below |
 | P2 save model | **done** — `pet/dex.js`: 已捕获 count (duplicates included), pokedex count (distinct), and a box holding one pet per species, each with its own level and bond |
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
-| P4 notification row + capture screen | **rows 3-4 drawn (2026-07-30)** — the engine has been wired into the tick since 07-28 and encounters persist; the left panel now shows the offer and the dex counts. The capture screen is the remaining piece. See below |
+| P4 notification row + capture screen | **done (2026-07-30)** — rows 3-4 draw the offer and the dex counts, and the capture screen plays. Not yet played on hardware by the owner |
 | P5 pokedex screen + swapping the active buddy | **screen done (2026-07-30)** — all 151 on three pages, KEY double to open. Swapping the active buddy is not started. See below |
 | P6 real cries | not started — waiting on a microSD card the owner does not have yet |
 
@@ -432,9 +432,54 @@ early-generation pixel art is the reference, not something new.
 
 How a species maps to its B/C width and slide speed was **decided on 07-30 and
 deliberately is not written here** — it is part of the same surprise the
-encounter table is, so it lives with the spoiler material in
-`scripts/gen-encounters.mjs`. Read that file before building this screen; do not
-re-derive it, and keep it out of chat.
+encounter table is, so it lives in `src/pet/capture-tuning.js`, which is a
+**fourth spoiler file** alongside the three listed above. Read it before
+touching difficulty; do not re-derive it, and keep it out of chat.
+
+### How it is built (2026-07-30)
+
+- `src/pet/capture.js` — the mechanism: where the slider is at time *t*, and
+  what a throw then does. Pure, and **species-free on purpose**, exactly like
+  `encounter.js`: it can be read and reviewed without learning anything.
+- `src/pet/capture-tuning.js` — **spoiler.** Species → difficulty.
+- `src/pet/capture-session.js` — the loop. Every side effect is injected
+  (clock, sleep, push, render), so the tests run a five-minute offer in
+  microseconds with no device.
+- `src/render/capture-screen.js` — the frames. Throw arc, wobble, sparkle,
+  flee.
+
+**KEY double is context-sensitive**, and row 3 tells you which you will get:
+with an offer live it opens the capture screen, otherwise the pokedex. There was
+no second gesture to spend — BOOT is power-save's, and KEY short/long are the
+greet and the evolution confirm.
+
+**The frame rate was measured before the design leaned on it.** A slider that
+cannot animate smoothly is not a timing game. `out/capture-probe.mjs`: a frame
+renders in **6.2ms**, and one 50ms slider step dirties **304 bytes** — against
+2850 for a single buddy-bob frame the animator already pushes three times a
+second. So 20fps costs the transport *less* than the idle buddy does, and
+`FRAME_MS` is 50.
+
+**The difficulty bands are sized in milliseconds, not pixels**, and that is the
+part worth not undoing. What the player controls is *when they press*, so a
+band is worth however long the slider spends inside it. The first tuning sized
+them by appearance and produced a hardest tier where B was worth 17ms — shorter
+than the button's own latency, i.e. luck wearing a skill costume. They now run
+500ms (easiest) to 107ms (hardest) inside B, with C giving ~300ms of second
+chance even at the hardest.
+
+**Unmeasured, and the first thing to check:** nobody has played it. If the hard
+end is luck rather than timing, lower the speed before widening B — widening
+first makes the easy end trivial.
+
+**The screen never writes the save.** It returns a verdict, the tick applies it
+(`applyCaptureResults`), and there is exactly one writer no matter how the
+minigame ends — the same reason evolution choices go through a queue. The visible
+cost is that `捕捉` on the panel can lag a catch by up to one tick; the screen
+itself says `捉到了！` immediately, which is where it matters.
+
+Every outcome clears the offer, not just a catch. Leaving it up after a miss
+would let the same pokemon be thrown at again, which is the opposite of fleeing.
 
 One stale comment worth knowing about: `ENCOUNTER_DEFAULTS.perTickChance` is
 `0.0065`, but the comment above it still describes `0.0028` and "near 2.5 a day".
@@ -454,9 +499,10 @@ pinning that property (`test/dex.test.js`, "an unrecognised field is carried
 through load and save untouched"). Bump the version when a field changes
 **meaning**, not when one is added.
 
-**Three files are spoilers and the owner has asked not to see them:**
-`host/scripts/gen-encounters.mjs`, `host/seed/encounters.json`, and
-`host/scripts/sim-encounters.mjs` (its output names species). They hold which
+**Four files are spoilers and the owner has asked not to see them:**
+`host/scripts/gen-encounters.mjs`, `host/seed/encounters.json`,
+`host/scripts/sim-encounters.mjs` (its output names species), and
+`host/src/pet/capture-tuning.js` (added 07-30 — species → capture difficulty). They hold which
 of the 151 appears under which conditions. The runtime engine
 (`src/pet/encounter.js`) is deliberately free of species knowledge so it can be
 read and reviewed without giving anything away, and the tests use invented
