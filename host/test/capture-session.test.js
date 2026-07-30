@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { runCaptureSession, FRAME_MS } from "../src/pet/capture-session.js";
 import { sliderCentre } from "../src/pet/capture.js";
+import { SOUND } from "../src/transport/proto.js";
 
 const PHASE = {
   AIM: "aim", THROW: "throw", HIT: "hit", WOBBLE: "wobble",
@@ -162,4 +163,24 @@ test("every frame of an attack knows it is an attack, not just the aiming ones",
     h.pushed.filter((f) => f.phase === PHASE.WOBBLE).every((f) => f.kind === "capture"),
     "and the wobble only ever belongs to the capture",
   );
+});
+
+test("a catch plays the fanfare exactly once, and an abort plays nothing", async () => {
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+  const caught = harness({ target: start, aimOffsets: [FRAME_MS, FRAME_MS, FRAME_MS] });
+  const heard = [];
+  const result = await runCaptureSession({ ...caught.io, playSound: (id) => heard.push(id) });
+
+  assert.equal(result.outcome, "caught");
+  // Once, not once per frame: PHASE.CAUGHT loops at 20fps for its whole
+  // duration, so a call placed inside that loop would fire ~2 times here and
+  // dozens of times with the real phase lengths.
+  assert.deepEqual(heard, [SOUND.EVOLVE]);
+
+  const bailed = harness({ target: start, aimOffsets: [FRAME_MS], abortAfter: 1 });
+  const quiet = [];
+  const out = await runCaptureSession({ ...bailed.io, playSound: (id) => quiet.push(id) });
+
+  assert.equal(out.outcome, "aborted");
+  assert.deepEqual(quiet, [], "backing out of the screen is not a catch");
 });

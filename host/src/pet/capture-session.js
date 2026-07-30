@@ -12,6 +12,7 @@
 // The only ways out are an outcome or BOOT short.
 import { createEncounterThrow, judgeZone } from "./capture.js";
 import { OUTCOME, STEP, applyThrow, createEncounter, stepKind } from "./capture-rules.js";
+import { SOUND } from "../transport/proto.js";
 
 // 20fps. Affordable rather than arbitrary: one slider step measured 304 bytes
 // of dirty rect (out/capture-probe.mjs), against 2850 for a single buddy-bob
@@ -33,6 +34,9 @@ export async function runCaptureSession({
   aborted = () => false,   // BOOT short: back out to the buddy panel
   phases,         // { THROW, WOBBLE, CAUGHT, RETRY, ESCAPED, HIT } durations
   PHASE,
+  // Injected like every other side effect here, and defaulted to a no-op so the
+  // existing tests keep driving this with no device and no sound at all.
+  playSound = () => {},
   logger = null,
 } = {}) {
   // Drawn ONCE. A does not move between the attacks or across a retry -- the
@@ -93,6 +97,12 @@ export async function runCaptureSession({
     await play(PHASE.WOBBLE, phases[PHASE.WOBBLE]);
 
     if (applied.outcome === OUTCOME.CAUGHT) {
+      // Fired before the phase rather than inside it: `play` loops for the whole
+      // duration, so anything in there would retrigger every 50ms frame. The
+      // fanfare is the evolution one, reused the way onboarding already reuses it
+      // for hatching -- the firmware has three system sounds and no dedicated
+      // capture jingle, and adding one is a reflash.
+      playSound(SOUND.EVOLVE);
       await play(PHASE.CAUGHT, phases[PHASE.CAUGHT]);
       return { outcome: "caught" };
     }

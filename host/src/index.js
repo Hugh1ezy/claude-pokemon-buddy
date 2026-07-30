@@ -252,6 +252,7 @@ export function createButtonDispatcher({
           aborted: () => captureAbort,
           phases: PHASE_MS,
           PHASE,
+          playSound: (id) => transport.playSound?.(id),
           logger,
         });
         if (result.outcome !== "aborted") {
@@ -455,8 +456,27 @@ export async function runOneTick({
   // more (the owner's call: offerMs governs the NOTIFICATION, not the aiming),
   // so without this the engine could expire the offer -- or roll a different
   // one -- under a player who is mid-throw.
+  const offeredBefore = pet.encounter?.offeredAt ?? null;
   if (!holdEncounter()) {
     pet = applyEncounterTick(pet, { usage, weather, room: sensor, now, rng: encounterRng, logger });
+  }
+
+  // A new offer announces itself. Row 3 is one line on a panel nobody is
+  // watching, and the offer expires on its own -- sound is the only channel
+  // that reaches the owner when they are not looking at the device, which is
+  // most of the time. Keyed on `offeredAt` rather than on the species, so a
+  // second offer of the same species still cries and a re-render never does.
+  //
+  // Quiet hours are already handled by the gate wrapped around this transport,
+  // so this must NOT check the clock itself or it would gate twice.
+  //
+  // Silent for the 133 species that have no cry yet: `cryAudioId` returns null
+  // for anything outside seed/species-cries.json, and a wrong cry is worse than
+  // none -- it would name the wrong pokemon out loud before the screen opens.
+  const offeredNow = pet.encounter?.offeredAt ?? null;
+  if (offeredNow != null && offeredNow !== offeredBefore) {
+    const wildCry = cryAudioId(pet.encounter?.species);
+    if (wildCry != null) activeTransport.playSound?.(wildCry);
   }
 
   if (evolutionAnimation) {
@@ -737,7 +757,17 @@ export async function main({
       onSignatureError: () => {},
       // Read at press time, not captured: the dex grows while the screen is
       // closed, and a stale snapshot would show yesterday's collection.
-      dexSource: () => ({ dex: runtime.pet, progress: dexProgress(runtime.pet ?? {}) }),
+      //
+      // Falls back to the save on disk exactly like `getView` and the tick do.
+      // `runtime.pet` is unset until the first tick assigns it, so without this
+      // the screen is reachable in the seconds after a host start and renders
+      // `dexProgress({})` -- 0/151 with all 151 silhouettes black, i.e. it
+      // reports the collection as empty rather than as unknown. Observed on the
+      // home PC 2026-07-30 with two entries sitting in the save.
+      dexSource: () => {
+        const pet = runtime.pet ?? loadState(statePath);
+        return { dex: pet, progress: dexProgress(pet ?? {}) };
+      },
       swapRequests,
       captureResults,
       logger,
