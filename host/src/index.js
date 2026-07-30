@@ -226,7 +226,7 @@ export function createButtonDispatcher({
     const offeredAt = Number(pet.encounter.offeredAt);
     if (!Number.isFinite(offeredAt)) return null;
     const left = offeredAt + ENCOUNTER_DEFAULTS.offerMs - captureNow();
-    return left > 0 ? { species, offerMsLeft: left } : null;
+    return left > 0 ? { species, offerMsLeft: left, test: pet.encounter.test === true } : null;
   }
 
   function startCapture() {
@@ -254,7 +254,9 @@ export function createButtonDispatcher({
           PHASE,
           logger,
         });
-        if (result.outcome !== "aborted") captureResults.push({ species: offer.species, outcome: result.outcome });
+        if (result.outcome !== "aborted") {
+          captureResults.push({ species: offer.species, outcome: result.outcome, test: offer.test });
+        }
         logger?.log?.(`capture: ${zhName(offer.species)} ${result.outcome}${result.reason ? ` (${result.reason})` : ""}`);
       } finally {
         captureActive = false;
@@ -613,6 +615,12 @@ export function applyCaptureResults(pet, captureResults, logger = console, today
     // leaving the offer up to be thrown at again.
     if (next.encounter?.species === result.species) {
       next = { ...next, encounter: null };
+    }
+    // A fixture encounter plays in full and records nothing. It still cleared
+    // the offer above, because the point is to rehearse the whole flow.
+    if (result.test === true) {
+      logger?.log?.(`pokedex: ${zhName(result.species)} was a test -- not recorded`);
+      continue;
     }
     if (result.outcome !== "caught" || !isDexSpecies(result.species)) continue;
 

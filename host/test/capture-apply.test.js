@@ -86,3 +86,24 @@ test("an array queue is drained, not just read", () => {
   assert.equal(dexProgress(pet).capturedCount, 1);
   assert.equal(items.length, 0, "a result applied twice would double-count the tally");
 });
+
+// The arm-encounter fixture marks its offers. Without this every dry run
+// inflated 捕捉 and lit a dex entry that was never actually earned -- which is
+// exactly what happened on 2026-07-30, five times.
+test("a test encounter plays out and records nothing", () => {
+  const pet = applyCaptureResults({ ...base(), encounter: { species: A, offeredAt: 1 } },
+    queue([{ species: A, outcome: "caught", test: true }]), null);
+
+  const progress = dexProgress(pet);
+  assert.equal(progress.capturedCount, 0, "捕捉 must not move for a fixture");
+  assert.equal(progress.dexCaught, 0, "nor may the dex light up");
+  assert.equal(progress.boxCount, 0);
+  assert.equal(pet.encounter, null, "but the offer is still consumed -- the flow ran");
+});
+
+test("only an explicit true counts as a test, so a real catch cannot be lost", () => {
+  for (const flag of [undefined, null, false, 0, "true"]) {
+    const pet = applyCaptureResults(base(), queue([{ species: A, outcome: "caught", test: flag }]), null);
+    assert.equal(dexProgress(pet).capturedCount, 1, `test: ${JSON.stringify(flag)} must still record`);
+  }
+});

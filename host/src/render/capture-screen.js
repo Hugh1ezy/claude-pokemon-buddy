@@ -10,6 +10,7 @@ import { sliderBands } from "../pet/capture.js";
 import { STEP, hpFraction } from "../pet/capture-rules.js";
 import { imageDataToFrame } from "./frame.js";
 import { H, INK, PAPER, W } from "./palette.js";
+import { drawShadow } from "./layout.js";
 import { drawSprite } from "./sprite-pipeline.js";
 import { loadBuddySprite } from "./sprites.js";
 
@@ -26,6 +27,17 @@ const TITLE_Y = 248;   // just above the timing bar, at the owner's ask
 const SPRITE_SLOT = 132;
 const SPRITE_TOP = 80;
 const GROUND_Y = SPRITE_TOP + SPRITE_SLOT;
+// Narrower and flatter than the buddy panel's, because this screen has the
+// title 36px below the ground line and a full-width ellipse would run into it.
+const SHADOW_RX = 46;
+const SHADOW_RY = 7;
+
+// The wobble, timed from its parts rather than from a total, so halving the
+// rock speed cannot silently leave the phase ending mid-rock. Halved on
+// 2026-07-30 at the owner's ask: 826ms a rock, where it was 413.
+const WOBBLE_DROP_MS = 260;
+export const WOBBLE_ROCKS = 3;
+const WOBBLE_ROCK_MS = 826;
 
 export const PHASE = {
   AIM: "aim",
@@ -43,7 +55,7 @@ export const PHASE = {
 export const PHASE_MS = {
   [PHASE.THROW]: 480,
   [PHASE.HIT]: 620,
-  [PHASE.WOBBLE]: 1500,
+  [PHASE.WOBBLE]: WOBBLE_DROP_MS + WOBBLE_ROCKS * WOBBLE_ROCK_MS,
   [PHASE.CAUGHT]: 1400,
   [PHASE.RETRY]: 900,
   [PHASE.ESCAPED]: 1400,
@@ -75,6 +87,10 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   // The pokemon is hidden from the moment the ball lands until the outcome is
   // known -- that is what makes the wobble suspenseful rather than decorative.
   const hidden = phase === PHASE.WOBBLE || phase === PHASE.CAUGHT;
+  // The ground. Same dithered ellipse the buddy panel puts under the buddy, so
+  // the two screens agree about what a floor looks like. Drawn before whatever
+  // stands on it, and kept below the sprite's feet and above the title.
+  if (!hidden) drawShadow(g, W / 2, GROUND_Y - 6, SHADOW_RX, SHADOW_RY);
   if (!hidden) {
     const flee = phase === PHASE.ESCAPED ? Math.round((elapsed / PHASE_MS[PHASE.ESCAPED]) * 90) : 0;
     // A struck pokemon flinches sideways -- the cheapest hit feedback that is
@@ -89,9 +105,11 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   if (phase === PHASE.HIT) drawSparks(g, W / 2, SPRITE_TOP + SPRITE_SLOT / 2, elapsed);
   if (phase === PHASE.WOBBLE) {
     const { fall, tilt } = wobbleAt(elapsed);
+    drawShadow(g, W / 2, GROUND_Y - 6, BALL_R, SHADOW_RY);
     drawBall(g, W / 2, GROUND_Y - BALL_R + 4 - fall, tilt);
   }
   if (phase === PHASE.CAUGHT) {
+    drawShadow(g, W / 2, GROUND_Y - 6, BALL_R, SHADOW_RY);
     drawBall(g, W / 2, GROUND_Y - BALL_R + 4, 0);
     drawCaughtStars(g, W / 2, GROUND_Y - BALL_R + 4, elapsed);
   }
@@ -227,9 +245,6 @@ function drawBall(g, cx, cy, tilt) {
 // rather than a decaying sine: a continuous wobble reads as "it is vibrating",
 // where three separate rocks with a pause between them read as three questions
 // being asked. It ends upright so the caught frame does not jump.
-const WOBBLE_DROP_MS = 260;
-export const WOBBLE_ROCKS = 3;
-
 export function wobbleAt(elapsed) {
   const drop = Math.min(1, elapsed / WOBBLE_DROP_MS);
   if (drop < 1) {
@@ -237,7 +252,7 @@ export function wobbleAt(elapsed) {
     return { fall: (1 - drop * drop) * 46, tilt: 0, rock: 0 };
   }
 
-  const each = (PHASE_MS[PHASE.WOBBLE] - WOBBLE_DROP_MS) / WOBBLE_ROCKS;
+  const each = WOBBLE_ROCK_MS;
   const since = elapsed - WOBBLE_DROP_MS;
   const index = Math.min(WOBBLE_ROCKS - 1, Math.floor(since / each));
   const within = (since - index * each) / each;

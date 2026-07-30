@@ -412,9 +412,10 @@ function drawBubble(g, rightX, y, text, { size = "normal" } = {}) {
   return x;
 }
 
-function drawShadow(g, cx, y) {
-  const rx = 57;
-  const ry = 10;
+// Exported so the capture screen can put the same floor under the wild
+// pokemon: two screens inventing their own ground would look like two places.
+// The radii are arguments now because that screen is tighter vertically.
+export function drawShadow(g, cx, y, rx = 57, ry = 10) {
   const left = Math.ceil(cx - rx);
   const right = Math.floor(cx + rx);
   const top = Math.ceil(y - ry);
