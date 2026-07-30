@@ -213,6 +213,48 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 If `status` shows the remote *behind* what is on this machine, stop and read "the
 two-buddy trap" below before running anything.
 
+## Two hardware numbers, measured 2026-07-31 (probes since removed)
+
+Both were guesses that decisions were resting on. The probe code lived in
+`app_main` for one flash and was deleted again — the numbers are the artefact.
+
+### The panel is fast: a full flush is ~11.75 ms
+
+    panel: RLCD_Display avg=11753us min=817us max=12360us n=20
+
+A whole 400x300 flush in **11.75 ms**, i.e. ~85 fps of headroom. The worry that
+a reflective LCD would turn out to be tens of milliseconds a frame was simply
+wrong, and it had been quietly bounding what the device could ever render on its
+own. Two consequences:
+
+- the offline capture minigame's 50 ms frame is trivially affordable — the flush
+  is under a quarter of it;
+- a Game Boy core at 30 fps (33 ms) has ~21 ms per frame left for emulation,
+  which is comfortable. 60 fps leaves ~5 ms, which is not.
+
+(`min=817us` is the first call in the loop, before there was anything to push;
+the honest figure is the average.)
+
+### PWR is not visible to software at all
+
+Ten unclaimed pins (1, 2, 3, 4, 7, 15, 17, 42, 47, 48) were pulled up and
+watched for 25 s while the owner pressed PWR repeatedly:
+
+    pwr-scan: watching 10 pins for 25s
+    pwr-scan: done, 0 pin(s) changed
+
+All ten sat high at rest and none moved. Together with the board's pinout sheet
+— which assigns a GPIO to everything else, down to `SD_CD_PIN GPIO 17(NC)`, and
+gives PWR none — **PWR is a hardware power-control button wired to the power
+path, not to the MCU.** So it cannot be read, cannot be given a function, and
+its long-press-to-shutdown cannot be remapped in firmware. It is not a spare
+third button; the device has exactly two.
+
+GPIO 6 was deliberately left out of the scan: the sheet calls it RLCD_TE, the
+panel's tearing-effect output, which toggles on its own and would have read as a
+press. The result is only as good as the assumption that the press happened
+inside the window.
+
 ## Session record: 2026-07-31 morning, work PC — the RTC now works
 
 `components/port_bsp/pcf85063.{h,cpp}`, on the same I2C bus as the SHTC3 and the
