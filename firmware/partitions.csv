@@ -1,0 +1,20 @@
+# Partition table for the 16MB flash on this board (measured with
+# `esptool flash_id`, not assumed).
+#
+# Until 2026-07-31 this project used IDF's `singleapp` default, which gives the
+# app exactly 1MB and leaves the other ~15MB unaddressable. The app had reached
+# 98% of that 1MB, which read like a hardware ceiling and is not one -- nothing
+# is allocated after `factory`, so it simply grows into empty space.
+#
+# `nvs` keeps its original offset AND size on purpose: it holds the wifi stack's
+# calibration data, and moving or resizing it is what would throw that away.
+# Growing it is a separate, deliberate decision -- 24K is far more than the
+# offline event log will ever need.
+#
+# Ends at 0x410000, so ~12MB stays unallocated and available for a future
+# assets or storage partition.
+#
+# Name,     Type, SubType,  Offset,   Size,  Flags
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+factory,    app,  factory,  0x10000,  4M,
