@@ -22,6 +22,12 @@ in: {codec: ES7210}
 
 Board: S3_RLCD_4_2
 i2c: {sda: 13, scl: 14}
+# TF slot, from the board's own pinout sheet (2026-07-31). One data line only,
+# so this is 1-bit SDMMC: codec_init.c derives width as `cfg.d3 ? 4 : 1`, and
+# leaving d1/d2/d3 out is what selects it. Card-detect is GPIO 17 on the sheet
+# but marked NC, so there is nothing to wire it to -- mount_sdcard already
+# forces cd = -1.
+sdcard: {clk: 38, cmd: 21, d0: 39}
 i2s: {mclk: 16, bclk: 9, ws: 45, din: 10, dout: 8}
 out: {codec: ES8311, pa: 46, pa_gain: 6, use_mclk: 1, pa_gain:6}
 in: {codec: ES7210}
