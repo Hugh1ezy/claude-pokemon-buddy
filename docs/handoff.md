@@ -43,9 +43,24 @@ Three remotes now:
 
 | Remote | What |
 |---|---|
-| `origin` | `Hugh1ezy/claude-pokemon-buddy` — the fork, **public**, code lives here |
-| `upstream` | `aquamarinz/claude-pokemon-buddy` — original, read-only |
+| `hugh` | `Hugh1ezy/claude-pokemon-buddy` — the fork, **public**, code lives here. Push here |
+| `origin` | `aquamarinz/claude-pokemon-buddy` — original, read-only. Never push |
 | `save` | `Hugh1ezy/cpb-save` — **private**, holds only `state.json` (`docs/save-sync.md`) |
+
+⚠ **Corrected 2026-07-30 (home PC).** This table named the fork `origin` and the
+original `upstream` for as long as it has existed, and both are wrong on both
+machines: there is no `upstream` remote at all, and `origin` is the aquamarinz
+original. Two consequences, both of which bit today:
+
+- A bare `git pull` (as the checklist below said for months) pulls from
+  **aquamarinz** and can never bring over the other machine's work. `main` also
+  shipped *tracking* `origin/main`. Fixed on the home PC 07-30 with
+  `git branch --set-upstream-to=hugh/main main` — **git does not carry this, so
+  check it on the work PC too**: `git rev-parse --abbrev-ref HEAD@{upstream}`
+  should print `hugh/main`.
+- `git fetch origin` silently leaves `hugh/main` stale. On the evening of 07-30
+  that made this day's 23 commits invisible from home and produced a confident
+  report that the work PC had done nothing. Fetch `hugh` **by name**.
 
 Buddy as of this note: **妙蛙草 (ivysaur) 慢性子** — it evolved from 妙蛙种子 on
 07-30 — published to `save` from the **work PC** at the end of 07-30. Same
@@ -64,7 +79,7 @@ they have been stripped twice. See the fixture note under the capture section.
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
-git pull
+git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
 cd host
 node scripts/save-sync-cli.mjs status   # both saves + which way to sync, no writes
 node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save
