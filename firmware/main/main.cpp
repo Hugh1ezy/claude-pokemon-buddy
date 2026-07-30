@@ -218,12 +218,21 @@ static constexpr uint8_t SND_HOUR   = 2;          // top-of-hour chime (host PLA
 // One note: sweep f0 -> f1 over `ms`. f0 == 0 means a silent gap.
 struct Note { float f0, f1; int ms; };
 #include "species_cries.inc"
-static constexpr uint8_t SND_COUNT = 21;           // 3 system sounds + 18 species cries
+// Derived, not written down. This was a literal 21 and the static_assert below
+// caught it the moment species_cries.inc grew to 156 cries -- which is the assert
+// doing its job, but the literal should never have been there to need catching.
+static constexpr uint8_t SND_COUNT = SND_SPECIES_BASE + SND_SPECIES_COUNT;
 static_assert(SND_SPECIES_BASE == 3, "species ids must start after BUI/EVOLVE/HOUR");
-static_assert(SND_COUNT == SND_SPECIES_BASE + SND_SPECIES_COUNT, "sound count must match species_cries.inc");
+// A sound id travels as ONE byte in the PLAY and CONFIG payloads, so the table can
+// never exceed 255 entries without a protocol change on both sides.
+static_assert(SND_SPECIES_BASE + SND_SPECIES_COUNT <= 255,
+              "sound ids are a single protocol byte -- the table cannot exceed 255");
 static CodecPort    *g_codec = nullptr;
-static int16_t      *g_snd[SND_COUNT] = {};       // synthesized PCM per sound (PSRAM)
-static size_t        g_snd_bytes[SND_COUNT] = {};
+// One scratch buffer, sized at boot to the longest sound and reused for every
+// playback. See synth_init(). Only audio_task ever writes it, and it holds the
+// queue's only consumer, so no lock is needed.
+static int16_t      *g_snd = nullptr;             // scratch PCM buffer (PSRAM)
+static size_t        g_snd_bytes = 0;             // its capacity, 0 = audio disabled
 static QueueHandle_t audio_queue = nullptr;       // sound id -> audio_task
 static std::atomic<uint8_t> g_active_cry{SND_BUI};  // KEY-press cry; set by host CONFIG
 static std::atomic<uint8_t> g_volume{80};
@@ -643,21 +652,51 @@ static void button_task(void *arg)
     }
 }
 
-// Render a square-wave note sequence into a fresh 16-bit stereo (L=R) PSRAM
-// buffer. Each note gets a 5ms attack + linear decay so the chiptune voice has
-// shape without clicks. (Same synthesis as B4's chirp, now reused for all sounds.)
-static void synth_tone(const Note *notes, int count, int16_t **out, size_t *bytes)
+// The three system voices. At file scope rather than inside the old synth_all()
+// because notes_for() below has to be able to reach them by id.
+// Bui = two rising syllables. Evolve = a rising C-major arpeggio landing on a held
+// high C. Hour = two short A5 beeps (a discreet chime).
+static const Note BUI_NOTES[]    = { {520.f, 780.f, 110}, {0.f, 0.f, 40}, {760.f, 1150.f, 130} };
+static const Note EVOLVE_NOTES[] = { {523.f, 523.f, 90}, {659.f, 659.f, 90},
+                                     {784.f, 784.f, 90}, {1047.f, 1047.f, 240} };
+static const Note HOUR_NOTES[]   = { {880.f, 880.f, 90}, {0.f, 0.f, 70}, {880.f, 880.f, 90} };
+
+// id -> note sequence. Returns false for an id this build has no sound for, which
+// is the normal case for a host that is newer than the flashed firmware: it will
+// ask for cries this image does not carry, and the answer is silence, not a wrong
+// species' cry.
+static bool notes_for(uint8_t id, const Note **notes, int *count)
+{
+    switch (id) {
+    case SND_BUI:    *notes = BUI_NOTES;    *count = 3; return true;
+    case SND_EVOLVE: *notes = EVOLVE_NOTES; *count = 4; return true;
+    case SND_HOUR:   *notes = HOUR_NOTES;   *count = 3; return true;
+    default: break;
+    }
+    if (id >= SND_SPECIES_BASE && id < SND_SPECIES_BASE + SND_SPECIES_COUNT) {
+        const SpeciesCry &cry = SPECIES_CRIES[id - SND_SPECIES_BASE];
+        *notes = cry.notes;
+        *count = cry.count;
+        return true;
+    }
+    return false;
+}
+
+static int frames_of(const Note *notes, int count)
 {
     int frames = 0;
     for (int j = 0; j < count; j++) frames += AUDIO_SR * notes[j].ms / 1000;
-    *bytes = (size_t)frames * AUDIO_CH * sizeof(int16_t);
-    *out = (int16_t *) heap_caps_malloc(*bytes, MALLOC_CAP_SPIRAM);
-    if (*out == NULL) {
-        ESP_LOGE(TAG, "synth_tone: PSRAM alloc of %zu bytes failed", *bytes);
-        *bytes = 0;
-        return;
-    }
+    return frames;
+}
 
+// Render a square-wave note sequence into `out`, which must hold at least
+// frames_of(notes, count) * AUDIO_CH samples. Each note gets a 5ms attack + linear
+// decay so the chiptune voice has shape without clicks. Returns the byte count
+// written. (Same synthesis as B4's chirp, reused for all sounds -- and mirrored
+// sample-for-sample by host/scripts/cries-to-wav.mjs, so a change here has to be
+// made there too or the audition tool starts lying.)
+static size_t synth_tone(const Note *notes, int count, int16_t *out)
+{
     int idx = 0;
     const int attack = AUDIO_SR * 5 / 1000;        // 5ms attack avoids a click
     for (int j = 0; j < count; j++) {
@@ -675,30 +714,44 @@ static void synth_tone(const Note *notes, int count, int16_t **out, size_t *byte
                 float env = (i < attack) ? (float)i / attack : (1.0f - 0.7f * frac);
                 v = (int16_t)(sq * env * 8000.0f);
             }
-            (*out)[idx++] = v;                     // L
-            (*out)[idx++] = v;                     // R
+            out[idx++] = v;                        // L
+            out[idx++] = v;                        // R
         }
     }
+    return (size_t)idx * sizeof(int16_t);
 }
 
-// Synthesize all system voices and species cries once at boot. Bui = two rising
-// syllables. Evolve = a rising C-major arpeggio landing on a held high C.
-// Hour = two short A5 beeps (a discreet chime).
-static void synth_all(void)
+// Allocate ONE buffer big enough for the longest sound, instead of pre-rendering
+// every sound at boot.
+//
+// This used to synthesize all of them into their own PSRAM buffers up front. That
+// was affordable at 21 sounds (~0.4MB) and stopped being affordable the moment the
+// cry table grew to 156 (~2.4MB), on a board whose PSRAM size is
+// CONFIG_SPIRAM_TYPE_AUTO and therefore not knowable at build time. Rendering a
+// cry is a few thousand iterations of float multiply-add -- microseconds -- so
+// precomputing 159 of them to avoid that was always the wrong trade, and it made
+// the sound count a memory question when it should never have been one.
+//
+// Now the count is free: adding a cry costs nothing but flash for its note table.
+static void synth_init(void)
 {
-    static const Note BUI[]    = { {520.f, 780.f, 110}, {0.f, 0.f, 40}, {760.f, 1150.f, 130} };
-    static const Note EVOLVE[] = { {523.f, 523.f, 90}, {659.f, 659.f, 90},
-                                   {784.f, 784.f, 90}, {1047.f, 1047.f, 240} };
-    static const Note HOUR[]   = { {880.f, 880.f, 90}, {0.f, 0.f, 70}, {880.f, 880.f, 90} };
-    synth_tone(BUI,    3, &g_snd[SND_BUI],    &g_snd_bytes[SND_BUI]);
-    synth_tone(EVOLVE, 4, &g_snd[SND_EVOLVE], &g_snd_bytes[SND_EVOLVE]);
-    synth_tone(HOUR,   3, &g_snd[SND_HOUR],   &g_snd_bytes[SND_HOUR]);
-    size_t free_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-    for (int i = 0; i < SND_SPECIES_COUNT; i++)
-        synth_tone(SPECIES_CRIES[i].notes, SPECIES_CRIES[i].count,
-                   &g_snd[SND_SPECIES_BASE + i], &g_snd_bytes[SND_SPECIES_BASE + i]);
-    ESP_LOGI(TAG, "synth: %d species cries, spiram %u -> %u",
-             SND_SPECIES_COUNT, (unsigned)free_before,
+    int max_frames = 0;
+    for (int id = 0; id < SND_COUNT; id++) {
+        const Note *notes; int count;
+        if (!notes_for((uint8_t)id, &notes, &count)) continue;
+        int frames = frames_of(notes, count);
+        if (frames > max_frames) max_frames = frames;
+    }
+
+    g_snd_bytes = (size_t)max_frames * AUDIO_CH * sizeof(int16_t);
+    g_snd = (int16_t *) heap_caps_malloc(g_snd_bytes, MALLOC_CAP_SPIRAM);
+    if (g_snd == NULL) {
+        ESP_LOGE(TAG, "synth_init: PSRAM alloc of %zu bytes failed -- audio disabled", g_snd_bytes);
+        g_snd_bytes = 0;
+        return;
+    }
+    ESP_LOGI(TAG, "synth: %d sounds on demand, one %u-byte buffer, spiram free %u",
+             SND_COUNT, (unsigned)g_snd_bytes,
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 }
 
@@ -711,9 +764,23 @@ static void audio_task(void *arg)
 {
     uint8_t id;
     for (;;) {
-        if (xQueueReceive(audio_queue, &id, portMAX_DELAY) == pdTRUE &&
-            g_codec && id < SND_COUNT && g_snd[id])
-            g_codec->write(g_snd[id], g_snd_bytes[id]);   // blocks until pushed to I2S
+        if (xQueueReceive(audio_queue, &id, portMAX_DELAY) != pdTRUE) continue;
+        if (!g_codec || g_snd == nullptr) continue;
+
+        const Note *notes; int count;
+        if (!notes_for(id, &notes, &count)) continue;    // unknown id -> silence
+
+        // Belt and braces: the buffer was sized to the longest sound this build
+        // knows about, so this cannot overflow unless notes_for and synth_init
+        // disagree. If they ever do, drop the sound rather than write past the end.
+        size_t need = (size_t)frames_of(notes, count) * AUDIO_CH * sizeof(int16_t);
+        if (need > g_snd_bytes) {
+            ESP_LOGE(TAG, "audio: sound %u needs %zu > %zu bytes, dropped", id, need, g_snd_bytes);
+            continue;
+        }
+
+        size_t bytes = synth_tone(notes, count, g_snd);
+        g_codec->write(g_snd, bytes);                    // blocks until pushed to I2S
     }
 }
 
@@ -1424,9 +1491,13 @@ extern "C" void app_main(void)
     g_codec = new CodecPort("S3_RLCD_4_2");
     g_codec->open(AUDIO_SR, AUDIO_CH, 16);
     g_codec->set_volume(g_volume.load());
-    synth_all();
+    synth_init();
     xTaskCreate(audio_task, "audio", 4096, nullptr, 4, nullptr);
-    ESP_LOGI(TAG, "B5: codec up; 3 system + 18 species sounds (KEY=active cry, PLAY=evolve/hour)");
+    // Counts derived, not written out: this line said "18 species" for as long as
+    // there were 18, and would have gone on saying it.
+    ESP_LOGI(TAG, "B5: codec up; %d system + %d species sounds, synthesized on demand "
+                  "(KEY=active cry, PLAY=evolve/hour)",
+             SND_SPECIES_BASE, SND_SPECIES_COUNT);
     xTaskCreate(hello_task, "hello", 2048, nullptr, 3, nullptr);
 
     // Safe to run continuously now: local_clock_task only draws while
