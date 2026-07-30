@@ -51,6 +51,40 @@ function expForHalfHeart(level) {
   return expToNextLevel(level) / 200;
 }
 
+// Credit the hours the device recorded while nothing was listening -- the
+// commute, mostly. `offline` is what parseOfflineBond returned: one day and the
+// hours a KEY press happened in.
+//
+// **Idempotent, and that is the design rather than a nicety.** applyBondTick
+// refuses a slot whose bit is already in `bondSlots`, so replaying a mask the
+// host has already applied changes nothing at all. That is what lets the device
+// republish the same mask every 30 seconds for the rest of the day and lets the
+// whole feature work with no acknowledgement, no sequence numbers, and no
+// delete-after-upload step -- the step that loses data when the upload fails
+// after the delete.
+//
+// Hours from any other day are dropped. `bondSlots` is per-day and resets, so
+// there is no honest way to credit yesterday, and pretending otherwise would
+// either wipe today's progress or pay a slot twice.
+export function applyOfflineBond(pet, { offline, now, today, epochDay } = {}) {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error("now is required");
+  if (!offline || !Array.isArray(offline.hours) || offline.hours.length === 0) return pet;
+  if (offline.epochDay !== epochDay) return pet;
+
+  let next = pet;
+  for (const hour of offline.hours) {
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) continue;
+    // The device cannot have recorded an hour that has not happened yet. If it
+    // claims one the two clocks disagree, and crediting early is the wrong way
+    // to be wrong -- the hour comes round on its own a moment later.
+    if (hour > now.getHours()) continue;
+    const at = new Date(now);
+    at.setHours(hour, 0, 0, 0);
+    next = applyBondTick(next, { now: at, clicked: true, today });
+  }
+  return next;
+}
+
 export function applyBondTick(pet, { now, clicked = false, today } = {}) {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error("now is required");
   if (typeof today !== "string" || today.length === 0) throw new Error("today is required");

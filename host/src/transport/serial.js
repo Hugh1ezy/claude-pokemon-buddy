@@ -4,7 +4,7 @@ import { SerialPort as NodeSerialPort } from "serialport";
 
 import { encodeFrame, PROTO_VER, T } from "./proto.js";
 import { SND_SPECIES_BASE, SPECIES_SOUND_ORDER } from "../pet/cry-audio.js";
-import { appendBytes, ackSeq, parseButton, parseHello, parseSensor, pumpFrames, volumeByte } from "./framing.js";
+import { appendBytes, ackSeq, parseButton, parseHello, parseOfflineBond, parseSensor, pumpFrames, volumeByte } from "./framing.js";
 
 const ESPRESSIF_VID = "303A";
 
@@ -173,6 +173,16 @@ export function makeTransport({
     if (frame.type === T.SENSOR) {
       latestSensor = parseSensor(frame.payload);
       if (latestSensor) events.emit("sensor", latestSensor);
+      return;
+    }
+
+    if (frame.type === T.OFFLINE) {
+      // Hours the owner pressed KEY with no host listening. The device keeps
+      // republishing the same mask for the rest of the day, on purpose, so
+      // this fires repeatedly and every repeat after the first credits
+      // nothing -- see applyOfflineBond.
+      const offline = parseOfflineBond(frame.payload);
+      if (offline) events.emit("offlineBond", offline);
       return;
     }
 
@@ -358,6 +368,10 @@ export function makeTransport({
     onSensor(callback) {
       events.on("sensor", callback);
       return () => events.off("sensor", callback);
+    },
+    onOfflineBond(callback) {
+      events.on("offlineBond", callback);
+      return () => events.off("offlineBond", callback);
     },
     feedSensor() {
       return latestSensor ? { ...latestSensor } : null;

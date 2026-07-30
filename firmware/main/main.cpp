@@ -58,6 +58,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "mdns.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
@@ -110,6 +111,7 @@ static constexpr uint8_t T_ACK    = 0x84;
 static constexpr uint8_t T_NACK   = 0x85;
 static constexpr uint8_t T_AUTH   = 0x86;   // host -> device (wifi only): pre-shared pairing token
 static constexpr uint8_t T_RESYNC = 0x87;   // device -> host: screen was drawn outside diff tracking, force full redraw
+static constexpr uint8_t T_OFFLINE = 0x88;  // device -> host: [epoch_day u16 LE][hours u24 LE], hours a KEY press happened with no host
 
 static constexpr size_t RX_MAX   = 48 * 1024;     // > largest valid frame (~30KB)
 static constexpr size_t RECT_MAX = (W * H) / 8;   // 15000B = full-screen 1bpp
@@ -243,6 +245,8 @@ static void play_sound(uint8_t id);               // fwd decl (used by parse_fra
 static void handle_time_sync(uint8_t hour, uint8_t minute, uint16_t epoch_day); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
 static void enter_local_clock_mode(bool user_initiated); // fwd decl (used by sensor_task's timeout watchdog)
 static void exit_local_clock_mode(void);          // fwd decl (used by parse_frames' auto-recovery path)
+static void offline_bond_note_press(void);        // fwd decl (button_task); defined with the clock it needs
+static void offline_bond_publish(void);           // fwd decl (sensor_task)
 
 static uint32_t crc32(const uint8_t *b, size_t n)
 {
@@ -339,10 +343,26 @@ static bool send_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_
 // telemetry any more than it should be able to push frames). A no-op write
 // when WiFi isn't connected/authed is not an error, see wifi_write_raw, so
 // this never spams tx-drop warnings when WiFi is unused.
-static void broadcast_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
+//
+// Returns whether a host was actually there to receive it. USB answers that
+// honestly -- usb_serial_jtag_write_bytes only completes while something is
+// reading the port, so an unplugged or un-hosted cable fails the write. WiFi
+// cannot answer it through send_frame, because wifi_write_raw deliberately
+// reports "no client connected" as success; g_wifi_authenticated is the real
+// signal there, since a client only reaches that state by completing T_AUTH.
+//
+// One known false positive: a PC with the port open but the buddy host not
+// running (a serial reader, say) makes the USB write succeed. Nothing is lost
+// by it -- see offline_bond_note_press, the only caller that cares.
+static bool broadcast_frame(uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len)
 {
-    send_frame(type, seq, payload, len, Link::USB);
-    if (g_wifi_authenticated) send_frame(type, seq, payload, len, Link::WIFI);
+    bool usb_ok = send_frame(type, seq, payload, len, Link::USB);
+    bool wifi_ok = false;
+    if (g_wifi_authenticated) {
+        send_frame(type, seq, payload, len, Link::WIFI);
+        wifi_ok = true;
+    }
+    return usb_ok || wifi_ok;
 }
 
 static void send_ack(uint8_t seq, Link link)
@@ -572,6 +592,11 @@ static void sensor_task(void *arg)
             ESP_LOGW(TAG, "sensor read failed");
         }
 
+        // Rides the sensor cadence rather than a link-up event: republishing a
+        // mask that is already applied costs nothing (see the note above it),
+        // and this way reconnecting over USB or WiFi needs no detection at all.
+        offline_bond_publish();
+
         if (g_mode.load() == DeviceMode::NORMAL &&
             esp_timer_get_time() - g_last_frame_us.load() > LOCAL_CLOCK_TIMEOUT_US) {
             ESP_LOGI(TAG, "local-clock: no frame in %lld s, auto-entering", (long long)(LOCAL_CLOCK_TIMEOUT_US / 1000000));
@@ -626,8 +651,18 @@ static void button_task(void *arg)
             uint8_t key_id = (uint8_t)(ev >> 8);
             uint8_t kind_id = (uint8_t)(ev & 0xff);
             uint8_t p[2] = { key_id, kind_id };
-            broadcast_frame(T_BUTTON, 0, p, sizeof(p));
+            const bool delivered = broadcast_frame(T_BUTTON, 0, p, sizeof(p));
             ESP_LOGI(TAG, "button key=%u kind=%u", p[0], p[1]);
+
+            // A KEY short press that reached no host is the one the owner
+            // otherwise loses -- it is both the greet gesture and the 亲密度
+            // credit, and away from a PC nothing was there to count it. Record
+            // the hour so the host can credit it on reconnect. Only KEY short:
+            // every other gesture is answered by a screen the host draws, and
+            // means nothing with no host to draw it.
+            if (!delivered && key_id == KEY_ID_KEY && kind_id == KIND_SHORT) {
+                offline_bond_note_press();
+            }
 
             // ENTER power-save (manual local-clock) is on BOOT, not KEY. It used
             // to be KEY double-click, chosen because KEY short already means
@@ -1300,6 +1335,125 @@ static bool compute_current_clock(uint8_t &hour, uint8_t &minute, uint16_t &epoc
     return true;
 }
 
+// ---- Offline 亲密度 (2026-07-31) -------------------------------------------
+// 亲密度 is credited by the host, one hourly slot at a time, and a working day's
+// slot only pays out if KEY was pressed while it was open. That press has to
+// reach the host, so every press made away from a PC -- the commute, mostly --
+// used to be worth nothing.
+//
+// What the device keeps is deliberately NOT an event log. It is one bitmask of
+// the HOURS a press happened in, for a single day:
+//
+//     [epoch_day u16][hours u24]      bit h set = KEY was pressed during hour h
+//
+// Three properties fall out of that shape, and they are the whole reason for it:
+//
+//   * **Replaying it twice does nothing.** The host credits slots through its
+//     own `bondSlots` bitmask, so re-applying an hour it already credited is a
+//     no-op. There is no sequence number, no acknowledgement, and no "delete
+//     after upload" step -- which is the step that loses data when an upload
+//     fails after the delete.
+//   * **It cannot grow.** Ten presses in one hour are one bit. A whole day is
+//     five bytes whether the owner pressed once or a hundred times.
+//   * **It needs no link-state machine.** Publishing is unconditional and
+//     repeated (see sensor_task); if nobody is listening the write simply
+//     fails, and the next one is 30 seconds away.
+//
+// The HOUR is what travels, not the slot index: which slot an hour maps to
+// depends on the day's window (Thursday opens at 11, the rest at 9) and that
+// table is the host's. The device stays free of the policy.
+//
+// Storage is NVS, not the SD card. This is a handful of bytes that must survive
+// a brownout, which is exactly what NVS is for and exactly what a FAT volume on
+// a removable card is not; the card can also simply be absent.
+static constexpr const char *OFFLINE_NS      = "cpb";
+static constexpr const char *OFFLINE_KEY_DAY = "obday";
+static constexpr const char *OFFLINE_KEY_HRS = "obhrs";
+
+static std::atomic<uint16_t> g_offline_day{0};
+static std::atomic<uint32_t> g_offline_hours{0};
+
+static void offline_bond_store(uint16_t day, uint32_t hours)
+{
+    nvs_handle_t h;
+    if (nvs_open(OFFLINE_NS, NVS_READWRITE, &h) != ESP_OK) return;
+    if (nvs_set_u16(h, OFFLINE_KEY_DAY, day) == ESP_OK &&
+        nvs_set_u32(h, OFFLINE_KEY_HRS, hours) == ESP_OK) {
+        nvs_commit(h);
+    }
+    nvs_close(h);
+}
+
+static void offline_bond_load(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(OFFLINE_NS, NVS_READONLY, &h) != ESP_OK) return;   // never written yet
+    uint16_t day = 0;
+    uint32_t hours = 0;
+    if (nvs_get_u16(h, OFFLINE_KEY_DAY, &day) == ESP_OK &&
+        nvs_get_u32(h, OFFLINE_KEY_HRS, &hours) == ESP_OK) {
+        g_offline_day.store(day);
+        g_offline_hours.store(hours);
+        diag("offline-bond: restored day=%u hours=0x%06lx", (unsigned)day, (unsigned long)hours);
+    }
+    nvs_close(h);
+}
+
+// Called only when a KEY short press reached no host at all.
+static void offline_bond_note_press(void)
+{
+    uint8_t hour = 0, minute = 0;
+    uint16_t day = 0;
+    if (!compute_current_clock(hour, minute, day)) {
+        // Absent, not guessed -- the same rule the encounter context follows.
+        // With no clock there is no hour to attribute the press to, and picking
+        // one would hand over a half heart that was never earned. The device
+        // has no RTC driver yet (the board's PCF85063 is unused), so this is
+        // reachable only after a reboot with no host since.
+        diag("offline-bond: press dropped, no time");
+        return;
+    }
+
+    const bool same_day = g_offline_day.load() == day;
+    const uint32_t hours = same_day ? g_offline_hours.load() : 0;
+    const uint32_t next = hours | (1UL << hour);
+    if (same_day && next == hours) return;   // this hour is already recorded
+
+    g_offline_day.store(day);
+    g_offline_hours.store(next);
+    offline_bond_store(day, next);
+    diag("offline-bond: hour %u recorded (day=%u hours=0x%06lx)",
+         (unsigned)hour, (unsigned)day, (unsigned long)next);
+}
+
+// Fire-and-forget, called on the sensor cadence so reconnecting needs no
+// link-up event to hang off: whenever a host is there, the next publish lands.
+static void offline_bond_publish(void)
+{
+    if (g_offline_hours.load() == 0) return;
+
+    uint8_t hour = 0, minute = 0;
+    uint16_t today = 0;
+    if (compute_current_clock(hour, minute, today) && g_offline_day.load() != today) {
+        // The day rolled over while we were still holding it. The host resets
+        // its slot mask per day and will never credit yesterday, so keeping
+        // this only means republishing something guaranteed to be ignored.
+        g_offline_day.store(today);
+        g_offline_hours.store(0);
+        offline_bond_store(today, 0);
+        diag("offline-bond: dropped, day rolled over");
+        return;
+    }
+
+    const uint16_t day = g_offline_day.load();
+    const uint32_t hours = g_offline_hours.load();
+    const uint8_t p[5] = {
+        (uint8_t)(day & 0xff), (uint8_t)(day >> 8),
+        (uint8_t)(hours & 0xff), (uint8_t)((hours >> 8) & 0xff), (uint8_t)((hours >> 16) & 0xff),
+    };
+    broadcast_frame(T_OFFLINE, 0, p, sizeof(p));
+}
+
 // ---- Ganzhi (stem-branch) date row -----------------------------------
 // Southern-hemisphere-adjusted four-pillar date, shown centered above the
 // clock. Derivation, southern-hemisphere rule, and verification against a
@@ -1560,6 +1714,9 @@ extern "C" void app_main(void)
     // After CodecPort, which is what tells codec_board which board's pin table
     // to parse -- get_sdcard_config reads that same parsed section.
     sdcard_probe();
+
+    // Safe here: wifi_init_sta above already ran nvs_flash_init.
+    offline_bond_load();
 
     xTaskCreate(hello_task, "hello", 2048, nullptr, 3, nullptr);
 

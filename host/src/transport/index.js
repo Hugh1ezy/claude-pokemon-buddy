@@ -77,6 +77,7 @@ export async function createTransport({
     sendTime,
     onButton,
     onSensor,
+    onOfflineBond,
     onReconnect,
     feedSensor,
     getHello,
@@ -127,6 +128,7 @@ export async function createTransport({
     const offs = [
       next.onButton?.((event) => events.emit("button", event)),
       next.onSensor?.((event) => events.emit("sensor", event)),
+      next.onOfflineBond?.((event) => events.emit("offlineBond", event)),
       next.onReconnect?.(() => {
         previousBytes = null;
         replay();
@@ -238,6 +240,11 @@ export async function createTransport({
   function onSensor(callback) {
     events.on("sensor", callback);
     return () => events.off("sensor", callback);
+  }
+
+  function onOfflineBond(callback) {
+    events.on("offlineBond", callback);
+    return () => events.off("offlineBond", callback);
   }
 
   function onReconnect(callback) {

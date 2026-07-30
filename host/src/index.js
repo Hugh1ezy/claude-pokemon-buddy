@@ -7,7 +7,7 @@ import { cryFor } from "./pet/cries.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { resolveEvolution } from "./pet/evolution.js";
 import { rollPersonality } from "./pet/personality.js";
-import { applyBondTick, heartsFromHalves } from "./pet/bond.js";
+import { applyBondTick, applyOfflineBond, heartsFromHalves } from "./pet/bond.js";
 import { dexProgress, normalizeDex, recordCapture, recordSeen } from "./pet/dex.js";
 import { stepEncounter } from "./pet/encounter.js";
 import { buildEncounterContext } from "./pet/encounter-context.js";
@@ -400,6 +400,7 @@ export async function runOneTick({
   holdEncounter = () => false,
   captureResults,
   swapRequests,
+  offlineBonds,
   logger = console,
 } = {}) {
   if (!usage) throw new Error("usage is required");
@@ -440,6 +441,9 @@ export async function runOneTick({
     today,
     clicked: buttonEvents.some((event) => event?.key === "KEY" && event?.kind === "short"),
   });
+  // Presses made with nothing listening. Inside the frozen pin below on
+  // purpose: a keepsake earns nothing whether the owner was at a PC or not.
+  pet = applyRecordedOfflineBonds(pet, offlineBonds, { now, today }, logger);
 
   if (frozen) pet = pinFrozenGrowth(beforeGrowth, pet);
 
@@ -673,6 +677,29 @@ export function applyCaptureResults(pet, captureResults, logger = console, today
 
 // Puts a chosen pokemon on the panel. Queued from the button path and applied
 // here for the same reason capture verdicts are: the tick is the only writer.
+// Drains whatever the device published this tick and credits it. The device
+// republishes the same mask every 30 seconds all day, so this runs constantly
+// and almost always credits nothing -- which is why it only logs when the
+// hearts actually moved.
+export function applyRecordedOfflineBonds(pet, offlineBonds, { now, today } = {}, logger = console) {
+  const pending = Array.isArray(offlineBonds)
+    ? offlineBonds.splice(0)
+    : typeof offlineBonds?.drain === "function" ? offlineBonds.drain() : [];
+  if (pending.length === 0) return pet;
+
+  const epochDay = epochDayFor(now);
+  let next = pet;
+  for (const offline of pending) {
+    const before = Number(next.bondHalves ?? 0);
+    next = applyOfflineBond(next, { offline, now, today, epochDay });
+    const gained = Number(next.bondHalves ?? 0) - before;
+    if (gained > 0) {
+      logger?.log?.(`bond: credited ${gained} offline half-heart(s) from hours ${offline.hours.join(",")}`);
+    }
+  }
+  return next;
+}
+
 export function applySwapRequests(pet, swapRequests, logger = console) {
   const requests = Array.isArray(swapRequests)
     ? swapRequests.splice(0)
@@ -763,6 +790,12 @@ export async function main({
     // tick, which is the only thing that writes the pet.
     const captureResults = createEvolutionIntentQueue();
     const swapRequests = createEvolutionIntentQueue();
+    // Hours the device recorded while nothing was listening. Collected off the
+    // transport rather than through the button dispatcher: these are not
+    // presses happening now, they are a report about presses already made, and
+    // routing them through the greet/evolution path would replay all of it.
+    const offlineBonds = [];
+    transport.onOfflineBond?.((event) => offlineBonds.push(event));
     const buttonDispatcher = createButtonDispatcher({
       transport: hostTransport,
       getPet: () => runtime.pet,
@@ -946,6 +979,7 @@ export async function main({
               holdEncounter: () => buttonDispatcher.isCaptureOpen(),
               captureResults,
               swapRequests,
+              offlineBonds,
               logger,
             });
           } catch (error) {

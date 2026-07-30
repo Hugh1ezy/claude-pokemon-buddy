@@ -103,6 +103,25 @@ export function parseSensor(payload) {
   };
 }
 
+// [epoch_day u16 LE][hours u24 LE] -- the hours of ONE local day in which the
+// owner pressed KEY with no host listening. A bitmask, not a list of presses:
+// the device cannot tell us how many times, only whether, and whether is all
+// the hourly 亲密度 slot rule ever asked.
+//
+// Returns hours ascending so a caller crediting them in order does not have to
+// sort, and drops bits 24-31, which the firmware never sets.
+export function parseOfflineBond(payload) {
+  if (payload.length < 5) return null;
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const epochDay = view.getUint16(0, true);
+  const mask = payload[2] | (payload[3] << 8) | (payload[4] << 16);
+  const hours = [];
+  for (let hour = 0; hour < 24; hour += 1) {
+    if ((mask & (1 << hour)) !== 0) hours.push(hour);
+  }
+  return { epochDay, hours };
+}
+
 export function volumeByte(value) {
   const volume = Number(value);
   if (!Number.isFinite(volume)) return 0;

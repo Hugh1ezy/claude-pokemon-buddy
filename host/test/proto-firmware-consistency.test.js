@@ -17,7 +17,7 @@ test("firmware protocol opcodes match host proto constants (Batch G gate)", () =
       .map(([, name, value]) => [name, Number.parseInt(value, 0)]),
   );
 
-  for (const name of ["FRAME", "PLAY", "CONFIG", "TIME", "VOLUME", "HELLO", "BUTTON", "SENSOR", "ACK", "NACK", "AUTH", "RESYNC"]) {
+  for (const name of ["FRAME", "PLAY", "CONFIG", "TIME", "VOLUME", "HELLO", "BUTTON", "SENSOR", "ACK", "NACK", "AUTH", "RESYNC", "OFFLINE"]) {
     assert.equal(firmwareTypes.get(name), T[name], `T_${name}`);
   }
 });
