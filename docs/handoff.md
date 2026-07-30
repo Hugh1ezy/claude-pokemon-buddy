@@ -1,7 +1,41 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-07-30
-(late evening, HOME PC)**.
+Rolling note between the home PC and the work PC. Last updated **2026-07-31
+(morning, WORK PC)**.
+
+> **2026-07-31 morning, work PC — the work checklist below is consumed.** In
+> order: pulled the 14 commits from the fork (`7edcac1` → `d3855b5`), stopped the
+> host, `save-sync pull` (Lv.18 exp=21.07 → exp=21.30, the home PC's evening
+> turn), restarted the host at 09:10:26. The first tick settled the day —
+> **Lv.23, streak 6** — and published, so both saves match again.
+>
+> **The host had been running since 07-30 18:34**, i.e. on code older than
+> everything the home PC pushed that evening, and it had the device attached and
+> was ticking. Same failure as 07-30: the process, not the repo, is what runs. The
+> stop-pull-restart order matters — pulling the save under a live host lets the
+> next tick write the in-memory copy back over it.
+>
+> **The remote names on this machine are NOT what `CLAUDE.md` describes.** Here
+> `origin` is the *fork* (`Hugh1ezy`) and `upstream` is aquamarinz — exactly the
+> opposite of the home PC, where `origin` is aquamarinz. So `main` tracking
+> `origin/main` is **correct here** and must not be "fixed"; the 07-30 instruction
+> to retarget it applies to the home PC only. A `hugh` remote was added here as an
+> alias for the fork so `CLAUDE.md`'s checklist runs verbatim on both machines.
+> The live hazard is the other direction: `git push origin main` is safe from this
+> machine and pushes to **aquamarinz** from home.
+>
+> **A restart log looks alarming and is not.** `ESP serial device detected;
+> upgrading mock transport to serial` is printed **only** by `runProbe`, i.e. only
+> when a host that already fell back to mock later finds the device. A clean start
+> that finds it in `createTransport`'s initial `connectAny()` attaches silently and
+> logs nothing at all, so its absence after a restart reads exactly like "the
+> device never came back". The line that would actually mean mock is `ESP serial
+> port not found; using mock transport`; check for **that**, or check who holds
+> COM7 (opening it from PowerShell fails while the host has it). Half of this
+> morning went into re-deriving that.
+>
+> **Still not done: nothing has been heard.** The speaker check below is
+> untouched — it needs the owner and the hardware.
 
 > **The home checklist is consumed and the evening went well past it.** Done in
 > order: pulled to `7edcac1`, confirmed the save matched, re-baked all 156 sprites,
@@ -87,7 +121,13 @@ they have been stripped twice. See the fixture note under the capture section.
 
 ---
 
-## ▶ What the WORK PC has to do, in order
+## ▶ What the WORK PC has to do, in order — ✅ done 2026-07-31 09:10
+
+Steps 1-6 below all ran or were checked this morning; step 1 turned out to be
+wrong for this machine (see the remote-names note at the top). Kept as written
+because it is also the arrival routine for the next trip.
+
+
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
