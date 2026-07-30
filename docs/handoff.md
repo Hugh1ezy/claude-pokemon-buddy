@@ -1,15 +1,19 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-07-30
-(WORK PC)**.
+(late evening, HOME PC)**.
 
-> **The 07-29 handoff never happened.** The device went home on the evening of
-> 07-29 and came back to the work PC on 07-30 without the home PC being touched:
-> no pull, no re-bake, no restart. So **the home checklist below is still
-> outstanding, exactly as written** — it was never consumed, and the home PC is
-> still on pre-`fcd7e60` code with stale sprites. Nothing was lost by the delay;
-> the device never attached to the home host, so no second buddy started
-> accruing.
+> **The home checklist is now consumed.** Done on the evening of 07-30, in this
+> order: pulled to `7edcac1`, confirmed the save already matched, re-baked all
+> 156 sprites, added the home SSID to `config.json`'s `places`, restarted the
+> host. The device is attached at home and the pokedex, both left-panel rows and
+> the capture screen are all live and were seen working. The owner caught their
+> first wild pokemon the same evening.
+>
+> **Read `CLAUDE.md` (new, repo root) before doing any of this again.** It holds
+> the sync routine as a single checklist, because the reason a whole work day
+> looked missing tonight was procedural, not technical — see the remotes note
+> below.
 
 **What 07-30 actually did on the work PC: restarted the host.** It had been up
 since 07-28 17:51, which is *older than the encounter wiring the home PC pushed
@@ -75,16 +79,31 @@ they have been stripped twice. See the fixture note under the capture section.
 
 ---
 
-## ▶ What the HOME PC has to do, in order
+## ▶ What the WORK PC has to do, in order
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
+git rev-parse --abbrev-ref HEAD@{upstream}   # want hugh/main -- see the remotes note
 git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
 cd host
 node scripts/save-sync-cli.mjs status   # both saves + which way to sync, no writes
-node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save
-node scripts/bake-assets.mjs            # required this time -- see below
+node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save, once the device is at work
 ```
+
+1. **Check the branch tracking first** — the line above. `main` shipped tracking
+   `origin/main` (aquamarinz), which is why a bare `git pull` has never brought
+   the other machine's work over. The home PC was fixed on 07-30; **git does not
+   carry this**, so the work PC is almost certainly still wrong.
+2. **Take the save once the device is actually at work.** It spent the night at
+   home with the host running and attached, so home is the owner and `pull` is
+   the right direction.
+3. **No re-bake needed.** Nothing since 07-29 touched the artwork; the home PC
+   re-baked all 156 on 07-30 and the bake is deterministic.
+4. **Restart the host.** Tonight's commits change the tick and the capture
+   screen.
+5. **No reflash** — but read the cries note in the session record below before
+   deciding to, because that is the one thing left in the sound work that needs
+   one.
 
 `status` actually shows the remote's save as of 07-29 — it printed only the
 remote's *name* before, so the "stop if the remote is behind" instruction below
@@ -135,6 +154,90 @@ keepsake rule, and the WiFi place detection. The phase table below is current.
 
 If `status` shows the remote *behind* what is on this machine, stop and read
 "the two-buddy trap" below before running anything.
+
+---
+
+## Session record: 2026-07-30 late evening, home PC
+
+### A whole work day was reported as missing, and the cause was the remote names
+
+The owner arrived home, asked why the pokedex would not open, and was told the
+machines were already in sync and that the work PC had committed nothing all day.
+Both halves of that were wrong. The 23 commits were on the fork, pushed at 18:33,
+and the error surfaced only when a push was rejected.
+
+What actually happened: `git fetch origin` was run instead of `git fetch hugh`.
+`origin` is the aquamarinz upstream, so the fetch succeeded, reported nothing new,
+and left `refs/remotes/hugh/main` sitting at whatever the last session had left
+there — two days stale. **A stale tracking ref is indistinguishable from a quiet
+remote.** Check the ref's date, not just the diff.
+
+Two fixes landed from this, both above: the corrected remotes table, and
+`main`'s upstream retargeted to `hugh/main` on this machine. The work PC still
+needs the second one — git does not carry it.
+
+`CLAUDE.md` at the repo root is new and holds the whole sync routine. It is
+deliberately **one** checklist reconciling both directions rather than a
+departure list and an arrival list: the owner said they will say
+「做准备工作」 on *arriving* at work, which is the opposite of what a
+"prepare to leave" reading would do, and a routine that depends on the owner
+picking the right phrase is a routine that will fail. Pushing inside that routine
+is pre-authorised — the owner's words were 「不用问我」 and 「不然很可能就没事做了」.
+
+### The pokedex screen reported the collection as empty
+
+`dexSource` in `index.js` read `runtime.pet` with a `?? {}` fallback, and
+`runtime.pet` is unset until the first tick assigns it. Opening the screen in the
+seconds after a host start therefore rendered `dexProgress({})` — **0/151 with
+all 151 silhouettes black** — while the save on disk held two entries. Seen for
+real tonight. `getView` and the tick in the same file already fell back to
+`loadState(statePath)`; this call site had been missed. Fixed the same way.
+
+It reports the collection as *empty* rather than as *unknown*, which is the part
+that matters: the owner reads it as lost data.
+
+### Sound is wired into the encounter and the capture, without a reflash
+
+The audio stack was already complete and had simply never been connected to the
+07-30 screens — `capture-screen.js` and `dex-screen.js` contained no sound calls
+at all. Now:
+
+- **A new offer plays the wild species' cry**, from the tick's call site rather
+  than from inside `applyEncounterTick`, which stays pure. Keyed on `offeredAt`,
+  so a second offer of the same species still cries and a re-render never does.
+  Quiet hours are already handled by the gate around the transport, so it must not
+  check the clock again.
+- **A catch plays the evolution fanfare**, reused the way `onboarding.js` already
+  reuses it for hatching. Injected into `runCaptureSession` like every other side
+  effect there, and fired *before* the phase, because `play()` loops at 20fps for
+  the phase's whole duration and anything inside it retriggers every frame. Pinned
+  by a test that asserts exactly one call.
+
+**What is left needs a reflash, and is the real remaining sound work.**
+`seed/species-cries.json` covers **18 of 151** species — the three starter lines
+and the nine eeveelutions. `cryAudioId` returns null for the other 133, so
+tonight's encounter cry is silent for 88% of what the engine can roll. Extending
+it means regenerating `species_cries.inc` via `scripts/gen-cries.mjs`, checking
+the PSRAM budget for 151 synthesized buffers instead of 21, and flashing. Note
+that `committed species_cries.inc matches regenerated output (no drift)` is one of
+the nine tests that always fail on Windows for want of python — so on either of
+these machines that regeneration cannot be verified by the suite.
+
+Before flashing anything, re-read the `wifi_creds.h` rule below: a build listing
+only the network you are standing in is how the work network got dropped on 07-27.
+
+### Two loose ends, deliberately not touched
+
+- **`捕捉` reads 3 but only 1 is real.** The 07-30 work-PC note recorded the true
+  state as `捕捉 0`, and `450be1d` stopped `normalizeDex` inventing captures out
+  of dex entries — but it does not retroactively strip a `capturedCount` already
+  written into the save. Two stale fixture counts are still in there, so tonight's
+  single genuine catch displays as 3. Left alone rather than edited: it is the
+  owner's save and the correction is theirs to authorise.
+- **`pollUsage failed: no-token`** repeats on every tick in
+  `out/host-autostart.log` on this machine. The home PC has no usage token
+  configured. Harmless to the buddy, noisy in the log, and it means the WEEK bar
+  and the 5h/wk figures stay blank here.
 
 ---
 
