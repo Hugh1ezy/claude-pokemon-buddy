@@ -66,6 +66,7 @@
 
 #include "display_bsp.h"
 #include "shtc3.h"
+#include "pcf85063.h"
 #include "multi_button.h"
 #include "codec_bsp.h"
 #include "codec_init.h"
@@ -86,6 +87,8 @@ static constexpr int I2C_SDA = 13;
 // panel above happens to tolerate static-init construction; I2C does not.)
 static I2cMasterBus *g_bus = nullptr;
 static Shtc3 *g_sensor = nullptr;
+// Same bus, same constraint: built in app_main, not during static init.
+static Pcf85063 *g_rtc = nullptr;
 
 // ---- Buttons ---------------------------------------------------------------
 static constexpr int KEY_GPIO  = 18;   // board "KEY"  -> host key_id 1
@@ -264,6 +267,8 @@ static void enter_local_clock_mode(bool user_initiated); // fwd decl (used by se
 static void exit_local_clock_mode(void);          // fwd decl (used by parse_frames' auto-recovery path)
 static void offline_bond_note_press(void);        // fwd decl (button_task); defined with the clock it needs
 static void offline_bond_publish(void);           // fwd decl (sensor_task)
+static void rtc_seed_clock(void);                 // fwd decl (app_main); defined with the clock it feeds
+static void rtc_maintain(void);                   // fwd decl (sensor_task)
 
 static uint32_t crc32(const uint8_t *b, size_t n)
 {
@@ -602,6 +607,7 @@ static void sensor_task(void *arg)
         // Rides the sensor cadence rather than a link-up event: republishing a
         // mask that is already applied costs nothing (see the note above it),
         // and this way reconnecting over USB or WiFi needs no detection at all.
+        rtc_maintain();
         offline_bond_publish();
 
         if (g_mode.load() == DeviceMode::NORMAL &&
@@ -1348,6 +1354,59 @@ static bool compute_current_clock(uint8_t &hour, uint8_t &minute, uint16_t &epoc
     return true;
 }
 
+// ---- PCF85063, the board's RTC (2026-07-31) --------------------------------
+// Until now the only clock was the one T_TIME sets, which lives in RAM and dies
+// with a reboot. That was fine for the panel -- no host, nothing to draw -- and
+// not fine for offline 亲密度, which has to name the HOUR a press happened in
+// and correctly refuses to guess. The chip has been on the board all along; the
+// driver was the missing half.
+static void rtc_seed_clock(void)
+{
+    if (!g_rtc || !g_rtc->present()) {
+        diag("rtc: absent");
+        return;
+    }
+    uint8_t hour = 0, minute = 0;
+    uint16_t day = 0;
+    if (!g_rtc->read(&hour, &minute, &day)) {
+        diag("rtc: no valid time");   // never set, or the backup rail dropped
+        return;
+    }
+    handle_time_sync(hour, minute, day);
+    diag("rtc: seeded %02u:%02u epoch_day=%u", (unsigned)hour, (unsigned)minute, (unsigned)day);
+}
+
+// Keeps the chip agreeing with whatever the host last told us. On the sensor
+// cadence rather than on the T_TIME path deliberately: T_TIME is handled in
+// rx_task, and an I2C round trip has no business on the frame parser.
+//
+// The one-minute deadband matters. Writing on every disagreement would rewrite
+// the chip constantly, and every write zeroes the seconds register -- so a
+// device with a host attached would be dragged permanently a few tens of
+// seconds late, which is precisely the reading offline 亲密度 depends on.
+static void rtc_maintain(void)
+{
+    if (!g_rtc || !g_rtc->present()) return;
+
+    uint8_t hour = 0, minute = 0;
+    uint16_t day = 0;
+    if (!compute_current_clock(hour, minute, day)) return;   // nothing authoritative to write
+
+    uint8_t rh = 0, rm = 0;
+    uint16_t rd = 0;
+    if (g_rtc->read(&rh, &rm, &rd)) {
+        const int32_t chip = (int32_t)rd * 1440 + rh * 60 + rm;
+        const int32_t host = (int32_t)day * 1440 + hour * 60 + minute;
+        int32_t delta = chip - host;
+        if (delta < 0) delta = -delta;
+        if (delta <= 1) return;
+    }
+
+    if (g_rtc->write(hour, minute, day)) {
+        diag("rtc: set to %02u:%02u epoch_day=%u", (unsigned)hour, (unsigned)minute, (unsigned)day);
+    }
+}
+
 // ---- Offline 亲密度 (2026-07-31) -------------------------------------------
 // 亲密度 is credited by the host, one hourly slot at a time, and a working day's
 // slot only pays out if KEY was pressed while it was open. That press has to
@@ -1705,6 +1764,10 @@ extern "C" void app_main(void)
     // I2C/SHTC3 deferred out of static init (see g_bus note). Sensor uplink last.
     g_bus    = new I2cMasterBus(I2C_SCL, I2C_SDA, 0);
     g_sensor = new Shtc3(*g_bus);
+    // Before anything can want the hour: with a charged 18650 this is the only
+    // clock a device that rebooted away from a host will ever have.
+    g_rtc    = new Pcf85063(*g_bus);
+    rtc_seed_clock();
     battery_adc_init();
     xTaskCreate(sensor_task, "sensor", 3072, nullptr, 4, nullptr);
     ESP_LOGI(TAG, "B3: sensor up");
