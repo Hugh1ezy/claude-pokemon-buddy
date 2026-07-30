@@ -514,6 +514,32 @@ makes the box a shelf rather than a shredder.
 real. Anything that entered the dex through `recordSeen` (the starter line) has
 no box entry and therefore no date, and the confirm screen shows `--`.
 
+### Testing it without waiting: out/arm-encounter.mjs
+
+Untracked fixture. Puts a wild pokemon on offer immediately so the capture
+screen can be exercised without waiting for the engine to roll one:
+
+    node "C:\Users\zy948\claude-pokemon-buddy\host\out\arm-encounter.mjs"        # 皮皮
+    node "C:\Users\zy948\claude-pokemon-buddy\host\out\arm-encounter.mjs" abra   # any dex key
+
+It resolves the save from its own location, so it runs from any directory and
+any shell. It used to use a relative path, and from the wrong folder that threw
+ENOENT — which, launched from a terminal button, looks exactly like nothing
+happening.
+
+**It marks the offer `test: true`, and a marked encounter records nothing** — no
+tally, no dex entry, no box copy — while still consuming the offer, since
+rehearsing the whole flow is the point.
+
+**That flag has to be listed in `normalizeEncounter` (`state.js`), and this is
+the trap.** That function rebuilds the encounter from named fields on every
+save/load, which is the right discipline for a field that drives a cooldown
+clock — but it means a flag merely *carried* on the object is silently dropped
+between the fixture writing it and the tick reading it. Five test catches went
+into the real collection that way before anyone noticed, and the save has been
+corrected by hand twice (`out/state.json.pretestfix`, `.pretestfix2`). There is
+a test pinning the round trip now.
+
 ### Three throws, and the HP bar (2026-07-30, the redesign)
 
 The single-throw version lost to button latency, so an encounter is now:
