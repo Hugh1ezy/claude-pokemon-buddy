@@ -549,16 +549,25 @@
     },
     {
       "key": "caterpie",
+      "zh": "绿毛虫",
+      "type": "bug",
       "notes": [
         {
           "f0": 926,
           "f1": 966,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "毛虫!",
+        "happy": "毛虫♪",
+        "strained": "毛虫…"
+      }
     },
     {
       "key": "metapod",
+      "zh": "铁甲蛹",
+      "type": "bug",
       "notes": [
         {
           "f0": 772,
@@ -570,10 +579,17 @@
           "f1": 772,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "甲蛹!",
+        "happy": "甲蛹♪",
+        "strained": "甲蛹…"
+      }
     },
     {
       "key": "butterfree",
+      "zh": "巴大蝴",
+      "type": "bug",
       "notes": [
         {
           "f0": 651,
@@ -590,20 +606,34 @@
           "f1": 691,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "大蝴!",
+        "happy": "大蝴♪",
+        "strained": "大蝴…"
+      }
     },
     {
       "key": "weedle",
+      "zh": "独角虫",
+      "type": "bug",
       "notes": [
         {
           "f0": 918,
           "f1": 958,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "角虫!",
+        "happy": "角虫♪",
+        "strained": "角虫…"
+      }
     },
     {
       "key": "kakuna",
+      "zh": "铁壳蛹",
+      "type": "bug",
       "notes": [
         {
           "f0": 782,
@@ -615,10 +645,17 @@
           "f1": 782,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "壳蛹!",
+        "happy": "壳蛹♪",
+        "strained": "壳蛹…"
+      }
     },
     {
       "key": "beedrill",
+      "zh": "大针蜂",
+      "type": "bug",
       "notes": [
         {
           "f0": 664,
@@ -635,90 +672,153 @@
           "f1": 704,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "针蜂!",
+        "happy": "针蜂♪",
+        "strained": "针蜂…"
+      }
     },
     {
       "key": "pidgey",
+      "zh": "波波",
+      "type": "normal",
       "notes": [
         {
           "f0": 836,
           "f1": 936,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "波波!",
+        "happy": "波波♪",
+        "strained": "波波…"
+      }
     },
     {
       "key": "pidgeotto",
+      "zh": "比比鸟",
+      "type": "normal",
       "notes": [
         {
           "f0": 570,
           "f1": 638,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "比鸟!",
+        "happy": "比鸟♪",
+        "strained": "比鸟…"
+      }
     },
     {
       "key": "pidgeot",
+      "zh": "比雕",
+      "type": "normal",
       "notes": [
         {
           "f0": 532,
           "f1": 596,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "比雕!",
+        "happy": "比雕♪",
+        "strained": "比雕…"
+      }
     },
     {
       "key": "rattata",
+      "zh": "小拉达",
+      "type": "normal",
       "notes": [
         {
           "f0": 793,
           "f1": 888,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "拉达!",
+        "happy": "拉达♪",
+        "strained": "拉达…"
+      }
     },
     {
       "key": "raticate",
+      "zh": "拉达",
+      "type": "normal",
       "notes": [
         {
           "f0": 630,
           "f1": 706,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "拉达!",
+        "happy": "拉达♪",
+        "strained": "拉达…"
+      }
     },
     {
       "key": "spearow",
+      "zh": "烈雀",
+      "type": "normal",
       "notes": [
         {
           "f0": 829,
           "f1": 928,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "烈雀!",
+        "happy": "烈雀♪",
+        "strained": "烈雀…"
+      }
     },
     {
       "key": "fearow",
+      "zh": "大嘴雀",
+      "type": "normal",
       "notes": [
         {
           "f0": 549,
           "f1": 615,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "嘴雀!",
+        "happy": "嘴雀♪",
+        "strained": "嘴雀…"
+      }
     },
     {
       "key": "ekans",
+      "zh": "阿柏蛇",
+      "type": "poison",
       "notes": [
         {
           "f0": 626,
           "f1": 563,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "柏蛇!",
+        "happy": "柏蛇♪",
+        "strained": "柏蛇…"
+      }
     },
     {
       "key": "arbok",
+      "zh": "阿柏怪",
+      "type": "poison",
       "notes": [
         {
           "f0": 445,
@@ -730,10 +830,17 @@
           "f1": 481,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "柏怪!",
+        "happy": "柏怪♪",
+        "strained": "柏怪…"
+      }
     },
     {
       "key": "pikachu",
+      "zh": "皮卡丘",
+      "type": "electric",
       "notes": [
         {
           "f0": 739,
@@ -745,10 +852,17 @@
           "f1": 1182,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "卡丘!",
+        "happy": "卡丘♪",
+        "strained": "卡丘…"
+      }
     },
     {
       "key": "raichu",
+      "zh": "雷丘",
+      "type": "electric",
       "notes": [
         {
           "f0": 590,
@@ -760,40 +874,68 @@
           "f1": 944,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "雷丘!",
+        "happy": "雷丘♪",
+        "strained": "雷丘…"
+      }
     },
     {
       "key": "sandshrew",
+      "zh": "穿山鼠",
+      "type": "ground",
       "notes": [
         {
           "f0": 588,
           "f1": 521,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "山鼠!",
+        "happy": "山鼠♪",
+        "strained": "山鼠…"
+      }
     },
     {
       "key": "sandslash",
+      "zh": "穿山王",
+      "type": "ground",
       "notes": [
         {
           "f0": 508,
           "f1": 450,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "山王!",
+        "happy": "山王♪",
+        "strained": "山王…"
+      }
     },
     {
       "key": "nidoran-f",
+      "zh": "尼多兰",
+      "type": "poison",
       "notes": [
         {
           "f0": 729,
           "f1": 656,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "多兰!",
+        "happy": "多兰♪",
+        "strained": "多兰…"
+      }
     },
     {
       "key": "nidorina",
+      "zh": "尼多娜",
+      "type": "poison",
       "notes": [
         {
           "f0": 617,
@@ -805,10 +947,17 @@
           "f1": 666,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "多娜!",
+        "happy": "多娜♪",
+        "strained": "多娜…"
+      }
     },
     {
       "key": "nidoqueen",
+      "zh": "尼多后",
+      "type": "poison",
       "notes": [
         {
           "f0": 514,
@@ -820,20 +969,34 @@
           "f1": 555,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "多后!",
+        "happy": "多后♪",
+        "strained": "多后…"
+      }
     },
     {
       "key": "nidoran-m",
+      "zh": "尼多朗",
+      "type": "poison",
       "notes": [
         {
           "f0": 699,
           "f1": 629,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "多朗!",
+        "happy": "多朗♪",
+        "strained": "多朗…"
+      }
     },
     {
       "key": "nidorino",
+      "zh": "尼多力诺",
+      "type": "poison",
       "notes": [
         {
           "f0": 611,
@@ -845,10 +1008,17 @@
           "f1": 660,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "力诺!",
+        "happy": "力诺♪",
+        "strained": "力诺…"
+      }
     },
     {
       "key": "nidoking",
+      "zh": "尼多王",
+      "type": "poison",
       "notes": [
         {
           "f0": 507,
@@ -860,10 +1030,17 @@
           "f1": 548,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "多王!",
+        "happy": "多王♪",
+        "strained": "多王…"
+      }
     },
     {
       "key": "clefairy",
+      "zh": "皮皮",
+      "type": "fairy",
       "notes": [
         {
           "f0": 804,
@@ -875,10 +1052,17 @@
           "f1": 825,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "皮皮!",
+        "happy": "皮皮♪",
+        "strained": "皮皮…"
+      }
     },
     {
       "key": "clefable",
+      "zh": "皮可西",
+      "type": "fairy",
       "notes": [
         {
           "f0": 621,
@@ -890,20 +1074,34 @@
           "f1": 637,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "可西!",
+        "happy": "可西♪",
+        "strained": "可西…"
+      }
     },
     {
       "key": "vulpix",
+      "zh": "六尾",
+      "type": "fire",
       "notes": [
         {
           "f0": 681,
           "f1": 987,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "六尾!",
+        "happy": "六尾♪",
+        "strained": "六尾…"
+      }
     },
     {
       "key": "ninetales",
+      "zh": "九尾",
+      "type": "fire",
       "notes": [
         {
           "f0": 596,
@@ -915,40 +1113,68 @@
           "f1": 626,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "九尾!",
+        "happy": "九尾♪",
+        "strained": "九尾…"
+      }
     },
     {
       "key": "jigglypuff",
+      "zh": "胖丁",
+      "type": "normal",
       "notes": [
         {
           "f0": 730,
           "f1": 818,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "胖丁!",
+        "happy": "胖丁♪",
+        "strained": "胖丁…"
+      }
     },
     {
       "key": "wigglytuff",
+      "zh": "胖可丁",
+      "type": "normal",
       "notes": [
         {
           "f0": 635,
           "f1": 711,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "可丁!",
+        "happy": "可丁♪",
+        "strained": "可丁…"
+      }
     },
     {
       "key": "zubat",
+      "zh": "超音蝠",
+      "type": "poison",
       "notes": [
         {
           "f0": 680,
           "f1": 612,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "音蝠!",
+        "happy": "音蝠♪",
+        "strained": "音蝠…"
+      }
     },
     {
       "key": "golbat",
+      "zh": "大嘴蝠",
+      "type": "poison",
       "notes": [
         {
           "f0": 506,
@@ -960,20 +1186,34 @@
           "f1": 546,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "嘴蝠!",
+        "happy": "嘴蝠♪",
+        "strained": "嘴蝠…"
+      }
     },
     {
       "key": "oddish",
+      "zh": "走路草",
+      "type": "grass",
       "notes": [
         {
           "f0": 695,
           "f1": 842,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "路草!",
+        "happy": "路草♪",
+        "strained": "路草…"
+      }
     },
     {
       "key": "gloom",
+      "zh": "臭臭花",
+      "type": "grass",
       "notes": [
         {
           "f0": 637,
@@ -985,10 +1225,17 @@
           "f1": 671,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "臭花!",
+        "happy": "臭花♪",
+        "strained": "臭花…"
+      }
     },
     {
       "key": "vileplume",
+      "zh": "霸王花",
+      "type": "grass",
       "notes": [
         {
           "f0": 565,
@@ -1000,20 +1247,34 @@
           "f1": 595,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "王花!",
+        "happy": "王花♪",
+        "strained": "王花…"
+      }
     },
     {
       "key": "paras",
+      "zh": "派拉斯",
+      "type": "bug",
       "notes": [
         {
           "f0": 880,
           "f1": 918,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "拉斯!",
+        "happy": "拉斯♪",
+        "strained": "拉斯…"
+      }
     },
     {
       "key": "parasect",
+      "zh": "派拉斯特",
+      "type": "bug",
       "notes": [
         {
           "f0": 664,
@@ -1025,20 +1286,34 @@
           "f1": 664,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "斯特!",
+        "happy": "斯特♪",
+        "strained": "斯特…"
+      }
     },
     {
       "key": "venonat",
+      "zh": "毛球",
+      "type": "bug",
       "notes": [
         {
           "f0": 662,
           "f1": 691,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "毛球!",
+        "happy": "毛球♪",
+        "strained": "毛球…"
+      }
     },
     {
       "key": "venomoth",
+      "zh": "末入蛾",
+      "type": "bug",
       "notes": [
         {
           "f0": 697,
@@ -1050,60 +1325,102 @@
           "f1": 697,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "入蛾!",
+        "happy": "入蛾♪",
+        "strained": "入蛾…"
+      }
     },
     {
       "key": "diglett",
+      "zh": "地鼠",
+      "type": "ground",
       "notes": [
         {
           "f0": 792,
           "f1": 702,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "地鼠!",
+        "happy": "地鼠♪",
+        "strained": "地鼠…"
+      }
     },
     {
       "key": "dugtrio",
+      "zh": "三地鼠",
+      "type": "ground",
       "notes": [
         {
           "f0": 521,
           "f1": 462,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "地鼠!",
+        "happy": "地鼠♪",
+        "strained": "地鼠…"
+      }
     },
     {
       "key": "meowth",
+      "zh": "喵喵",
+      "type": "normal",
       "notes": [
         {
           "f0": 762,
           "f1": 853,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "喵喵!",
+        "happy": "喵喵♪",
+        "strained": "喵喵…"
+      }
     },
     {
       "key": "persian",
+      "zh": "猫老大",
+      "type": "normal",
       "notes": [
         {
           "f0": 572,
           "f1": 641,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "老大!",
+        "happy": "老大♪",
+        "strained": "老大…"
+      }
     },
     {
       "key": "psyduck",
+      "zh": "可达鸭",
+      "type": "water",
       "notes": [
         {
           "f0": 649,
           "f1": 544,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "达鸭!",
+        "happy": "达鸭♪",
+        "strained": "达鸭…"
+      }
     },
     {
       "key": "golduck",
+      "zh": "哥达鸭",
+      "type": "water",
       "notes": [
         {
           "f0": 505,
@@ -1115,20 +1432,34 @@
           "f1": 529,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "达鸭!",
+        "happy": "达鸭♪",
+        "strained": "达鸭…"
+      }
     },
     {
       "key": "mankey",
+      "zh": "猴怪",
+      "type": "fighting",
       "notes": [
         {
           "f0": 625,
           "f1": 513,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "猴怪!",
+        "happy": "猴怪♪",
+        "strained": "猴怪…"
+      }
     },
     {
       "key": "primeape",
+      "zh": "火暴猴",
+      "type": "fighting",
       "notes": [
         {
           "f0": 572,
@@ -1140,20 +1471,34 @@
           "f1": 446,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "暴猴!",
+        "happy": "暴猴♪",
+        "strained": "暴猴…"
+      }
     },
     {
       "key": "growlithe",
+      "zh": "卡蒂狗",
+      "type": "fire",
       "notes": [
         {
           "f0": 629,
           "f1": 912,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "蒂狗!",
+        "happy": "蒂狗♪",
+        "strained": "蒂狗…"
+      }
     },
     {
       "key": "arcanine",
+      "zh": "风速狗",
+      "type": "fire",
       "notes": [
         {
           "f0": 428,
@@ -1165,20 +1510,34 @@
           "f1": 449,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "速狗!",
+        "happy": "速狗♪",
+        "strained": "速狗…"
+      }
     },
     {
       "key": "poliwag",
+      "zh": "蚊香蝌蚪",
+      "type": "water",
       "notes": [
         {
           "f0": 699,
           "f1": 586,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "蝌蚪!",
+        "happy": "蝌蚪♪",
+        "strained": "蝌蚪…"
+      }
     },
     {
       "key": "poliwhirl",
+      "zh": "蚊香蛙",
+      "type": "water",
       "notes": [
         {
           "f0": 632,
@@ -1190,10 +1549,17 @@
           "f1": 662,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "香蛙!",
+        "happy": "香蛙♪",
+        "strained": "香蛙…"
+      }
     },
     {
       "key": "poliwrath",
+      "zh": "快泳蛙",
+      "type": "water",
       "notes": [
         {
           "f0": 547,
@@ -1205,20 +1571,34 @@
           "f1": 573,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "泳蛙!",
+        "happy": "泳蛙♪",
+        "strained": "泳蛙…"
+      }
     },
     {
       "key": "abra",
+      "zh": "凯西",
+      "type": "psychic",
       "notes": [
         {
           "f0": 611,
           "f1": 764,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "凯西!",
+        "happy": "凯西♪",
+        "strained": "凯西…"
+      }
     },
     {
       "key": "kadabra",
+      "zh": "勇吉拉",
+      "type": "psychic",
       "notes": [
         {
           "f0": 518,
@@ -1230,10 +1610,17 @@
           "f1": 492,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "吉拉!",
+        "happy": "吉拉♪",
+        "strained": "吉拉…"
+      }
     },
     {
       "key": "alakazam",
+      "zh": "胡地",
+      "type": "psychic",
       "notes": [
         {
           "f0": 519,
@@ -1250,20 +1637,34 @@
           "f1": 675,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "胡地!",
+        "happy": "胡地♪",
+        "strained": "胡地…"
+      }
     },
     {
       "key": "machop",
+      "zh": "腕力",
+      "type": "fighting",
       "notes": [
         {
           "f0": 618,
           "f1": 507,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "腕力!",
+        "happy": "腕力♪",
+        "strained": "腕力…"
+      }
     },
     {
       "key": "machoke",
+      "zh": "豪力",
+      "type": "fighting",
       "notes": [
         {
           "f0": 495,
@@ -1275,10 +1676,17 @@
           "f1": 386,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "豪力!",
+        "happy": "豪力♪",
+        "strained": "豪力…"
+      }
     },
     {
       "key": "machamp",
+      "zh": "怪力",
+      "type": "fighting",
       "notes": [
         {
           "f0": 451,
@@ -1290,20 +1698,34 @@
           "f1": 352,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "怪力!",
+        "happy": "怪力♪",
+        "strained": "怪力…"
+      }
     },
     {
       "key": "bellsprout",
+      "zh": "喇叭芽",
+      "type": "grass",
       "notes": [
         {
           "f0": 693,
           "f1": 838,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "叭芽!",
+        "happy": "叭芽♪",
+        "strained": "叭芽…"
+      }
     },
     {
       "key": "weepinbell",
+      "zh": "口呆花",
+      "type": "grass",
       "notes": [
         {
           "f0": 642,
@@ -1315,10 +1737,17 @@
           "f1": 676,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "呆花!",
+        "happy": "呆花♪",
+        "strained": "呆花…"
+      }
     },
     {
       "key": "victreebel",
+      "zh": "大食花",
+      "type": "grass",
       "notes": [
         {
           "f0": 555,
@@ -1330,20 +1759,34 @@
           "f1": 584,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "食花!",
+        "happy": "食花♪",
+        "strained": "食花…"
+      }
     },
     {
       "key": "tentacool",
+      "zh": "玛瑙水母",
+      "type": "water",
       "notes": [
         {
           "f0": 584,
           "f1": 489,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "水母!",
+        "happy": "水母♪",
+        "strained": "水母…"
+      }
     },
     {
       "key": "tentacruel",
+      "zh": "毒刺水母",
+      "type": "water",
       "notes": [
         {
           "f0": 531,
@@ -1355,50 +1798,85 @@
           "f1": 557,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "水母!",
+        "happy": "水母♪",
+        "strained": "水母…"
+      }
     },
     {
       "key": "geodude",
+      "zh": "小拳石",
+      "type": "rock",
       "notes": [
         {
           "f0": 562,
           "f1": 529,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "拳石!",
+        "happy": "拳石♪",
+        "strained": "拳石…"
+      }
     },
     {
       "key": "graveler",
+      "zh": "隆隆石",
+      "type": "rock",
       "notes": [
         {
           "f0": 421,
           "f1": 396,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "隆石!",
+        "happy": "隆石♪",
+        "strained": "隆石…"
+      }
     },
     {
       "key": "golem",
+      "zh": "隆隆岩",
+      "type": "rock",
       "notes": [
         {
           "f0": 344,
           "f1": 324,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "隆岩!",
+        "happy": "隆岩♪",
+        "strained": "隆岩…"
+      }
     },
     {
       "key": "ponyta",
+      "zh": "小火马",
+      "type": "fire",
       "notes": [
         {
           "f0": 576,
           "f1": 835,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "火马!",
+        "happy": "火马♪",
+        "strained": "火马…"
+      }
     },
     {
       "key": "rapidash",
+      "zh": "烈焰马",
+      "type": "fire",
       "notes": [
         {
           "f0": 467,
@@ -1410,20 +1888,34 @@
           "f1": 490,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "焰马!",
+        "happy": "焰马♪",
+        "strained": "焰马…"
+      }
     },
     {
       "key": "slowpoke",
+      "zh": "呆呆兽",
+      "type": "water",
       "notes": [
         {
           "f0": 580,
           "f1": 486,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "呆兽!",
+        "happy": "呆兽♪",
+        "strained": "呆兽…"
+      }
     },
     {
       "key": "slowbro",
+      "zh": "呆河马",
+      "type": "water",
       "notes": [
         {
           "f0": 507,
@@ -1435,20 +1927,34 @@
           "f1": 531,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "河马!",
+        "happy": "河马♪",
+        "strained": "河马…"
+      }
     },
     {
       "key": "magnemite",
+      "zh": "小磁怪",
+      "type": "electric",
       "notes": [
         {
           "f0": 758,
           "f1": 1213,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "磁怪!",
+        "happy": "磁怪♪",
+        "strained": "磁怪…"
+      }
     },
     {
       "key": "magneton",
+      "zh": "三合一磁怪",
+      "type": "electric",
       "notes": [
         {
           "f0": 531,
@@ -1460,50 +1966,85 @@
           "f1": 850,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "磁怪!",
+        "happy": "磁怪♪",
+        "strained": "磁怪…"
+      }
     },
     {
       "key": "farfetchd",
+      "zh": "大葱鸭",
+      "type": "normal",
       "notes": [
         {
           "f0": 635,
           "f1": 711,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "葱鸭!",
+        "happy": "葱鸭♪",
+        "strained": "葱鸭…"
+      }
     },
     {
       "key": "doduo",
+      "zh": "嘟嘟",
+      "type": "normal",
       "notes": [
         {
           "f0": 537,
           "f1": 601,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "嘟嘟!",
+        "happy": "嘟嘟♪",
+        "strained": "嘟嘟…"
+      }
     },
     {
       "key": "dodrio",
+      "zh": "嘟嘟利",
+      "type": "normal",
       "notes": [
         {
           "f0": 470,
           "f1": 526,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "嘟利!",
+        "happy": "嘟利♪",
+        "strained": "嘟利…"
+      }
     },
     {
       "key": "seel",
+      "zh": "小海狮",
+      "type": "water",
       "notes": [
         {
           "f0": 524,
           "f1": 439,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "海狮!",
+        "happy": "海狮♪",
+        "strained": "海狮…"
+      }
     },
     {
       "key": "dewgong",
+      "zh": "白海狮",
+      "type": "water",
       "notes": [
         {
           "f0": 475,
@@ -1515,20 +2056,34 @@
           "f1": 497,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "海狮!",
+        "happy": "海狮♪",
+        "strained": "海狮…"
+      }
     },
     {
       "key": "grimer",
+      "zh": "臭泥",
+      "type": "poison",
       "notes": [
         {
           "f0": 583,
           "f1": 525,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "臭泥!",
+        "happy": "臭泥♪",
+        "strained": "臭泥…"
+      }
     },
     {
       "key": "muk",
+      "zh": "臭臭泥",
+      "type": "poison",
       "notes": [
         {
           "f0": 564,
@@ -1540,20 +2095,34 @@
           "f1": 609,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "臭泥!",
+        "happy": "臭泥♪",
+        "strained": "臭泥…"
+      }
     },
     {
       "key": "shellder",
+      "zh": "大舌贝",
+      "type": "water",
       "notes": [
         {
           "f0": 823,
           "f1": 690,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "舌贝!",
+        "happy": "舌贝♪",
+        "strained": "舌贝…"
+      }
     },
     {
       "key": "cloyster",
+      "zh": "刺甲贝",
+      "type": "water",
       "notes": [
         {
           "f0": 477,
@@ -1565,20 +2134,34 @@
           "f1": 499,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "甲贝!",
+        "happy": "甲贝♪",
+        "strained": "甲贝…"
+      }
     },
     {
       "key": "gastly",
+      "zh": "鬼斯",
+      "type": "ghost",
       "notes": [
         {
           "f0": 945,
           "f1": 675,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "鬼斯!",
+        "happy": "鬼斯♪",
+        "strained": "鬼斯…"
+      }
     },
     {
       "key": "haunter",
+      "zh": "鬼斯通",
+      "type": "ghost",
       "notes": [
         {
           "f0": 945,
@@ -1590,10 +2173,17 @@
           "f1": 900,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "斯通!",
+        "happy": "斯通♪",
+        "strained": "斯通…"
+      }
     },
     {
       "key": "gengar",
+      "zh": "耿鬼",
+      "type": "ghost",
       "notes": [
         {
           "f0": 557,
@@ -1605,30 +2195,51 @@
           "f1": 530,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "耿鬼!",
+        "happy": "耿鬼♪",
+        "strained": "耿鬼…"
+      }
     },
     {
       "key": "onix",
+      "zh": "大岩蛇",
+      "type": "rock",
       "notes": [
         {
           "f0": 264,
           "f1": 248,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "岩蛇!",
+        "happy": "岩蛇♪",
+        "strained": "岩蛇…"
+      }
     },
     {
       "key": "drowzee",
+      "zh": "素利普",
+      "type": "psychic",
       "notes": [
         {
           "f0": 571,
           "f1": 714,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "利普!",
+        "happy": "利普♪",
+        "strained": "利普…"
+      }
     },
     {
       "key": "hypno",
+      "zh": "素利柏",
+      "type": "psychic",
       "notes": [
         {
           "f0": 486,
@@ -1640,20 +2251,34 @@
           "f1": 462,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "利柏!",
+        "happy": "利柏♪",
+        "strained": "利柏…"
+      }
     },
     {
       "key": "krabby",
+      "zh": "大钳蟹",
+      "type": "water",
       "notes": [
         {
           "f0": 771,
           "f1": 646,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "钳蟹!",
+        "happy": "钳蟹♪",
+        "strained": "钳蟹…"
+      }
     },
     {
       "key": "kingler",
+      "zh": "巨钳蟹",
+      "type": "water",
       "notes": [
         {
           "f0": 540,
@@ -1665,20 +2290,34 @@
           "f1": 565,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "钳蟹!",
+        "happy": "钳蟹♪",
+        "strained": "钳蟹…"
+      }
     },
     {
       "key": "voltorb",
+      "zh": "雷电球",
+      "type": "electric",
       "notes": [
         {
           "f0": 689,
           "f1": 1102,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "电球!",
+        "happy": "电球♪",
+        "strained": "电球…"
+      }
     },
     {
       "key": "electrode",
+      "zh": "顽皮弹",
+      "type": "electric",
       "notes": [
         {
           "f0": 513,
@@ -1690,20 +2329,34 @@
           "f1": 821,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "皮弹!",
+        "happy": "皮弹♪",
+        "strained": "皮弹…"
+      }
     },
     {
       "key": "exeggcute",
+      "zh": "蛋蛋",
+      "type": "grass",
       "notes": [
         {
           "f0": 756,
           "f1": 915,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "蛋蛋!",
+        "happy": "蛋蛋♪",
+        "strained": "蛋蛋…"
+      }
     },
     {
       "key": "exeggutor",
+      "zh": "椰蛋树",
+      "type": "grass",
       "notes": [
         {
           "f0": 420,
@@ -1715,30 +2368,51 @@
           "f1": 442,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "蛋树!",
+        "happy": "蛋树♪",
+        "strained": "蛋树…"
+      }
     },
     {
       "key": "cubone",
+      "zh": "卡拉卡拉",
+      "type": "ground",
       "notes": [
         {
           "f0": 646,
           "f1": 573,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "卡拉!",
+        "happy": "卡拉♪",
+        "strained": "卡拉…"
+      }
     },
     {
       "key": "marowak",
+      "zh": "嘎啦嘎啦",
+      "type": "ground",
       "notes": [
         {
           "f0": 484,
           "f1": 429,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "嘎啦!",
+        "happy": "嘎啦♪",
+        "strained": "嘎啦…"
+      }
     },
     {
       "key": "hitmonlee",
+      "zh": "沙瓦郎",
+      "type": "fighting",
       "notes": [
         {
           "f0": 517,
@@ -1750,10 +2424,17 @@
           "f1": 403,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "瓦郎!",
+        "happy": "瓦郎♪",
+        "strained": "瓦郎…"
+      }
     },
     {
       "key": "hitmonchan",
+      "zh": "艾比郎",
+      "type": "fighting",
       "notes": [
         {
           "f0": 521,
@@ -1765,30 +2446,51 @@
           "f1": 406,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "比郎!",
+        "happy": "比郎♪",
+        "strained": "比郎…"
+      }
     },
     {
       "key": "lickitung",
+      "zh": "大舌头",
+      "type": "normal",
       "notes": [
         {
           "f0": 514,
           "f1": 576,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "舌头!",
+        "happy": "舌头♪",
+        "strained": "舌头…"
+      }
     },
     {
       "key": "koffing",
+      "zh": "瓦斯弹",
+      "type": "poison",
       "notes": [
         {
           "f0": 829,
           "f1": 746,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "斯弹!",
+        "happy": "斯弹♪",
+        "strained": "斯弹…"
+      }
     },
     {
       "key": "weezing",
+      "zh": "双弹瓦斯",
+      "type": "poison",
       "notes": [
         {
           "f0": 639,
@@ -1800,70 +2502,119 @@
           "f1": 690,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "瓦斯!",
+        "happy": "瓦斯♪",
+        "strained": "瓦斯…"
+      }
     },
     {
       "key": "rhyhorn",
+      "zh": "铁甲犀牛",
+      "type": "ground",
       "notes": [
         {
           "f0": 430,
           "f1": 381,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "犀牛!",
+        "happy": "犀牛♪",
+        "strained": "犀牛…"
+      }
     },
     {
       "key": "rhydon",
+      "zh": "铁甲暴龙",
+      "type": "ground",
       "notes": [
         {
           "f0": 392,
           "f1": 347,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "暴龙!",
+        "happy": "暴龙♪",
+        "strained": "暴龙…"
+      }
     },
     {
       "key": "chansey",
+      "zh": "吉利蛋",
+      "type": "normal",
       "notes": [
         {
           "f0": 561,
           "f1": 628,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "利蛋!",
+        "happy": "利蛋♪",
+        "strained": "利蛋…"
+      }
     },
     {
       "key": "tangela",
+      "zh": "蔓藤怪",
+      "type": "grass",
       "notes": [
         {
           "f0": 538,
           "f1": 651,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "藤怪!",
+        "happy": "藤怪♪",
+        "strained": "藤怪…"
+      }
     },
     {
       "key": "kangaskhan",
+      "zh": "袋龙",
+      "type": "normal",
       "notes": [
         {
           "f0": 462,
           "f1": 517,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "袋龙!",
+        "happy": "袋龙♪",
+        "strained": "袋龙…"
+      }
     },
     {
       "key": "horsea",
+      "zh": "墨海马",
+      "type": "water",
       "notes": [
         {
           "f0": 757,
           "f1": 634,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "海马!",
+        "happy": "海马♪",
+        "strained": "海马…"
+      }
     },
     {
       "key": "seadra",
+      "zh": "海刺龙",
+      "type": "water",
       "notes": [
         {
           "f0": 605,
@@ -1875,20 +2626,34 @@
           "f1": 634,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "刺龙!",
+        "happy": "刺龙♪",
+        "strained": "刺龙…"
+      }
     },
     {
       "key": "goldeen",
+      "zh": "角金鱼",
+      "type": "water",
       "notes": [
         {
           "f0": 687,
           "f1": 576,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "金鱼!",
+        "happy": "金鱼♪",
+        "strained": "金鱼…"
+      }
     },
     {
       "key": "seaking",
+      "zh": "金鱼王",
+      "type": "water",
       "notes": [
         {
           "f0": 569,
@@ -1900,20 +2665,34 @@
           "f1": 596,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "鱼王!",
+        "happy": "鱼王♪",
+        "strained": "鱼王…"
+      }
     },
     {
       "key": "staryu",
+      "zh": "海星星",
+      "type": "water",
       "notes": [
         {
           "f0": 610,
           "f1": 511,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "星星!",
+        "happy": "星星♪",
+        "strained": "星星…"
+      }
     },
     {
       "key": "starmie",
+      "zh": "宝石海星",
+      "type": "water",
       "notes": [
         {
           "f0": 531,
@@ -1925,10 +2704,17 @@
           "f1": 557,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "海星!",
+        "happy": "海星♪",
+        "strained": "海星…"
+      }
     },
     {
       "key": "mr-mime",
+      "zh": "魔墙人偶",
+      "type": "psychic",
       "notes": [
         {
           "f0": 520,
@@ -1940,20 +2726,34 @@
           "f1": 494,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "人偶!",
+        "happy": "人偶♪",
+        "strained": "人偶…"
+      }
     },
     {
       "key": "scyther",
+      "zh": "飞天螳螂",
+      "type": "bug",
       "notes": [
         {
           "f0": 585,
           "f1": 611,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "螳螂!",
+        "happy": "螳螂♪",
+        "strained": "螳螂…"
+      }
     },
     {
       "key": "jynx",
+      "zh": "迷唇姐",
+      "type": "ice",
       "notes": [
         {
           "f0": 642,
@@ -1965,10 +2765,17 @@
           "f1": 669,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "唇姐!",
+        "happy": "唇姐♪",
+        "strained": "唇姐…"
+      }
     },
     {
       "key": "electabuzz",
+      "zh": "电击兽",
+      "type": "electric",
       "notes": [
         {
           "f0": 570,
@@ -1980,10 +2787,17 @@
           "f1": 912,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "击兽!",
+        "happy": "击兽♪",
+        "strained": "击兽…"
+      }
     },
     {
       "key": "magmar",
+      "zh": "鸭嘴火龙",
+      "type": "fire",
       "notes": [
         {
           "f0": 534,
@@ -1995,40 +2809,68 @@
           "f1": 561,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "火龙!",
+        "happy": "火龙♪",
+        "strained": "火龙…"
+      }
     },
     {
       "key": "pinsir",
+      "zh": "大甲",
+      "type": "bug",
       "notes": [
         {
           "f0": 588,
           "f1": 613,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "大甲!",
+        "happy": "大甲♪",
+        "strained": "大甲…"
+      }
     },
     {
       "key": "tauros",
+      "zh": "肯泰罗",
+      "type": "normal",
       "notes": [
         {
           "f0": 484,
           "f1": 542,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "泰罗!",
+        "happy": "泰罗♪",
+        "strained": "泰罗…"
+      }
     },
     {
       "key": "magikarp",
+      "zh": "鲤鱼王",
+      "type": "water",
       "notes": [
         {
           "f0": 687,
           "f1": 576,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "鱼王!",
+        "happy": "鱼王♪",
+        "strained": "鱼王…"
+      }
     },
     {
       "key": "gyarados",
+      "zh": "暴鲤龙",
+      "type": "water",
       "notes": [
         {
           "f0": 338,
@@ -2040,100 +2882,170 @@
           "f1": 354,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "鲤龙!",
+        "happy": "鲤龙♪",
+        "strained": "鲤龙…"
+      }
     },
     {
       "key": "lapras",
+      "zh": "乘龙",
+      "type": "water",
       "notes": [
         {
           "f0": 407,
           "f1": 341,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "乘龙!",
+        "happy": "乘龙♪",
+        "strained": "乘龙…"
+      }
     },
     {
       "key": "ditto",
+      "zh": "百变怪",
+      "type": "normal",
       "notes": [
         {
           "f0": 784,
           "f1": 878,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "变怪!",
+        "happy": "变怪♪",
+        "strained": "变怪…"
+      }
     },
     {
       "key": "porygon",
+      "zh": "3D龙",
+      "type": "normal",
       "notes": [
         {
           "f0": 578,
           "f1": 647,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "D龙!",
+        "happy": "D龙♪",
+        "strained": "D龙…"
+      }
     },
     {
       "key": "omanyte",
+      "zh": "菊石兽",
+      "type": "rock",
       "notes": [
         {
           "f0": 616,
           "f1": 580,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "石兽!",
+        "happy": "石兽♪",
+        "strained": "石兽…"
+      }
     },
     {
       "key": "omastar",
+      "zh": "多刺菊石兽",
+      "type": "rock",
       "notes": [
         {
           "f0": 481,
           "f1": 453,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "石兽!",
+        "happy": "石兽♪",
+        "strained": "石兽…"
+      }
     },
     {
       "key": "kabuto",
+      "zh": "化石盔",
+      "type": "rock",
       "notes": [
         {
           "f0": 581,
           "f1": 546,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "石盔!",
+        "happy": "石盔♪",
+        "strained": "石盔…"
+      }
     },
     {
       "key": "kabutops",
+      "zh": "镰刀盔",
+      "type": "rock",
       "notes": [
         {
           "f0": 459,
           "f1": 432,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "刀盔!",
+        "happy": "刀盔♪",
+        "strained": "刀盔…"
+      }
     },
     {
       "key": "aerodactyl",
+      "zh": "化石翼龙",
+      "type": "rock",
       "notes": [
         {
           "f0": 420,
           "f1": 395,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "翼龙!",
+        "happy": "翼龙♪",
+        "strained": "翼龙…"
+      }
     },
     {
       "key": "snorlax",
+      "zh": "卡比兽",
+      "type": "normal",
       "notes": [
         {
           "f0": 352,
           "f1": 394,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "比兽!",
+        "happy": "比兽♪",
+        "strained": "比兽…"
+      }
     },
     {
       "key": "articuno",
+      "zh": "急冻鸟",
+      "type": "ice",
       "notes": [
         {
           "f0": 494,
@@ -2150,10 +3062,17 @@
           "f1": 515,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "冻鸟!",
+        "happy": "冻鸟♪",
+        "strained": "冻鸟…"
+      }
     },
     {
       "key": "zapdos",
+      "zh": "闪电鸟",
+      "type": "electric",
       "notes": [
         {
           "f0": 417,
@@ -2170,10 +3089,17 @@
           "f1": 668,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "电鸟!",
+        "happy": "电鸟♪",
+        "strained": "电鸟…"
+      }
     },
     {
       "key": "moltres",
+      "zh": "火焰鸟",
+      "type": "fire",
       "notes": [
         {
           "f0": 399,
@@ -2190,20 +3116,34 @@
           "f1": 418,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "焰鸟!",
+        "happy": "焰鸟♪",
+        "strained": "焰鸟…"
+      }
     },
     {
       "key": "dratini",
+      "zh": "迷你龙",
+      "type": "dragon",
       "notes": [
         {
           "f0": 613,
           "f1": 749,
           "ms": 150
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "你龙!",
+        "happy": "你龙♪",
+        "strained": "你龙…"
+      }
     },
     {
       "key": "dragonair",
+      "zh": "哈克龙",
+      "type": "dragon",
       "notes": [
         {
           "f0": 473,
@@ -2215,10 +3155,17 @@
           "f1": 446,
           "ms": 180
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "克龙!",
+        "happy": "克龙♪",
+        "strained": "克龙…"
+      }
     },
     {
       "key": "dragonite",
+      "zh": "快龙",
+      "type": "dragon",
       "notes": [
         {
           "f0": 359,
@@ -2230,10 +3177,17 @@
           "f1": 339,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "快龙!",
+        "happy": "快龙♪",
+        "strained": "快龙…"
+      }
     },
     {
       "key": "mewtwo",
+      "zh": "超梦",
+      "type": "psychic",
       "notes": [
         {
           "f0": 361,
@@ -2255,10 +3209,17 @@
           "f1": 469,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "超梦!",
+        "happy": "超梦♪",
+        "strained": "超梦…"
+      }
     },
     {
       "key": "mew",
+      "zh": "梦幻",
+      "type": "psychic",
       "notes": [
         {
           "f0": 627,
@@ -2280,7 +3241,12 @@
           "f1": 815,
           "ms": 210
         }
-      ]
+      ],
+      "bubble": {
+        "idle": "梦幻!",
+        "happy": "梦幻♪",
+        "strained": "梦幻…"
+      }
     }
   ]
 }

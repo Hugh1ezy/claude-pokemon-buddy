@@ -7,11 +7,16 @@ test("SND_SPECIES_BASE is 3 (after BUI/EVOLVE/HOUR)", () => {
   assert.equal(SND_SPECIES_BASE, 3);
 });
 
-test("18 species map to contiguous, unique ids [3,20]", () => {
-  assert.equal(SPECIES_SOUND_ORDER.length, 18);
+// Pinned as an invariant rather than as a count. This asserted exactly 18 and had
+// to be edited the moment a cry was added, which is the wrong thing to notice --
+// what matters is that ids stay contiguous from the base and unique, whatever the
+// length is. The first entry's id is pinned separately below, and that IS a
+// constant worth freezing: it is the ABI the firmware's table is built against.
+test("species map to contiguous, unique ids from the sound base", () => {
   const ids = SPECIES_SOUND_ORDER.map((s) => cryAudioId(s));
-  assert.deepEqual(ids, Array.from({ length: 18 }, (_, i) => 3 + i));
-  assert.equal(new Set(ids).size, 18);
+  assert.equal(ids.length, SPECIES_SOUND_ORDER.length);
+  assert.deepEqual(ids, Array.from({ length: ids.length }, (_, i) => ids[0] + i));
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 test("cryAudioId follows JSON order (eevee=3, blastoise=20)", () => {

@@ -277,6 +277,21 @@ export function createButtonDispatcher({
       pageCursorCount: onPage(roster, was?.page ?? 0).length,
     });
     if (next === was && action == null) return;
+
+    // The selected species cries when the cursor lands on it, including the press
+    // that opens the screen. Sent as PLAY rather than via setActiveCry, which
+    // would rewrite what the KEY button plays and outlive the screen.
+    //
+    // Only owned species are in `roster`, so an undiscovered silhouette is
+    // silent -- which is the point: hearing one before finding it would give it
+    // away, and the black rows are not selectable anyway.
+    const wasSpecies = was ? onPage(roster, was.page)[was.cursor]?.species ?? null : null;
+    const nowSpecies = next ? onPage(roster, next.page)[next.cursor]?.species ?? null : null;
+    if (nowSpecies && nowSpecies !== wasSpecies) {
+      const selectedCry = cryAudioId(nowSpecies);
+      if (selectedCry != null) transport.playSound?.(selectedCry);
+    }
+
     dexView = next;
 
     // Read before the queue runs: `action` is decided against the roster the

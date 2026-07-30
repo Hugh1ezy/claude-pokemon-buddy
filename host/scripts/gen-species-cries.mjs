@@ -110,6 +110,13 @@ function cryFor(species, height, weight) {
   return notes;
 }
 
+// Last two characters of the Chinese name, which is how the hand-written 蛙草!
+// reads. Short names are taken whole rather than padded.
+function placeholderBubble(zh) {
+  const stem = typeof zh === "string" && zh.length > 2 ? zh.slice(-2) : (zh ?? "♪");
+  return { idle: `${stem}!`, happy: `${stem}♪`, strained: `${stem}…` };
+}
+
 const dry = process.argv.includes("--dry");
 
 // ORDER IS AN ABI. `cryAudioId` is soundBase + index into this list, and the
@@ -130,7 +137,19 @@ const present = new Set(species.map((s) => s.key));
 for (const s of POKEDEX.species) {
   if (present.has(s.key)) continue;
   const api = await get(`https://pokeapi.co/api/v2/pokemon/${s.dex}/`);
-  species.push({ key: s.key, notes: cryFor(s, api.height, api.weight) });
+  species.push({
+    key: s.key,
+    zh: s.zh,
+    type: s.types[0],
+    notes: cryFor(s, api.height, api.weight),
+    // PLACEHOLDER FLAVOUR, and the one thing in this file that is not derived
+    // from data. The existing 18 have hand-written Chinese onomatopoeia (呼噜,
+    // 滋滋!, 咻~) which no dataset contains, so the generated entries take the
+    // last two characters of the Chinese name instead -- the same shape as the
+    // hand-written 蛙草! -- and are meant to be replaced by hand over time.
+    // Marked here rather than silently, because it is the only guess in the file.
+    bubble: placeholderBubble(s.zh),
+  });
   present.add(s.key);
 }
 
