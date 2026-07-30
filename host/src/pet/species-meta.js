@@ -42,6 +42,16 @@ export function zhName(species) {
   return SPECIES_ZH[species] ?? species;
 }
 
+// How a pokemon is named anywhere it is shown: the owner's name, 的, and the
+// species' pokedex name. Always composed, never read out of the save's `name`
+// field -- that one is written once at onboarding from the starter's species
+// and never follows an evolution, so it goes stale the first time the buddy
+// changes shape. Composing from the CURRENT species is what makes the name and
+// the sprite incapable of disagreeing.
+export function displayName(ownerName, species) {
+  return `${ownerName || "阿布"}的${zhName(species ?? "eevee")}`;
+}
+
 export function dexNumber(species) {
   return SPECIES_DEX[species] ?? null;
 }

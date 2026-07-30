@@ -244,17 +244,58 @@ save-sync has nothing new to publish until something actually happens.
 `drawLeftPanel` had kept blank and commented `reserved (future notifications)`
 since the panel was first drawn, which is where the owner asked for them:
 
-- **Row 3** is the encounter notification, drawn only while an offer is live. It
-  alternates between an inverted box and an outlined one rather than between
-  drawn and blank — a row that vanishes for half its cycle can be missed
-  entirely by glancing at the wrong moment, and this one has `offerMs` (5
-  minutes) to be noticed in. `encounterBlinkOn()` keys off the animator's
-  `animPhase`, so it needs no timer of its own and a still frame (paintFromDisk,
-  the dashboard preview) shows the loud phase.
+- **Row 3** is one centred line, always present, revised to the owner's spec on
+  07-30. With an offer live it reads the fixed `有野生宝可梦出现` and **never
+  names the species** — that is the capture screen's to reveal, and there is a
+  test asserting two different species render byte-identical. With no offer it
+  reads `工作要耐心礼貌哦` or `在家要好好休息哦` depending on the WiFi (below).
+  No box, no fill: the blink is a **weight** change, 800 against 400. Zpix has
+  exactly two effective weights (≤600 and ≥700 each render identically) and both
+  advance the same width, so the text changes stroke without shifting a pixel.
+  `encounterBlinkOn()` keys off the animator's `animPhase`, so it needs no timer
+  of its own and a still frame (paintFromDisk, the dashboard preview) shows the
+  heavy phase.
 - **Row 4** is `图鉴 n/151` and `捕捉 n`, always drawn. They are deliberately two
   numbers, not one: `dexCaught` is distinct species and `capturedCount` counts
   duplicates, so a duplicate catch moves the second and not the first. A test
   pins exactly that.
+
+### Which place the host is in, and the two fonts that came with it
+
+Row 3's idle message needs to know whether the host is at work or at home.
+`src/place.js` answers it from the **WiFi SSID** (`netsh wlan show interfaces`),
+not from the hostname — the machines are fixed today, but the network is what
+the question actually means, and a hostname would lie about a machine that
+moved. Three things worth knowing:
+
+- **The SSID → place map lives in `config.json`**, which is per-machine and
+  untracked, so neither SSID reaches the public repo. Add it once per machine:
+  `"places": { "<your ssid>": "work" }` / `"home"`. **The home PC does not have
+  its entry yet** — until it does, the row is simply blank there.
+- **An unknown or unreadable SSID draws nothing.** No guess: the wrong guess
+  tells him to rest at home while he is sitting at his desk.
+- **It does not shell out when `places` is empty**, which matters more than it
+  sounds. Every test that drives a tick has no `places`, and spawning netsh
+  there slowed the tick enough to start losing a *third* main-orchestration race
+  on top of the two below. That was the whole cause; the guard removed it.
+
+**Two font decisions.** Row 2's date went to 21px, exactly 1.5x its old 14px, at
+the owner's ask. Two consequences:
+
+- **The weekday stayed at 14px.** Both at 21px measure 200px against 193px of
+  usable row and collide into `2026年7月30日周四` with no gap — nothing throws,
+  the text just runs together. Getting both large needs the year dropped or the
+  row split, which is a content decision. `test/left-rows.test.js` now measures
+  the widest possible date against the panel so this cannot come back silently.
+- **21 is off the Zpix 12px grid and has NOT been accepted on hardware yet.**
+  `layout.test.js` keeps a list of approved sizes for exactly this reason (12/24/48
+  are grid multiples; 14 was an earlier signed-off exception). Look at the real
+  panel: if it reads fuzzy, go back to 14 or up to 24 — 24 is on the grid but
+  does not fit without dropping the year.
+
+That guard also had a hole worth remembering: it scans `g.font` template
+literals, so moving a size into `const DATE_PX = 21` made it match nothing and
+the unapproved size sailed through. It now scans the `_PX` constants too.
 
 **The blink was measured before it shipped, and the worry was wrong.** The
 concern was the one the animator section below raises: row 3 sits in the left
@@ -319,9 +360,11 @@ early-generation pixel art is the reference, not something new.
     again, and keep going until A lands in B.
   - **outside both** → it escapes immediately and the encounter is over.
 
-Note what this does to `seed/pokedex.json`'s capture rates: they stop being the
-mechanism. Either they become the input that sets B and C's width and speed, or
-they go unused — worth deciding deliberately rather than leaving both in.
+How a species maps to its B/C width and slide speed was **decided on 07-30 and
+deliberately is not written here** — it is part of the same surprise the
+encounter table is, so it lives with the spoiler material in
+`scripts/gen-encounters.mjs`. Read that file before building this screen; do not
+re-derive it, and keep it out of chat.
 
 One stale comment worth knowing about: `ENCOUNTER_DEFAULTS.perTickChance` is
 `0.0065`, but the comment above it still describes `0.0028` and "near 2.5 a day".

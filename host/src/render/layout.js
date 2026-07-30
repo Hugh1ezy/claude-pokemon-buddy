@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { createCanvas, GlobalFonts } from "@napi-rs/canvas";
 
 import { EEVEE_IDLE_CRY } from "../pet/cries.js";
-import { zhName } from "../pet/species-meta.js";
+import { displayName, zhName } from "../pet/species-meta.js";
 import { drawIdleAccent } from "./idle-accents.js";
 import { H, INK, LEFT_W, PAPER, W } from "./palette.js";
 import { layoutText } from "./format.js";
@@ -76,8 +76,13 @@ function drawLeftPanel(g, model) {
   // Row 2: date flush left, weekday flush right -- the same 11/12px margins the
   // rows above and below use, so the two ends of the row line up with everything
   // else in the panel rather than floating in the middle.
-  g.font = `800 14px ${CJK}`;
+  // The date at 1.5x its original 14px, at the owner's ask. The weekday stays
+  // at 14px because the two at 21px measure 200px against 193px of usable row
+  // and collide -- "2026年7月30日周四" with no gap. Enlarging both needs the
+  // year dropped or the row split, which is a content decision, not a font one.
+  g.font = `800 ${DATE_PX}px ${CJK}`;
   g.fillText(text.date, 11, 88);
+  g.font = `800 ${WEEKDAY_PX}px ${CJK}`;
   g.textAlign = "right";
   g.fillText(text.weekday, LEFT_W - 12, 88);
   g.textAlign = "left";
@@ -119,46 +124,56 @@ function drawLeftPanel(g, model) {
 // Left-panel rows 3 and 4, in the band the layout has kept blank since the
 // panel was first drawn: below the date/weekday row (baseline 88) and above the
 // WEEK meter (top 175).
-const ENC_ROW_Y = 100;      // alert box top
-const ENC_ROW_H = 30;
+export const DATE_PX = 21;      // 1.5x the original 14
+export const WEEKDAY_PX = 14;   // see drawLeftPanel: 21 here overflows the row
+export const DATE_ROW_LEFT = 11;
+export const DATE_ROW_RIGHT = LEFT_W - 12;
+
+const ENC_ROW_Y = 100;      // top of the message row; its baseline is +20
 const DEX_ROW_Y = 155;      // text baseline, 20px clear of the WEEK meter above it
 const PANEL_LEFT = 10;      // matches the separator lines and the 11px text margin
 const PANEL_RIGHT = LEFT_W - 12;
 
-// Inverted while "on", outlined while "off" -- NOT drawn-then-blank. A row that
-// vanishes for half its cycle is a row you can miss entirely by glancing at the
-// wrong moment, and this one has five minutes to be noticed in. Both phases
-// carry the same text at the same place; only the polarity moves.
-export const ENCOUNTER_BLINK_PERIOD = 6;   // animator frames (333ms each) -- 1s inverted, 1s outlined
+// The row never goes blank and the text never moves; only the stroke weight
+// alternates. Two reasons it is done this way rather than by inverting a box:
+// the species must NOT be given away before the capture screen shows it, and a
+// row that blinks to blank can be missed entirely by glancing during the off
+// half -- an offer only lasts offerMs.
+export const ENCOUNTER_BLINK_PERIOD = 6;   // animator frames (333ms each) -- 1s heavy, 1s light
+
+export const ENCOUNTER_TEXT = "有野生宝可梦出现";
+export const PLACE_TEXT = {
+  work: "工作要耐心礼貌哦",
+  home: "在家要好好休息哦",
+};
 
 export function encounterBlinkOn(animPhase) {
-  if (!Number.isInteger(animPhase)) return true;   // a still frame shows the loud one
+  if (!Number.isInteger(animPhase)) return true;   // a still frame shows the heavy one
   return animPhase % ENCOUNTER_BLINK_PERIOD < ENCOUNTER_BLINK_PERIOD / 2;
 }
 
+// Centred, because it is a message rather than a field -- everything else in
+// this panel is a label paired with a value and hangs off one margin or the
+// other, and this row is neither.
+function drawCentred(g, text, y) {
+  g.fillText(text, Math.round(PANEL_LEFT + (PANEL_RIGHT - PANEL_LEFT - g.measureText(text).width) / 2), y);
+}
+
 function drawEncounterRow(g, model) {
-  const encounter = model.encounter;
-  if (!encounter?.zh) return;
+  // An unknown place draws nothing at all. Guessing is worse than silence here:
+  // the wrong guess tells him to rest at home while he is sitting at his desk.
+  const idle = PLACE_TEXT[model.place] ?? null;
+  const wild = Boolean(model.encounter?.species);
+  if (!wild && !idle) return;
 
-  const w = PANEL_RIGHT - PANEL_LEFT;
-  const on = encounterBlinkOn(model.buddy?.animPhase);
-
-  g.fillStyle = on ? INK : PAPER;
-  g.fillRect(PANEL_LEFT, ENC_ROW_Y, w, ENC_ROW_H);
-  if (!on) {
-    g.fillStyle = INK;
-    g.fillRect(PANEL_LEFT, ENC_ROW_Y, w, 2);
-    g.fillRect(PANEL_LEFT, ENC_ROW_Y + ENC_ROW_H - 2, w, 2);
-    g.fillRect(PANEL_LEFT, ENC_ROW_Y, 2, ENC_ROW_H);
-    g.fillRect(PANEL_RIGHT - 2, ENC_ROW_Y, 2, ENC_ROW_H);
-  }
-
-  g.fillStyle = on ? PAPER : INK;
-  g.font = `800 14px ${CJK}`;
-  const label = `野生的 ${encounter.zh}`;
-  const textW = g.measureText(label).width;
-  g.fillText(label, Math.round(PANEL_LEFT + (w - textW) / 2), ENC_ROW_Y + 20);
+  const heavy = wild ? encounterBlinkOn(model.buddy?.animPhase) : true;
   g.fillStyle = INK;
+  // 14px, the same approved size the rest of the panel's prose uses. Zpix only
+  // has two effective weights -- everything at or below 600 renders identically,
+  // as does everything at or above 700 -- and both advance the same width, which
+  // is what lets this blink without the text shifting sideways.
+  g.font = `${heavy ? 800 : 400} 14px ${CJK}`;
+  drawCentred(g, wild ? ENCOUNTER_TEXT : idle, ENC_ROW_Y + 20);
 }
 
 // 图鉴 counts distinct species (the collection), 捕捉 counts throws that landed
@@ -313,7 +328,7 @@ function drawSpeciesLine(g, panelX, panelW, buddy) {
     centered("▲ 按 KEY 进化！");
   } else {
     g.fillStyle = INK;
-    centered(`${buddy.name ?? "阿布"}的${zhName(buddy.species ?? "eevee")}`);
+    centered(displayName(buddy.name, buddy.species));
   }
   g.fillStyle = INK;
 }

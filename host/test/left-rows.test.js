@@ -2,7 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { renderFrame } from "../src/render/frame.js";
-import { ENCOUNTER_BLINK_PERIOD, encounterBlinkOn } from "../src/render/layout.js";
+import {
+  DATE_PX,
+  DATE_ROW_LEFT,
+  DATE_ROW_RIGHT,
+  ENCOUNTER_BLINK_PERIOD,
+  WEEKDAY_PX,
+  encounterBlinkOn,
+} from "../src/render/layout.js";
 import { LEFT_W } from "../src/render/palette.js";
 
 // Left panel rows 3 and 4. Both are drawn into a band that was blank for the
@@ -12,7 +19,7 @@ import { LEFT_W } from "../src/render/palette.js";
 const ENC_BAND = { y0: 96, y1: 134 };
 const DEX_BAND = { y0: 140, y1: 160 };
 
-function model({ animPhase = 0, encounter = null, dex = null } = {}) {
+function model({ animPhase = 0, encounter = null, dex = null, place = null } = {}) {
   return {
     clock: "11:34",
     now: new Date(2026, 6, 30, 11, 34),
@@ -23,6 +30,7 @@ function model({ animPhase = 0, encounter = null, dex = null } = {}) {
     out: { t: 19, h: 64 },
     streak: 5,
     dex,
+    place,
     encounter,
     buddy: {
       name: "Hughie", mood: "focus", level: 18, species: "bulbasaur",
@@ -54,27 +62,49 @@ async function bandOf(m, band) {
 const inkInBand = async (m, band) => (await bandOf(m, band)).ink;
 const sigOf = async (m, band) => (await bandOf(m, band)).sig;
 
-test("row 3 stays blank when nothing is on offer", async () => {
+test("row 3 stays blank when there is neither an offer nor a known place", async () => {
   assert.equal(await inkInBand(model(), ENC_BAND), 0);
 });
 
-test("row 3 draws the encounter, and both blink phases keep it readable", async () => {
-  const on = await inkInBand(model({ encounter: { species: "gastly", zh: "耿鬼" }, animPhase: 0 }), ENC_BAND);
-  const off = await inkInBand(model({ encounter: { species: "gastly", zh: "耿鬼" }, animPhase: 3 }), ENC_BAND);
+test("row 3 shows the place message when nothing is on offer", async () => {
+  const work = await sigOf(model({ place: "work" }), ENC_BAND);
+  const home = await sigOf(model({ place: "home" }), ENC_BAND);
 
-  assert.ok(on > 0, "the inverted phase must draw something");
-  // The point of the outlined phase: a row that blinks to blank can be missed
-  // entirely by looking at it during the off half, and this one has five
-  // minutes to be noticed in.
-  assert.ok(off > 0, "the off phase must still be visible, not blank");
-  assert.notEqual(on, off, "the two phases must actually differ, or it is not blinking");
+  assert.notEqual(work, "0".repeat(work.length), "work must draw something");
+  assert.notEqual(home, "0".repeat(home.length), "home must draw something");
+  assert.notEqual(work, home, "the two places must not show the same message");
 });
 
-test("the species name is really rendered, not a fixed label", async () => {
-  const a = await sigOf(model({ encounter: { species: "a", zh: "鲤鱼王" } }), ENC_BAND);
-  const b = await sigOf(model({ encounter: { species: "b", zh: "耿鬼" } }), ENC_BAND);
+// Guessing is worse than silence: the wrong guess tells him to rest at home
+// while he is sitting at his desk.
+test("an unknown place draws nothing rather than guessing one", async () => {
+  for (const place of [null, undefined, "", "cafe", "WORK", 7]) {
+    assert.equal(await inkInBand(model({ place }), ENC_BAND), 0, `place ${JSON.stringify(place)}`);
+  }
+});
 
-  assert.notEqual(a, b, "two different names must not render identically");
+test("an offer replaces the place message and never names the species", async () => {
+  const idle = await sigOf(model({ place: "work" }), ENC_BAND);
+  const a = await sigOf(model({ place: "work", encounter: { species: "gastly" } }), ENC_BAND);
+  const b = await sigOf(model({ place: "home", encounter: { species: "magikarp" } }), ENC_BAND);
+
+  assert.notEqual(a, idle, "an offer must take the row over from the place message");
+  // The species is the capture screen's to reveal. Two different species at the
+  // same blink phase must render identically, or the row is leaking it.
+  assert.equal(a, b, "row 3 must not vary with the species -- or the place, once an offer is up");
+});
+
+test("the blink changes weight without moving the text", async () => {
+  const heavy = await bandOf(model({ encounter: { species: "gastly" }, animPhase: 0 }), ENC_BAND);
+  const light = await bandOf(model({ encounter: { species: "gastly" }, animPhase: 3 }), ENC_BAND);
+
+  assert.ok(light.ink > 0, "the light phase must still be visible, not blank");
+  assert.ok(heavy.ink > light.ink, "the heavy phase must carry more ink than the light one");
+
+  // Zpix synthesises bold at the same advance width, which is what makes this
+  // blink readable rather than jittery: the glyphs must not shift sideways.
+  const firstInk = (sig) => sig.indexOf("1") % (LEFT_W - 2);
+  assert.equal(firstInk(heavy.sig), firstInk(light.sig), "the text must not move between phases");
 });
 
 test("row 4 is drawn whenever dex progress is in the model, and blank without it", async () => {
@@ -99,6 +129,28 @@ test("row 4 shows the two counts separately, so a duplicate catch moves one and 
 
   assert.notEqual(before, afterDuplicate, "捕捉 must move on a duplicate");
   assert.notEqual(afterDuplicate, afterNewSpecies, "图鉴 must move on a new species");
+});
+
+// Row 2's date went to 1.5x on 2026-07-30 and the weekday did not, because at
+// 21px the pair measures 200px against 193px of usable row and collides into
+// "2026年7月30日周四". Nothing threw -- the text just ran together -- so this
+// measures the widths instead of trusting them.
+test("row 2's date and weekday cannot collide at any date this century", async () => {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const g = createCanvas(LEFT_W, 40).getContext("2d");
+  const avail = DATE_ROW_RIGHT - DATE_ROW_LEFT;
+
+  // The widest date this font can be asked for: a two-digit month and day.
+  g.font = `800 ${DATE_PX}px "Zpix"`;
+  const dateW = g.measureText("2026年12月30日").width;
+  g.font = `800 ${WEEKDAY_PX}px "Zpix"`;
+  const weekdayW = Math.max(...["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    .map((d) => g.measureText(d).width));
+
+  assert.ok(
+    dateW + weekdayW < avail,
+    `date ${Math.round(dateW)} + weekday ${Math.round(weekdayW)} must fit in ${avail}`,
+  );
 });
 
 test("the blink alternates on a fixed period and a still frame shows the loud phase", () => {

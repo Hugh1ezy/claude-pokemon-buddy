@@ -130,13 +130,26 @@ test("layout uses the registered Zpix pixel font at approved sizes only", () => 
   const source = readFileSync(new URL("../src/render/layout.js", import.meta.url), "utf8");
   const staticFontSizes = [...source.matchAll(/g\.font = `[^`]*?(\d+)px \$\{(?:MONO|CJK)\}`/g)]
     .map((match) => Number(match[1]));
+  // A size moved into a `const NAME_PX = n` escapes the regex above -- the
+  // template then reads `${DATE_PX}px` and matches nothing. That happened on
+  // 2026-07-30 and let an unapproved size through silently, so the constants
+  // are checked too.
+  const constantFontSizes = [...source.matchAll(/^\s*(?:export )?const \w*_PX = (\d+);/gm)]
+    .map((match) => Number(match[1]));
   // 12/24/48 = Zpix 整数倍；14 = 2026-07-07 视觉伴侣选型定稿（说明行，真机渲染验收过）。
-  const approved = new Set([12, 14, 24, 48]);
+  // 21 = 2026-07-30，owner 明确要求日期行放大到 1.5 倍（14 x 1.5）。它不在 12px
+  // 网格上，和 14 一样属于例外；**尚未在真机上验收**，看着糊就换回 14 或改用 24
+  // （24 是网格内的，但那一行放不下，得先去掉年份）。
+  const approved = new Set([12, 14, 21, 24, 48]);
 
   assert.match(source, /GlobalFonts\.registerFromPath/);
   assert.doesNotMatch(source, /Courier New|PingFang|Hiragino|Microsoft YaHei/);
   assert.ok(staticFontSizes.length > 0);
-  assert.deepEqual(staticFontSizes.filter((size) => !approved.has(size)), []);
+  assert.ok(constantFontSizes.length > 0, "the _PX constants must still be found by the regex above");
+  assert.deepEqual(
+    [...staticFontSizes, ...constantFontSizes].filter((size) => !approved.has(size)),
+    [],
+  );
 });
 
 test("layout text uses degraded labels instead of fake reset data", () => {

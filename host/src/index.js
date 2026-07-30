@@ -25,6 +25,7 @@ import { loadBuddySprite } from "./render/sprites.js";
 import { loadState, saveState } from "./state.js";
 import { createSaveSync } from "./save-sync.js";
 import { createTransport } from "./transport/index.js";
+import { resolvePlace } from "./place.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
 import { pollUsageOnce } from "./usage-poll.mjs";
@@ -191,6 +192,7 @@ export async function runOneTick({
   evolutionIntents,
   buddyName = "阿布",
   encounterRng = Math.random,
+  place = null,
   logger = console,
 } = {}) {
   if (!usage) throw new Error("usage is required");
@@ -243,7 +245,7 @@ export async function runOneTick({
 
   const cryId = cryAudioId(pet.species);
   if (cryId != null) activeTransport.setActiveCry?.(cryId);
-  const model = await buildRenderModel({ pet, usage, weather, room: sensor, now, buddyName });
+  const model = await buildRenderModel({ pet, usage, weather, room: sensor, now, buddyName, place });
   onRenderModel?.(model);
   const { pngBuffer, bitmap } = await renderFrame(model);
 
@@ -255,7 +257,7 @@ export async function runOneTick({
 
 // Shared by the tick and by the cold-start first paint (paintFromDisk), so the
 // two can never drift into rendering the same buddy differently.
-export async function buildRenderModel({ pet, usage, weather, room, now, buddyName }) {
+export async function buildRenderModel({ pet, usage, weather, room, now, buddyName, place = null }) {
   const mood = deriveMood(usage);
   const sprite = await loadBuddySprite(pet.species);
   return {
@@ -268,13 +270,13 @@ export async function buildRenderModel({ pet, usage, weather, room, now, buddyNa
       t: weather.temp ?? 0,
       h: weather.humidity ?? 64,
     },
-    // Left panel rows 3 and 4. The species name is resolved here rather than in
-    // the layout so the renderer keeps taking strings it can draw and not keys
-    // it has to look up -- the same split the rest of the panel already uses.
+    // Left panel rows 3 and 4.
     dex: dexProgress(pet),
-    encounter: pet.encounter?.species
-      ? { species: pet.encounter.species, zh: zhName(pet.encounter.species) }
-      : null,
+    place,
+    // Row 3 says only THAT something is out there, never what -- the species is
+    // the capture screen's to reveal. The key is carried anyway because the
+    // renderer needs to know whether an offer is live at all.
+    encounter: pet.encounter?.species ? { species: pet.encounter.species } : null,
     buddy: {
       name: buddyName,
       spriteGray: sprite.gray,
@@ -496,6 +498,10 @@ export async function main({
         // ccusage answers. The official percentages come off disk and are
         // usually still fresh, so the two bars are typically right immediately.
         const usage = mergeUsage(usageForDisplay(null, null).usage, loadRateLimits());
+        // No `place` here on purpose. This is the cold-start repaint that was
+        // tuned from 6.9s to 2.8s, and it is not going to grow a subprocess for
+        // one row of text -- the first tick is ~3s behind it and fills the row
+        // in then.
         const model = await buildRenderModel({
           pet, usage, weather: DEFAULT_WEATHER, room: hostTransport.feedSensor?.() ?? null,
           now, buddyName: config.name,
@@ -559,6 +565,12 @@ export async function main({
           });
           const usage = mergeUsage(selected.usage, loadRateLimits());
           const weather = await loadWeatherSnapshot(weatherClient, config);
+          // Inside the existing pause with the rest of the tick's I/O, not
+          // outside it: netsh is tens of milliseconds against ccusage's three
+          // seconds, and the pause is load-shedding that is not to be narrowed
+          // (see docs/handoff.md). An unreadable SSID resolves to null, which
+          // draws nothing rather than guessing the wrong place.
+          const place = await resolvePlace({ places: config.places }).catch(() => null);
           const room = hostTransport.feedSensor();
           const pendingButtons = buttonDispatcher.drainTickEvents();
           let pet;
@@ -576,6 +588,7 @@ export async function main({
               pendingButtons,
               evolutionIntents,
               buddyName: config.name,
+              place,
               logger,
             });
           } catch (error) {

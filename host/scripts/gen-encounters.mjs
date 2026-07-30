@@ -10,6 +10,22 @@
 // Run from host/: node scripts/gen-encounters.mjs  ->  seed/encounters.json
 //
 // ---------------------------------------------------------------------------
+// Capture difficulty — decided by the owner 2026-07-30, filed here because it
+// is part of the same surprise and he asked for it to stay out of chat.
+//
+// The capture screen's slider is tuned FROM `capture_rate` in seed/pokedex.json:
+// that number sets the width of B and C and the speed the piece slides at. So
+// the rates already collected in P1 stay the difficulty knob -- a rare species
+// is hard because its window is narrow and fast, not because a hidden roll went
+// against you. Nothing else consumes capture_rate; if this is ever abandoned,
+// the field becomes dead and should be removed rather than left to imply a
+// mechanic that is not there.
+//
+// The mechanic itself (bar, fixed line A, sliding B, surrounding C, and what
+// each landing means) is in docs/handoff.md, which is safe -- it gives away no
+// species. Only the mapping from species to difficulty belongs in this file.
+//
+// ---------------------------------------------------------------------------
 // Pacing, and where the numbers came from
 //
 // Target: all 151 in six months to a year of ordinary use. The device is on

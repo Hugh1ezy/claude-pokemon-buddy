@@ -12,12 +12,13 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { loadConfig } from "../src/config.js";
 import { createSaveSync } from "../src/save-sync.js";
-import { zhName } from "../src/pet/species-meta.js";
+import { displayName } from "../src/pet/species-meta.js";
 
 const command = process.argv[2] ?? "status";
 const statePath = process.env.CPB_STATE_PATH ?? "out/state.json";
 const config = loadConfig("config.json");
 const settings = config.saveSync ?? {};
+const ownerName = config.name;
 
 if (!settings.enabled) {
   console.error('config.json has no enabled "saveSync" block -- nothing to sync.');
@@ -74,14 +75,15 @@ function describeSave(path) {
   }
 }
 
-// The species' own name, resolved from `species` rather than read out of the
-// save's `name` field. `name` is set at hatch and never follows an evolution,
-// so it printed as "妙蛙种子 (ivysaur)" once the buddy evolved -- a line that
-// reads exactly like the two-buddy trap in the one command that exists to rule
-// the two-buddy trap in or out.
+// Composed the same way every other surface names a pokemon (displayName), so
+// two screens can never disagree about who this is. Notably NOT the save's own
+// `name` field: that is written once at onboarding and never follows an
+// evolution, so it printed "妙蛙种子 (ivysaur)" -- a name and species that do
+// not match, in the one command whose job is to rule the two-buddy trap in or
+// out. The raw key stays alongside it because this is a diagnostic.
 function summarise(save) {
-  const species = save.species ? `${zhName(save.species)} (${save.species})` : "?";
-  return `${species} Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
+  const who = save.species ? `${displayName(ownerName, save.species)} (${save.species})` : "?";
+  return `${who} Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
 }
 
 function describeRemote(peeked) {
