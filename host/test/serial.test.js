@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { decodeFrame, encodeFrame, MAGIC, T } from "../src/transport/proto.js";
+import { SND_SPECIES_BASE, SPECIES_SOUND_ORDER } from "../src/pet/cry-audio.js";
 import { createSerialTransport, findEspPort, makeTransport } from "../src/transport/serial.js";
 
 test("findEspPort returns first serial path with Espressif VID 303A", async () => {
@@ -102,6 +103,11 @@ test("malformed BUTTON payloads are ignored instead of emitting null events (RL7
   transport.close();
 });
 
+// The expected count is derived, not written into the fixture. It was a literal 21
+// here, and when the cry table grew this test began asserting that a genuine
+// mismatch produces no warning -- i.e. it would have defended the bug.
+const EXPECTED_SND_COUNT = SND_SPECIES_BASE + SPECIES_SOUND_ORDER.length;
+
 test("incoming HELLO stores firmware protocol info and stays queryable (RM8)", () => {
   const port = new FakePort();
   const warnings = [];
@@ -110,10 +116,30 @@ test("incoming HELLO stores firmware protocol info and stays queryable (RM8)", (
     logger: { warn: (message) => warnings.push(String(message)) },
   });
 
-  port.emitData(encodeFrame({ type: T.HELLO, seq: 0, payload: Uint8Array.from([1, 21]) }));
+  port.emitData(encodeFrame({ type: T.HELLO, seq: 0, payload: Uint8Array.from([1, EXPECTED_SND_COUNT]) }));
 
-  assert.deepEqual(transport.getHello(), { protoVer: 1, sndCount: 21 });
-  assert.deepEqual(warnings, []);
+  assert.deepEqual(transport.getHello(), { protoVer: 1, sndCount: EXPECTED_SND_COUNT });
+  assert.deepEqual(warnings, [], "a firmware carrying the whole table must not warn");
+  transport.close();
+});
+
+test("a firmware with fewer sounds than the cry list warns once", () => {
+  const port = new FakePort();
+  const warnings = [];
+  const transport = makeTransport({
+    port,
+    logger: { warn: (message) => warnings.push(String(message)) },
+  });
+
+  // An image flashed before the table grew. It is not an error -- the device simply
+  // ignores ids it does not have, which is silence rather than a wrong cry -- but it
+  // has to be visible, because "that pokemon has no sound" is otherwise a mystery.
+  const stale = encodeFrame({ type: T.HELLO, seq: 0, payload: Uint8Array.from([1, 21]) });
+  port.emitData(stale);
+  port.emitData(stale);
+
+  assert.equal(warnings.length, 1, "warned exactly once, not once per HELLO");
+  assert.match(warnings[0], /21 sounds/);
   transport.close();
 });
 

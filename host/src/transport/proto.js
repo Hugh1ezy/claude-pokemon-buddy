@@ -1,6 +1,9 @@
 export const MAGIC = 0xA5;
 export const PROTO_VER = 1;
-export const SND_COUNT = 21;
+// NOTE: the expected sound-table size is NOT here. It is derived in serial.js from
+// seed/species-cries.json, because a literal in this file sat at 21 while the cry
+// table grew to 156 and silently disabled the mismatch warning it fed. This module
+// stays free of seed-data dependencies so tests can import it on its own.
 export const MAX_INBOUND_PAYLOAD = 30016;
 export const T = {
   FRAME: 0x01,

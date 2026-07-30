@@ -2,10 +2,17 @@ import { EventEmitter } from "node:events";
 
 import { SerialPort as NodeSerialPort } from "serialport";
 
-import { encodeFrame, PROTO_VER, SND_COUNT, T } from "./proto.js";
+import { encodeFrame, PROTO_VER, T } from "./proto.js";
+import { SND_SPECIES_BASE, SPECIES_SOUND_ORDER } from "../pet/cry-audio.js";
 import { appendBytes, ackSeq, parseButton, parseHello, parseSensor, pumpFrames, volumeByte } from "./framing.js";
 
 const ESPRESSIF_VID = "303A";
+
+// How many sounds the host expects the firmware to carry, used only to warn when a
+// device is running an image older than the cry list. Derived rather than written
+// down: this was a literal 21 in proto.js while the table grew to 156, which
+// silently disabled the very warning it feeds.
+const SND_COUNT = SND_SPECIES_BASE + SPECIES_SOUND_ORDER.length;
 const PORT_GUARDED = Symbol("serialPortErrorsGuarded");
 const DEFAULT_BAUD_RATE = 115200;
 const DEFAULT_TIMEOUT_MS = 250;

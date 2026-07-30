@@ -307,9 +307,10 @@ the home wifi**, and the device would fail to join at work the next morning. Tha
 is the 07-27 incident again, whose symptom (stuck on the clock face, button
 apparently dead) reads as broken hardware.
 
-The work passphrase is not on this machine, and it must not go into a tracked file.
-So either add the work entry to `firmware/main/wifi_creds.h` on the home PC (two
-entries, format in `wifi_creds.h.example`), or only ever flash from the work PC.
+**Resolved the same evening.** Both networks are in the home PC's `wifi_creds.h`
+now, the image was rebuilt and flashed from home over COM3, and the device rejoined
+the home network. Still check the entry count before any future flash: the file is
+per-machine, git cannot carry it, and the work PC's copy is a separate question.
 
 **This is independent of any particular change** — it is a standing trap. Anyone
 who flashes from home once strands the device at work. Check the entry count
@@ -323,6 +324,22 @@ policy blocks `export.ps1` outright. What works is a script file run with
 calling `python $env:IDF_PATH\tools\idf.py` — `idf.py` is not directly callable
 because `.PY` is not in PATHEXT. Do not change the machine's execution policy for
 this.
+
+### The board has 8MB PSRAM — read it from the chip, not from sdkconfig
+
+`esptool` prints it on every connect: `Features: WiFi, BLE, Embedded PSRAM 8MB`.
+`CONFIG_SPIRAM_TYPE_AUTO` means the *config* does not name a size, which is not the
+same as the size being unknowable — and an earlier note in this file argued from the
+config that 2.36MB of pre-synthesized cries "might not fit". It would have fit
+easily. Any question about this board's memory can be answered in one connect:
+
+```powershell
+python -m esptool --port COM3 flash_id
+```
+
+The on-demand change below still stands on its own merits — 2.36MB resident for
+something recomputable in microseconds is waste, and it decouples the sound count
+from memory permanently — but it was not rescuing the device from anything.
 
 ### Cries are synthesized on demand now, and the app partition is 92% full
 
