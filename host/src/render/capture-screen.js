@@ -22,7 +22,7 @@ const BAR_H = 26;
 const HP_X = 24;
 const HP_Y = 26;
 const HP_H = 20;
-const TITLE_Y = 68;
+const TITLE_Y = 248;   // just above the timing bar, at the owner's ask
 const SPRITE_SLOT = 132;
 const SPRITE_TOP = 80;
 const GROUND_Y = SPRITE_TOP + SPRITE_SLOT;
@@ -89,13 +89,13 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   if (phase === PHASE.HIT) drawSparks(g, W / 2, SPRITE_TOP + SPRITE_SLOT / 2, elapsed);
   if (phase === PHASE.WOBBLE) {
     const { fall, tilt } = wobbleAt(elapsed);
-    drawBall(g, W / 2, GROUND_Y - 10 - fall, tilt);
+    drawBall(g, W / 2, GROUND_Y - BALL_R + 4 - fall, tilt);
   }
   if (phase === PHASE.CAUGHT) {
-    drawBall(g, W / 2, GROUND_Y - 10, 0);
-    drawCaughtStars(g, W / 2, GROUND_Y - 10, elapsed);
+    drawBall(g, W / 2, GROUND_Y - BALL_R + 4, 0);
+    drawCaughtStars(g, W / 2, GROUND_Y - BALL_R + 4, elapsed);
   }
-  if (phase === PHASE.RETRY) drawBurst(g, W / 2, GROUND_Y - 10, elapsed / PHASE_MS[PHASE.RETRY]);
+  if (phase === PHASE.RETRY) drawBurst(g, W / 2, GROUND_Y - BALL_R + 4, elapsed / PHASE_MS[PHASE.RETRY]);
 
   // The timing bar stays up through every phase except the two that end the
   // encounter, so the piece does not vanish and reappear between throws.
@@ -156,43 +156,70 @@ function drawBar(g, state, t) {
   g.fillRect(BAR_X, BAR_Y, 2, BAR_H);
   g.fillRect(BAR_X + BAR_W - 2, BAR_Y, 2, BAR_H);
 
-  // C first, as an outline, so B can sit inside it solid.
+  // C and B fill the bar's full height rather than sitting inset in it, so the
+  // piece reads as part of the bar instead of as something floating in it.
   const c0 = at(bands.c[0]);
   const c1 = at(bands.c[1]);
-  g.fillRect(c0, BAR_Y + 5, c1 - c0, 2);
-  g.fillRect(c0, BAR_Y + BAR_H - 7, c1 - c0, 2);
-  g.fillRect(c0, BAR_Y + 5, 2, BAR_H - 10);
-  g.fillRect(c1 - 2, BAR_Y + 5, 2, BAR_H - 10);
+  g.fillRect(c0, BAR_Y, c1 - c0, 2);
+  g.fillRect(c0, BAR_Y + BAR_H - 2, c1 - c0, 2);
+  g.fillRect(c0, BAR_Y, 2, BAR_H);
+  g.fillRect(c1 - 2, BAR_Y, 2, BAR_H);
 
   const b0 = at(bands.b[0]);
-  g.fillRect(b0, BAR_Y + 5, Math.max(2, at(bands.b[1]) - b0), BAR_H - 10);
+  g.fillRect(b0, BAR_Y, Math.max(2, at(bands.b[1]) - b0), BAR_H);
 
-  // A last and full height, so it stays visible on top of a solid B.
+  // A last, and exactly as tall as the bar -- it used to overhang both ends,
+  // which made it read as a separate marker rather than as a position in the
+  // bar. Drawn last so it stays visible on top of a solid B.
   const a = at(bands.target);
-  g.fillRect(a - 1, BAR_Y - 6, 3, BAR_H + 12);
+  g.fillRect(a - 1, BAR_Y, 3, BAR_H);
 }
 
+// Twice the old size, and drawn as an actual pokeball rather than a dot with a
+// stripe: the top half solid, the BOTTOM HALF WHITE, a band across the middle
+// and a button in it. On a 1-bit panel the white lower half is what makes it
+// read as a ball at a glance -- an all-black circle reads as a hole.
+const BALL_R = 26;
+
 function drawBall(g, cx, cy, tilt) {
-  const r = 13;
+  const r = BALL_R;
   g.save();
   g.translate(cx, cy);
   g.rotate(tilt);
-  g.fillStyle = INK;
+
+  // White lower half first, then the black upper half over it.
+  g.fillStyle = PAPER;
   g.beginPath();
   g.arc(0, 0, r, 0, Math.PI * 2);
   g.fill();
-  // The band and the button, in paper, so it reads as a pokeball at 1 bit
-  // rather than as a dot.
-  g.fillStyle = PAPER;
-  g.fillRect(-r, -2, r * 2, 4);
-  g.beginPath();
-  g.arc(0, 0, 4, 0, Math.PI * 2);
-  g.fill();
   g.fillStyle = INK;
   g.beginPath();
-  g.arc(0, 0, 2, 0, Math.PI * 2);
+  g.arc(0, 0, r, Math.PI, 0);
   g.fill();
+
+  // The outline has to be drawn explicitly: without it the white half has no
+  // edge against the white page and the ball looks cut in half.
+  g.strokeStyle = INK;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(0, 0, r - 1, 0, Math.PI * 2);
+  g.stroke();
+
+  g.fillStyle = INK;
+  g.fillRect(-r, -3, r * 2, 6);
+
+  const button = Math.round(r * 0.34);
+  g.fillStyle = INK;
+  g.beginPath();
+  g.arc(0, 0, button + 3, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = PAPER;
+  g.beginPath();
+  g.arc(0, 0, button, 0, Math.PI * 2);
+  g.fill();
+
   g.restore();
+  g.fillStyle = INK;
 }
 
 // The ball falls to the ground, then rocks three times -- one rock is one
