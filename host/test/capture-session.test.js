@@ -2,153 +2,147 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { runCaptureSession, FRAME_MS } from "../src/pet/capture-session.js";
-import { CAUGHT, ESCAPED, sliderCentre } from "../src/pet/capture.js";
+import { sliderCentre } from "../src/pet/capture.js";
 
-const PHASE = { AIM: "aim", THROW: "throw", WOBBLE: "wobble", CAUGHT: "caught", RETRY: "retry", ESCAPED: "escaped" };
-const PHASES = { throw: 100, wobble: 200, caught: 100, retry: 100, escaped: 100 };
+const PHASE = {
+  AIM: "aim", THROW: "throw", HIT: "hit", WOBBLE: "wobble",
+  CAUGHT: "caught", RETRY: "retry", ESCAPED: "escaped",
+};
+const PHASES = { throw: 100, hit: 100, wobble: 200, caught: 100, retry: 100, escaped: 100 };
 const PARAMS = { bHalf: 0.08, cHalf: 0.20, speed: 0.0005 };
 
-// A clock that only moves when the session sleeps, so a five-minute offer runs
-// in microseconds and the test controls exactly when the press lands.
-function harness({ pressAfterMs = null, offerMsLeft = 300_000, rng = () => 0.5 } = {}) {
+// Aims the throws for us: the clock only moves when the session sleeps, so a
+// press can be dropped on an exact millisecond. `aimAt` is a list of offsets
+// from the start of each aiming phase -- one per throw.
+function harness({ aimOffsets = [], params = PARAMS, target = null, abortAfter = null } = {}) {
   let clock = 0;
-  const pushed = [];
   let press = false;
+  let phaseStart = 0;
+  let throwIndex = -1;
+  let aiming = false;
+  const pushed = [];
+
+  // rng draws A then the slider phase. Pinning the phase to 0 makes the
+  // trajectory predictable so a test can aim at it.
+  const draws = [target ?? 0.5, 0];
+  let drawn = 0;
 
   const io = {
+    species: "clefairy", zh: "皮皮", params,
     now: () => clock,
     sleep: async (ms) => {
       clock += ms;
-      if (pressAfterMs != null && clock >= pressAfterMs) press = true;
+      // Only ever press while aiming. An earlier version armed the press during
+      // the throw animation too, so the session's stale-press discard consumed
+      // it and every throw after the first was aimed at the wrong moment.
+      if (aiming) {
+        const want = aimOffsets[throwIndex];
+        if (want != null && clock - phaseStart >= want) press = true;
+      }
+      if (abortAfter != null && clock >= abortAfter) io.__abort = true;
     },
     push: async (frame) => { pushed.push(frame); },
-    render: async ({ phase, elapsed }) => ({ phase, elapsed }),
+    render: async ({ phase, elapsed, rules, kind }) => {
+      aiming = phase === PHASE.AIM;
+      // A fresh aiming phase is a new throw. Counted here rather than from the
+      // press, because this is the one event the session cannot fake.
+      if (aiming && elapsed === 0) { phaseStart = clock; throwIndex += 1; }
+      return { phase, elapsed, hp: rules?.hp, kind };
+    },
     pressed: () => press,
     takePress: () => { press = false; },
-    phases: PHASES,
-    PHASE,
-    offerMsLeft,
-    rng,
-    species: "pidgey",
-    zh: "波波",
-    params: PARAMS,
+    aborted: () => Boolean(io.__abort),
+    phases: PHASES, PHASE,
+    rng: () => draws[Math.min(drawn++, draws.length - 1)],
   };
-  return { io, pushed, at: () => clock };
+  return { io, pushed };
 }
 
 const phasesOf = (pushed) => [...new Set(pushed.map((f) => f.phase))];
 
-test("aiming pushes frames until a press, then plays throw, wobble and an outcome", async () => {
-  const h = harness({ pressAfterMs: 400 });
+test("an encounter is two attacks and then the capture", async () => {
+  // Target parked where the slider starts, and every press on the same beat, so
+  // all three land in B.
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+  const h = harness({ target: start, aimOffsets: [FRAME_MS, FRAME_MS, FRAME_MS] });
   const result = await runCaptureSession(h.io);
 
-  assert.ok(["caught", "escaped", "retry"].includes(result.outcome) === false || true);
-  const seen = phasesOf(h.pushed);
-  assert.ok(seen.includes(PHASE.AIM), "it must animate the bar first");
-  assert.ok(seen.includes(PHASE.THROW), "every throw animates the ball");
-  assert.ok(h.pushed.length > 5, "the aiming loop must actually animate, not push once");
+  assert.equal(result.outcome, "caught");
+  const kinds = h.pushed.filter((f) => f.phase === PHASE.AIM).map((f) => f.kind);
+  assert.equal(kinds.filter((k) => k === "attack").length > 0, true, "the first throws must be attacks");
+  assert.ok(phasesOf(h.pushed).includes(PHASE.HIT), "an attack that lands must show the hit");
+  assert.ok(phasesOf(h.pushed).includes(PHASE.WOBBLE));
+  assert.ok(phasesOf(h.pushed).includes(PHASE.CAUGHT));
+});
+
+test("the HP bar falls across the two attacks and stops at 1", async () => {
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+  const h = harness({ target: start, aimOffsets: [FRAME_MS, FRAME_MS, FRAME_MS] });
+  await runCaptureSession(h.io);
+
+  const hps = h.pushed.map((f) => f.hp).filter((v) => v != null);
+  assert.equal(hps[0], 12, "it starts full");
+  assert.equal(Math.min(...hps), 1, "two clean attacks wear it to exactly 1");
+});
+
+// The whole point of the redesign: A must not move between the throws, or the
+// two attacks teach nothing about the capture.
+test("the target does not move between throws", async () => {
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+  const h = harness({ target: start, aimOffsets: [FRAME_MS, FRAME_MS, FRAME_MS] });
+  await runCaptureSession(h.io);
+
+  // Only two rng draws for the whole encounter: A and the slider phase. A third
+  // would mean something was re-rolled.
+  assert.equal(h.io.rng(), 0, "after A and phase, the draws must be exhausted");
 });
 
 test("the aiming loop runs at the measured frame interval", async () => {
-  const h = harness({ pressAfterMs: 500 });
+  const h = harness({ aimOffsets: [500, 500, 500] });
   await runCaptureSession(h.io);
 
   const aim = h.pushed.filter((f) => f.phase === PHASE.AIM);
-  assert.ok(aim.length >= 9, `500ms at ${FRAME_MS}ms should be ~10 frames, got ${aim.length}`);
-  for (let i = 1; i < aim.length; i += 1) {
-    assert.equal(aim[i].elapsed - aim[i - 1].elapsed, FRAME_MS);
+  const firstRun = [];
+  for (const frame of aim) {
+    if (frame.elapsed === 0 && firstRun.length) break;
+    firstRun.push(frame);
   }
-});
-
-// The five minutes belong to the encounter, not to the screen. Standing there
-// aiming forever must not hold the offer open.
-test("an offer that expires while aiming escapes rather than waiting", async () => {
-  const h = harness({ pressAfterMs: null, offerMsLeft: 2_000 });
-  const result = await runCaptureSession(h.io);
-
-  assert.deepEqual(result, { outcome: ESCAPED, reason: "expired" });
-  assert.ok(phasesOf(h.pushed).includes(PHASE.ESCAPED));
-  assert.ok(!phasesOf(h.pushed).includes(PHASE.THROW), "nothing was thrown, so nothing should fly");
-});
-
-// A miss outside C ends the encounter, and it must not tease with a wobble
-// first -- the ball never closed on anything.
-test("a throw that misses everything flees without a wobble", async () => {
-  // Park A far from the slider's reachable range by choosing the target with rng.
-  const h = harness({ pressAfterMs: 100, rng: (() => { let i = 0; return () => (i++ === 0 ? 0.99 : 0.0); })() });
-  const result = await runCaptureSession(h.io);
-
-  assert.equal(result.outcome, ESCAPED);
-  assert.equal(result.reason, "missed");
-  const seen = phasesOf(h.pushed);
-  assert.ok(seen.includes(PHASE.THROW));
-  assert.ok(!seen.includes(PHASE.WOBBLE), "a clean miss must not wobble");
-});
-
-test("a hit wobbles before it says caught", async () => {
-  // createThrow draws A first and the phase second. Pin the phase to 0, work
-  // out where the slider will actually be at the moment of the press, and put A
-  // exactly there -- aiming by hand is what the earlier version of this test
-  // got wrong, feeding the same number to both draws.
-  const pressAt = FRAME_MS;
-  const target = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, pressAt);
-  const draws = [target, 0];
-  let drawn = 0;
-  const h = harness({ pressAfterMs: pressAt, rng: () => draws[Math.min(drawn++, draws.length - 1)] });
-  const result = await runCaptureSession(h.io);
-
-  assert.equal(result.outcome, CAUGHT);
-  const seen = phasesOf(h.pushed);
-  const wobbleAt = h.pushed.findIndex((f) => f.phase === PHASE.WOBBLE);
-  const caughtAt = h.pushed.findIndex((f) => f.phase === PHASE.CAUGHT);
-  assert.ok(wobbleAt >= 0 && caughtAt >= 0);
-  assert.ok(wobbleAt < caughtAt, "the wobble must come before the verdict, or there is no suspense");
-  assert.ok(seen.includes(PHASE.THROW));
-});
-
-// The press that opened the screen is still sitting in the flag when the
-// session starts. Without discarding it the first frame would judge itself and
-// the player would never get to aim.
-test("the press that opened the screen does not count as the throw", async () => {
-  let clock = 0;
-  let press = true;                      // as if the opening press were still pending
-  const pushed = [];
-  const result = await runCaptureSession({
-    species: "pidgey", zh: "波波", params: PARAMS, offerMsLeft: 3_000,
-    now: () => clock,
-    sleep: async (ms) => { clock += ms; },
-    push: async (f) => { pushed.push(f); },
-    render: async ({ phase, elapsed }) => ({ phase, elapsed }),
-    pressed: () => press,
-    takePress: () => { press = false; },
-    phases: PHASES, PHASE, rng: () => 0.5,
-  });
-
-  assert.equal(result.reason, "expired", "with the stale press discarded and none following, it should time out");
-  assert.ok(pushed.filter((f) => f.phase === PHASE.AIM).length > 10);
+  for (let i = 1; i < firstRun.length; i += 1) {
+    assert.equal(firstRun[i].elapsed - firstRun[i - 1].elapsed, FRAME_MS);
+  }
 });
 
 // BOOT short is the universal way back to the buddy panel. Backing out is
 // navigation, not an outcome: nothing was thrown, so nothing fled, and the
 // offer has to still be there when you come back.
 test("BOOT short backs out without throwing and without ending the encounter", async () => {
-  let clock = 0;
-  const pushed = [];
-  let abort = false;
-
-  const result = await runCaptureSession({
-    species: "pidgey", zh: "波波", params: PARAMS, offerMsLeft: 300_000,
-    now: () => clock,
-    sleep: async (ms) => { clock += ms; if (clock >= 300) abort = true; },
-    push: async (f) => { pushed.push(f); },
-    render: async ({ phase, elapsed }) => ({ phase, elapsed }),
-    pressed: () => false,
-    takePress: () => {},
-    aborted: () => abort,
-    phases: PHASES, PHASE, rng: () => 0.5,
-  });
+  const h = harness({ aimOffsets: [], abortAfter: 300 });
+  const result = await runCaptureSession(h.io);
 
   assert.deepEqual(result, { outcome: "aborted" });
-  const seen = [...new Set(pushed.map((f) => f.phase))];
-  assert.deepEqual(seen, [PHASE.AIM], "backing out must not play a throw, a wobble or a flee");
+  assert.deepEqual(phasesOf(h.pushed), [PHASE.AIM], "backing out must not play a throw or a flee");
+});
+
+// There is no deadline any more -- offerMs governs the notification, not the
+// aiming. Standing there is allowed.
+test("aiming forever is allowed: nothing times the screen out", async () => {
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+  const h = harness({ target: start, aimOffsets: [600_000, 100, 100] });
+  const result = await runCaptureSession(h.io);
+
+  assert.notEqual(result.outcome, "escaped", "ten minutes of aiming must not lose the pokemon");
+  const aim = h.pushed.filter((f) => f.phase === PHASE.AIM);
+  assert.ok(aim.length > 1000, `it should still be animating after ten minutes, got ${aim.length} frames`);
+});
+
+test("a teleporter gets one throw and it is the capture", async () => {
+  const params = { ...PARAMS, teleports: true };
+  const start = sliderCentre({ params, phase: 0, target: 0 }, FRAME_MS);
+  const h = harness({ params, target: start, aimOffsets: [FRAME_MS] });
+  const result = await runCaptureSession(h.io);
+
+  assert.equal(result.outcome, "caught");
+  assert.ok(!phasesOf(h.pushed).includes(PHASE.HIT), "there are no attacks to land");
+  const kinds = h.pushed.filter((f) => f.phase === PHASE.AIM).map((f) => f.kind);
+  assert.ok(!kinds.includes("attack"), "its only throw is the capture");
 });

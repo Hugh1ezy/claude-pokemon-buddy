@@ -243,7 +243,6 @@ export function createButtonDispatcher({
           species: offer.species,
           zh: zhName(offer.species),
           params: captureParams(offer.species),
-          offerMsLeft: offer.offerMsLeft,
           render: renderCapture,
           push: (frame) => transport.push(frame),
           now: captureNow,
@@ -326,6 +325,9 @@ export function createButtonDispatcher({
     isDexOpen() {
       return dexView != null || captureActive;
     },
+    isCaptureOpen() {
+      return captureActive;
+    },
     // Driven by the tick, which is the only clock this state has. Closing on
     // its own matters because an open screen holds the animator paused and
     // swallows the greet gesture -- walking away should not cost either.
@@ -377,6 +379,7 @@ export async function runOneTick({
   // settlement, encounters and the save all matter whether or not anyone is
   // looking -- it just does not push its frame over the screen.
   shouldPush = () => true,
+  holdEncounter = () => false,
   captureResults,
   swapRequests,
   logger = console,
@@ -446,7 +449,13 @@ export async function runOneTick({
   // notification would blink for a pokemon already in the box.
   pet = applyCaptureResults(pet, captureResults, logger, today);
 
-  pet = applyEncounterTick(pet, { usage, weather, room: sensor, now, rng: encounterRng, logger });
+  // Held still while a capture is on screen. The screen has no time limit any
+  // more (the owner's call: offerMs governs the NOTIFICATION, not the aiming),
+  // so without this the engine could expire the offer -- or roll a different
+  // one -- under a player who is mid-throw.
+  if (!holdEncounter()) {
+    pet = applyEncounterTick(pet, { usage, weather, room: sensor, now, rng: encounterRng, logger });
+  }
 
   if (evolutionAnimation) {
     saveState(statePath, pet);
@@ -866,6 +875,7 @@ export async function main({
               buddyName: config.name,
               place,
               shouldPush: () => !buttonDispatcher.isDexOpen(),
+              holdEncounter: () => buttonDispatcher.isCaptureOpen(),
               captureResults,
               swapRequests,
               logger,

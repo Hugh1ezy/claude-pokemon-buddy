@@ -493,7 +493,58 @@ makes the box a shelf rather than a shredder.
 real. Anything that entered the dex through `recordSeen` (the starter line) has
 no box entry and therefore no date, and the confirm screen shows `--`.
 
-### The capture screen, as the owner specified it on 2026-07-30
+### Three throws, and the HP bar (2026-07-30, the redesign)
+
+The single-throw version lost to button latency, so an encounter is now:
+
+    throw 1   attack      throw 2   attack      throw 3+  capture
+
+**A does not move for the whole encounter, retries included.** That is the fix,
+not a detail. By the third throw you have watched the same target twice and know
+how early to press; difficulty stops being "guess the lag" and becomes "do not
+panic on the last one". The first version re-rolled A each throw on purpose, to
+stop a failed timing being replayable — exactly backwards for what was needed.
+
+**The HP bar** sits at the top. It starts at `HP_MAX` and attacks take it down:
+B a half, C a third, a clean miss nothing. **Attacks can never take the last
+point** — one clamp, and it is what makes "the second B does half-minus-one"
+fall out on its own instead of being a special case. Two B hits land on exactly
+1, which is the state the forgiving capture needs.
+
+| capture lands | result |
+|---|---|
+| **B** | caught, however the attacks went |
+| **C** | caught **iff HP is 1** (i.e. both attacks hit B), else retry until B |
+| **neither** | flees, however the attacks went |
+
+Checked against the owner's own shorthand, which `test/capture-rules.test.js`
+writes down almost verbatim: `B+B+either = 1`, `B+C+B = 1`, `B+C+C = retry`,
+`B+B+N = 0`, `C+C+B = 1`, `C+C+C = retry`.
+
+**`HP_MAX` is 12, and the size is forced rather than chosen.** The rules need
+`HP_MAX - (a B hit) - (a C hit) > 1`, or B+C would leave exactly 1 and a
+C-capture after it would succeed — contradicting `B+C+C = retry`. That needs
+`HP_MAX > 6`, and the halves and thirds need it divisible by 6. Twelve is the
+smallest that is both. **Six would silently break the owner's table**, which is
+the sort of thing that looks fine until someone plays it.
+
+**A missed attack costs the shortcut, not the encounter.** It does no damage, so
+HP never reaches 1, so the capture then has to be a clean B. Only the capture
+throw can end things badly.
+
+**凯西 (abra) is the one exception**: one throw, and it is the capture, because
+that is its whole character in the games. Anything but B and it is gone — no
+retry. `TELEPORTERS` lives in `capture-tuning.js` so `capture-rules.js` can stay
+species-free; it takes the behaviour as a boolean, never a name.
+
+**The screen has no time limit.** The owner's call: `offerMs` governs how long
+the *notification* stands, not how long you may aim. The only ways out are an
+outcome or BOOT short. Two consequences worth knowing: the encounter tick is
+**held still** while a capture is on screen (`holdEncounter`), so the engine
+cannot expire or replace the offer under a player mid-throw; and an abandoned
+capture screen holds the panel indefinitely, since nothing times it out.
+
+### The capture screen, as first specified on 2026-07-30
 
 Written down because it came from him in conversation and nothing else records
 it. The order he asked for is **rows 3-4 (done) → the pokedex screen → the
@@ -504,7 +555,12 @@ interesting one.
 ground, and stars come off it on a success. Explicitly the classic GBA look —
 early-generation pixel art is the reference, not something new.
 
-*The mechanic*, which is his own rather than the games':
+**Superseded on the same day — see "Three throws" below.** The single-throw
+version was built, played, and failed on *button latency*: one press against a
+narrow window is a guess, not a skill. The bar, A, B and C all survive; what
+changed is that there are now three throws and the first two are practice.
+
+*The original mechanic, which is his own rather than the games':*
 
 - A horizontal bar spans the bottom of the screen.
 - A vertical line **A** sits at a random position in it, and does not move.

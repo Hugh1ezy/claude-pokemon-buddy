@@ -25,24 +25,29 @@ const HARDEST = 3;
 // bands by appearance instead produced a hardest tier where B was worth 17ms --
 // shorter than the button's own latency, i.e. pure luck dressed up as skill.
 //
-// Milliseconds inside each band at each end of the range:
+// Milliseconds inside each band, measured with the numbers below:
 //
-//            crossing   inside B   inside C
-//   easiest    2500ms      500ms     1100ms
-//   hardest    1333ms      107ms      293ms
+//                    inside B   inside C
+//   easiest (255)      579ms     1263ms
+//   abra (200)         453ms     1009ms
+//   clefairy (150)     363ms      826ms
+//   bulbasaur (45)     221ms      540ms
+//   mewtwo (3)         177ms      452ms
 //
-// So even at the hardest, a mistimed press has ~300ms of C to land in -- it
-// costs the throw, not the encounter, which is the "keep trying until B" rule
-// the owner asked for. Beyond C it flees.
-//
-// UNMEASURED, and the reason these are gentle: nobody has played it yet. The
-// numbers assume the button's own latency is small next to 107ms; if the
-// hardest tier turns out to be luck rather than timing, lower SPEED.hard before
-// touching anything else -- widening B first would make the easy end trivial.
-const B_HALF = { easy: 0.100, hard: 0.040 };
-const C_HALF = { easy: 0.220, hard: 0.110 };
+// Even the hardest gives ~180ms in B and ~450ms in C. That is the whole point
+// after 07-30: the owner reported the single-throw version failing on button
+// LATENCY, so the windows have to be wide enough that a consistent delay can be
+// learned and compensated for. It is the three-throw structure, not a narrow
+// window, that makes a rare species hard now.
+const B_HALF = { easy: 0.110, hard: 0.055 };
+const C_HALF = { easy: 0.240, hard: 0.140 };
 // Bar fractions per millisecond.
-const SPEED = { easy: 0.00040, hard: 0.00075 };
+const SPEED = { easy: 0.00038, hard: 0.00062 };
+
+// The one species that is gone before you can hit it twice -- one throw, and it
+// is the capture. The owner named it himself and it is game canon rather than a
+// surprise, but it lives here so capture-rules.js can stay species-free.
+const TELEPORTERS = new Set(["abra"]);
 
 export function captureParams(species, { rate = SPECIES_CAPTURE_RATE[species] } = {}) {
   // An unknown species is treated as mid-difficulty rather than throwing: a
@@ -55,8 +60,23 @@ export function captureParams(species, { rate = SPECIES_CAPTURE_RATE[species] } 
     bHalf: lerp(B_HALF.easy, B_HALF.hard, difficulty),
     cHalf: lerp(C_HALF.easy, C_HALF.hard, difficulty),
     speed: lerp(SPEED.easy, SPEED.hard, difficulty),
+    teleports: TELEPORTERS.has(species),
   };
 }
+
+// Left to me on 2026-07-30, so: capture_rate still drives the slider, but
+// GENTLY, and the spread was pulled in when the three-throw design landed.
+//
+// The reasoning, since the next person will want it. Difficulty now comes from
+// two places at once -- how narrow the window is, and how many throws you have
+// to keep your nerve for. Those multiply rather than add: a hard species is a
+// narrow window you must hit THREE times, and the last one flees on a clean
+// miss. The single-throw tuning would have compounded into something no one
+// could catch. So the numbers above are the earlier ones softened, and the
+// three-throw structure is left to do most of the work.
+//
+// If a species still feels impossible, that is this file's fault and not
+// capture-rules.js's -- lower SPEED.hard first.
 
 function lerp(a, b, t) {
   return a + (b - a) * t;

@@ -7,6 +7,7 @@
 import { createCanvas } from "@napi-rs/canvas";
 
 import { sliderBands } from "../pet/capture.js";
+import { STEP, hpFraction } from "../pet/capture-rules.js";
 import { imageDataToFrame } from "./frame.js";
 import { H, INK, PAPER, W } from "./palette.js";
 import { drawSprite } from "./sprite-pipeline.js";
@@ -18,13 +19,18 @@ const BAR_X = 24;
 const BAR_W = W - BAR_X * 2;
 const BAR_Y = 258;
 const BAR_H = 26;
-const SPRITE_SLOT = 140;
-const SPRITE_TOP = 56;
+const HP_X = 24;
+const HP_Y = 26;
+const HP_H = 20;
+const TITLE_Y = 68;
+const SPRITE_SLOT = 132;
+const SPRITE_TOP = 80;
 const GROUND_Y = SPRITE_TOP + SPRITE_SLOT;
 
 export const PHASE = {
   AIM: "aim",
   THROW: "throw",
+  HIT: "hit",
   WOBBLE: "wobble",
   CAUGHT: "caught",
   RETRY: "retry",
@@ -36,13 +42,14 @@ export const PHASE = {
 // ball flies, ball rocks, and only then do you find out.
 export const PHASE_MS = {
   [PHASE.THROW]: 480,
+  [PHASE.HIT]: 620,
   [PHASE.WOBBLE]: 1500,
   [PHASE.CAUGHT]: 1400,
   [PHASE.RETRY]: 900,
   [PHASE.ESCAPED]: 1400,
 };
 
-export async function renderCaptureFrame({ species, phase, elapsed = 0, state, zh }) {
+export async function renderCaptureFrame({ species, phase, elapsed = 0, state, zh, rules, kind, before }) {
   const canvas = createCanvas(W, H);
   const g = canvas.getContext("2d");
   g.imageSmoothingEnabled = false;
@@ -50,9 +57,17 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   g.fillRect(0, 0, W, H);
   g.fillStyle = INK;
 
+  // The HP bar animates DOWN across the hit phase rather than snapping: a bar
+  // that has already dropped by the time you look at it does not read as
+  // damage, it reads as a different number.
+  const shown = phase === PHASE.HIT && before
+    ? hpFraction(before) + (hpFraction(rules) - hpFraction(before)) * Math.min(1, elapsed / PHASE_MS[PHASE.HIT])
+    : hpFraction(rules ?? { hp: 1 });
+  if (phase !== PHASE.CAUGHT && phase !== PHASE.ESCAPED) drawHpBar(g, shown, zh);
+
   g.font = `800 14px ${CJK}`;
-  const title = titleFor(phase, zh);
-  g.fillText(title, Math.round((W - g.measureText(title).width) / 2), 30);
+  const title = titleFor(phase, zh, kind, rules);
+  g.fillText(title, Math.round((W - g.measureText(title).width) / 2), TITLE_Y);
 
   const sprite = await loadBuddySprite(species);
   const spriteX = Math.round((W - SPRITE_SLOT) / 2);
@@ -62,18 +77,22 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   const hidden = phase === PHASE.WOBBLE || phase === PHASE.CAUGHT;
   if (!hidden) {
     const flee = phase === PHASE.ESCAPED ? Math.round((elapsed / PHASE_MS[PHASE.ESCAPED]) * 90) : 0;
+    // A struck pokemon flinches sideways -- the cheapest hit feedback that is
+    // not a colour change, on a panel with no colours to change.
+    const flinch = phase === PHASE.HIT ? Math.round(Math.sin(elapsed / 45) * 5 * (1 - Math.min(1, elapsed / PHASE_MS[PHASE.HIT]))) : 0;
     drawSprite(g, sprite.gray, {
-      x: spriteX, y: SPRITE_TOP - flee, maxSize: SPRITE_SLOT, srcW: sprite.w, srcH: sprite.h,
+      x: spriteX + flinch, y: SPRITE_TOP - flee, maxSize: SPRITE_SLOT, srcW: sprite.w, srcH: sprite.h,
     });
   }
 
-  if (phase === PHASE.THROW) drawThrownBall(g, elapsed / PHASE_MS[PHASE.THROW], spriteX);
+  if (phase === PHASE.THROW) drawThrown(g, elapsed / PHASE_MS[PHASE.THROW], kind);
+  if (phase === PHASE.HIT) drawStars(g, W / 2, SPRITE_TOP + SPRITE_SLOT / 2, elapsed);
   if (phase === PHASE.WOBBLE) drawBall(g, W / 2, GROUND_Y - 10, wobbleTilt(elapsed));
   if (phase === PHASE.CAUGHT) { drawBall(g, W / 2, GROUND_Y - 10, 0); drawStars(g, W / 2, GROUND_Y - 10, elapsed); }
   if (phase === PHASE.RETRY) drawBurst(g, W / 2, GROUND_Y - 10, elapsed / PHASE_MS[PHASE.RETRY]);
 
-  // The bar stays up through every phase except the two that end the encounter,
-  // so the piece does not vanish and reappear between throws.
+  // The timing bar stays up through every phase except the two that end the
+  // encounter, so the piece does not vanish and reappear between throws.
   if (phase !== PHASE.CAUGHT && phase !== PHASE.ESCAPED) {
     drawBar(g, state, phase === PHASE.AIM ? elapsed : state.frozenAt ?? elapsed);
   }
@@ -81,13 +100,42 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   return imageDataToFrame(g.getImageData(0, 0, W, H), W, H);
 }
 
-function titleFor(phase, zh) {
+// Says which throw this is, because the first two are worth spending
+// deliberately: they are the practice that makes the third hittable.
+function titleFor(phase, zh, kind, rules) {
   switch (phase) {
     case PHASE.CAUGHT: return `捉到了！${zh}`;
     case PHASE.RETRY: return "差一点⋯⋯再来！";
     case PHASE.ESCAPED: return `${zh} 跑掉了`;
-    default: return `野生的 ${zh}`;
+    default:
+      if (kind !== STEP.ATTACK) return "投球！";
+      // While aiming, this is the throw you are ABOUT to make; once it has
+      // landed, `thrown` has already advanced, so the hit frame must name the
+      // one that just connected or it counts to 3 out of 2.
+      return `攻击 ${clampAttack(phase === PHASE.AIM ? (rules?.thrown ?? 0) + 1 : rules?.thrown ?? 1)}/2`;
   }
+}
+
+function clampAttack(n) {
+  return Math.min(2, Math.max(1, n));
+}
+
+// Top of the screen, the owner's placement. Drawn as an outline that empties
+// left to right so a full bar and an empty one differ by area rather than by a
+// number nobody can read at this size.
+function drawHpBar(g, fraction, zh) {
+  const w = W - HP_X * 2;
+  g.fillStyle = INK;
+  g.fillRect(HP_X, HP_Y, w, 2);
+  g.fillRect(HP_X, HP_Y + HP_H - 2, w, 2);
+  g.fillRect(HP_X, HP_Y, 2, HP_H);
+  g.fillRect(HP_X + w - 2, HP_Y, 2, HP_H);
+
+  const filled = Math.round((w - 8) * Math.max(0, Math.min(1, fraction)));
+  g.fillRect(HP_X + 4, HP_Y + 4, filled, HP_H - 8);
+
+  g.font = `700 12px ${CJK}`;
+  g.fillText(zh, HP_X, HP_Y - 6);
 }
 
 // A: the fixed line. B: the solid block you have to hit. C: the outline around
@@ -148,13 +196,29 @@ function wobbleTilt(elapsed) {
   return Math.sin(u * Math.PI * 6) * 0.45 * (1 - u);
 }
 
-function drawThrownBall(g, u, spriteX) {
+// A ball for the capture, a wedge for an attack. They fly the same arc on
+// purpose -- the timing you learn on the attacks has to be the timing that
+// works on the throw, and a different flight would teach the wrong beat.
+function drawThrown(g, u, kind) {
   const from = { x: 40, y: GROUND_Y - 4 };
   const to = { x: W / 2, y: SPRITE_TOP + SPRITE_SLOT / 2 };
-  const x = from.x + (to.x - from.x) * u;
-  const y = from.y + (to.y - from.y) * u - Math.sin(u * Math.PI) * 70;   // arc
-  drawBall(g, Math.round(x), Math.round(y), u * Math.PI * 3);
-  if (u > 0.92) drawStars(g, to.x, to.y, 120);                          // the hit
+  const x = Math.round(from.x + (to.x - from.x) * u);
+  const y = Math.round(from.y + (to.y - from.y) * u - Math.sin(u * Math.PI) * 70);
+
+  if (kind === STEP.ATTACK) drawStrike(g, x, y, u);
+  else drawBall(g, x, y, u * Math.PI * 3);
+}
+
+// A chevron pointing where it is going, which reads as motion at 1 bit where a
+// circle just reads as a dot.
+function drawStrike(g, cx, cy, u) {
+  const r = 9;
+  g.fillStyle = INK;
+  for (let i = 0; i < r; i += 1) {
+    const t = i / r;
+    g.fillRect(cx - r + i, cy - Math.round(r * (1 - t)), 2, Math.round(2 * r * (1 - t)) + 2);
+  }
+  void u;
 }
 
 function drawStars(g, cx, cy, elapsed) {

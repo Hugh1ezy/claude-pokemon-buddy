@@ -1,28 +1,24 @@
-// The capture minigame's mechanism: where the slider is, and what a throw at a
-// given moment does. Pure and species-free, on purpose and for the same reason
+// The slider: where it is at a given moment, and which band a throw at that
+// moment lands in. Pure and species-free, on purpose and for the same reason
 // encounter.js is -- this file can be read and reviewed without learning
-// anything the owner asked to be surprised by. Which species is how hard lives
-// in capture-tuning.js, which is a spoiler file.
-//
-// The shape, in the owner's words (docs/handoff.md has the full spec):
+// anything the owner asked to be surprised by. Which species is how hard, and
+// which one teleports, lives in capture-tuning.js, a spoiler file.
 //
 //   |------------------------[ C [ B ] C ]-----------|------|
 //   0                                                A      1
 //
-// A is a fixed vertical line at a random spot. B slides left and right; C is B
-// widened symmetrically and slides with it. A press stops the slider, and where
-// A falls in the stopped piece decides the throw.
-export const CAUGHT = "caught";
-export const RETRY = "retry";
-export const ESCAPED = "escaped";
+// A is a fixed vertical line. B slides left and right; C is B widened
+// symmetrically and slides with it. A press stops the slider, and where A falls
+// in the stopped piece is the ZONE. What a zone MEANS is capture-rules.js's
+// business, not this file's.
+export const ZONE = { B: "B", C: "C", NONE: "N" };
 
-// Everything is in bar fractions (0..1), not pixels, so the logic is
-// independent of how wide the screen draws the bar.
-export function createThrow({ params, rng = Math.random }) {
+// A is drawn ONCE PER ENCOUNTER and does not move again -- not between the two
+// attacks, not on a retry. That is the whole point of the three-throw design:
+// the first two throws are where you learn the button's latency, and a target
+// that moved between them would make that learning worthless.
+export function createEncounterThrow({ params, rng = Math.random }) {
   return {
-    // A is re-rolled for every throw. With a fixed A the slider is periodic, so
-    // a retry could be won by simply repeating the timing that just failed --
-    // which would make C a free pass instead of a second chance.
     target: rng(),
     phase: rng(),          // where in its sweep the slider starts
     params,
@@ -46,12 +42,11 @@ export function sliderCentre(state, t) {
   return lo + tri * span;
 }
 
-export function judgeThrow(state, t) {
-  const centre = sliderCentre(state, t);
-  const distance = Math.abs(state.target - centre);
-  if (distance <= state.params.bHalf) return CAUGHT;
-  if (distance <= state.params.cHalf) return RETRY;
-  return ESCAPED;
+export function judgeZone(state, t) {
+  const distance = Math.abs(state.target - sliderCentre(state, t));
+  if (distance <= state.params.bHalf) return ZONE.B;
+  if (distance <= state.params.cHalf) return ZONE.C;
+  return ZONE.NONE;
 }
 
 // The bands as fractions, for the renderer. Clamped to the bar because a
