@@ -25,7 +25,9 @@ import { loadBuddySprite } from "./render/sprites.js";
 import { loadState, saveState } from "./state.js";
 import { createSaveSync } from "./save-sync.js";
 import { createTransport } from "./transport/index.js";
+import { ageDexView, isDexOpenGesture, stepDexView } from "./pet/dex-view.js";
 import { resolvePlace } from "./place.js";
+import { dexPageCount, renderDexPage } from "./render/dex-screen.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
 import { pollUsageOnce } from "./usage-poll.mjs";
@@ -122,10 +124,18 @@ export function createButtonDispatcher({
   animator = { pause() {}, resume() {} },
   playSignature = playSignatureAnimation,
   onSignatureError = () => {},
+  // The pokedex screen. Handled here rather than in the tick because the tick
+  // is 60 seconds wide: routing a button through it would mean pressing KEY and
+  // waiting up to a minute for the screen, which is not a screen, it is a
+  // delivery. The signature animation is on this same immediate path for the
+  // same reason.
+  dexSource = null,           // () => ({ dex, progress }) -- null disables the screen
+  renderDex = renderDexPage,
   logger = null,
 } = {}) {
   const tickQueue = [];
   let signatureInFlight = false;
+  let dexView = null;
   const off = transport?.onButton?.((event) => {
     // The firmware logs every press it sends; the host logged nothing, so
     // "I pressed KEY and nothing happened" had no evidence on this side at
@@ -145,6 +155,15 @@ export function createButtonDispatcher({
     // does not play, so the two can never both act on the same press.
     if (shouldQueueButtonForTick(event)) tickQueue.push(event);
 
+    // The pokedex takes KEY over completely while it is up -- short turns the
+    // page instead of greeting, long returns instead of confirming. Checked
+    // before the signature branch so an open screen is not painted over by a
+    // greet animation the press was never meant for.
+    if (dexSource && (dexView != null || isDexOpenGesture(event))) {
+      handleDexButton(event);
+      return;
+    }
+
     if (!shouldPlaySignature(event, getPet())) return;
     if (signatureInFlight) return;
     const pressModel = getModel();
@@ -157,7 +176,47 @@ export function createButtonDispatcher({
     }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
   });
 
+  function handleDexButton(event) {
+    const source = dexSource();
+    const pages = dexPageCount(source?.progress?.dexTotal ?? 0);
+    const was = dexView;
+    const next = stepDexView(dexView, event, { pages });
+    if (next === was) return;
+    dexView = next;
+
+    actions.run(async () => {
+      if (next == null) {
+        // Nothing repaints the panel here: resuming the animator does it within
+        // one frame (333ms), and duplicating the tick's render just to be 300ms
+        // quicker would be a second place for the two to disagree.
+        animator.resume();
+        return;
+      }
+      if (was == null) animator.pause();
+      await transport.push(await renderDex({ dex: source.dex, page: next.page, progress: source.progress }));
+    }).catch((error) => {
+      logger?.warn?.(`pokedex screen failed: ${errorReason(error)}`);
+      // Do not leave the animator parked on a screen that failed to draw.
+      if (dexView != null) { dexView = null; animator.resume(); }
+    });
+  }
+
   return {
+    isDexOpen() {
+      return dexView != null;
+    },
+    // Driven by the tick, which is the only clock this state has. Closing on
+    // its own matters because an open screen holds the animator paused and
+    // swallows the greet gesture -- walking away should not cost either.
+    ageDex() {
+      if (dexView == null) return false;
+      const next = ageDexView(dexView);
+      if (next != null) { dexView = next; return false; }
+      dexView = null;
+      animator.resume();
+      logger?.log?.("pokedex closed itself after no input");
+      return true;
+    },
     drainTickEvents() {
       return tickQueue.splice(0);
     },
@@ -193,6 +252,10 @@ export async function runOneTick({
   buddyName = "阿布",
   encounterRng = Math.random,
   place = null,
+  // The pokedex screen holds the panel. The tick still runs in full -- bond,
+  // settlement, encounters and the save all matter whether or not anyone is
+  // looking -- it just does not push its frame over the screen.
+  shouldPush = () => true,
   logger = console,
 } = {}) {
   if (!usage) throw new Error("usage is required");
@@ -250,7 +313,7 @@ export async function runOneTick({
   const { pngBuffer, bitmap } = await renderFrame(model);
 
   saveState(statePath, pet);
-  await activeTransport.push({ pngBuffer, bitmap });
+  if (shouldPush()) await activeTransport.push({ pngBuffer, bitmap });
 
   return pet;
 }
@@ -433,6 +496,9 @@ export async function main({
       actions,
       animator,
       onSignatureError: () => {},
+      // Read at press time, not captured: the dex grows while the screen is
+      // closed, and a stale snapshot would show yesterday's collection.
+      dexSource: () => ({ dex: runtime.pet, progress: dexProgress(runtime.pet ?? {}) }),
       logger,
     });
     const dashboardServer = dashboard
@@ -573,6 +639,7 @@ export async function main({
           const place = await resolvePlace({ places: config.places }).catch(() => null);
           const room = hostTransport.feedSensor();
           const pendingButtons = buttonDispatcher.drainTickEvents();
+          buttonDispatcher.ageDex();
           let pet;
           try {
             pet = await runOneTick({
@@ -589,6 +656,7 @@ export async function main({
               evolutionIntents,
               buddyName: config.name,
               place,
+              shouldPush: () => !buttonDispatcher.isDexOpen(),
               logger,
             });
           } catch (error) {

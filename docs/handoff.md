@@ -205,7 +205,7 @@ transport, or the animator. The device is running exactly what it ran before.
 | P2 save model | **done** — `pet/dex.js`: 已捕获 count (duplicates included), pokedex count (distinct), and a box holding one pet per species, each with its own level and bond |
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
 | P4 notification row + capture screen | **rows 3-4 drawn (2026-07-30)** — the engine has been wired into the tick since 07-28 and encounters persist; the left panel now shows the offer and the dex counts. The capture screen is the remaining piece. See below |
-| P5 pokedex screen + swapping the active buddy | not started |
+| P5 pokedex screen + swapping the active buddy | **screen done (2026-07-30)** — all 151 on three pages, KEY double to open. Swapping the active buddy is not started. See below |
 | P6 real cries | not started — waiting on a microSD card the owner does not have yet |
 
 ### P4, where it actually stands
@@ -334,6 +334,61 @@ own.
 **What is left is the capture screen** and the button that answers it. Until it
 exists, an offer can appear and expire and the only thing that ever happens is
 row 3 blinking — nothing can be caught yet, so `捕捉` correctly stays at 0.
+
+### The pokedex screen (2026-07-30)
+
+All 151 in dex order, 10x6 to a page, three pages. Caught entries are the same
+line art the buddy panel draws; the rest are **solid silhouettes** — the owner's
+call, taking the classic look and accepting that it gives every shape away at
+once. `src/render/dex-screen.js` renders, `src/pet/dex-view.js` is the state.
+
+**The gestures, and why.** `KEY` double opens it — it was the one gesture the
+firmware sends, the dispatcher already queued, and *nothing consumed*. Inside,
+short turns the page (wrapping), long returns. **BOOT is not touched**: it
+belongs entirely to power-save, and borrowing it is the mistake that stopped the
+radio on 07-27 with a symptom that read as dead hardware. A test asserts BOOT
+does nothing to the screen in either state.
+
+**It is on the dispatcher's immediate path, not the tick's.** Routing a button
+through a 60-second tick would mean pressing KEY and waiting up to a minute — a
+delivery, not a screen. The signature animation already lives on that path for
+the same reason, and the pokedex branch is checked *before* it so an open screen
+is not painted over by a greet the press never meant.
+
+**Three things hold the panel steady while it is up**, and all three have tests
+because each one fails silently:
+
+- the animator is paused on open and resumed on close, exactly once — page
+  turns must not stack pauses;
+- the tick still runs in full (bond, settlement, encounters, the save all
+  matter whether or not anyone is looking) but skips its `push`, via
+  `runOneTick`'s `shouldPush`;
+- a render that throws closes the screen and unparks the animator, because the
+  alternative is a panel frozen on the last frame forever.
+
+**It closes itself after ~3 idle ticks.** An open screen holds the animator
+paused and swallows the greet gesture; walking away should not cost either.
+
+**The silhouette is a flood fill, and the obvious version does not work.** The
+first attempt inked "anything that is not paper", which renders every entry
+identically — these sprites are line art on *transparency*, so a figure's
+interior composites to exactly the same white as the page around it. There is no
+"inside" to test a pixel for. `fillOutline()` floods the background inward from
+the border instead and inks whatever it could not reach. That depends on the
+outline being closed, which is why the downsample is a **box filter** rather
+than nearest-neighbour: it thickens every stroke and seals the hairline gaps
+that open when a 155px drawing is sampled to 36. A figure that still leaks comes
+out as line art instead of a shadow — wrong, but visibly wrong.
+
+**Cell size was chosen by looking.** `out/dex-grid-probe.mjs` renders a page at
+several sizes; at 30px the line art collapses into blobs, at 36px the species
+stay apart. 10x6 also makes the grid position readable as the dex number — row 1
+of page 1 is 1-10.
+
+Cells are cached per species *and* state (the two renderings are different
+bitmaps), which is what makes a page turn 12ms instead of 190ms. `out/dex-screen-probe.mjs`
+has those timings and the page-turn dirty rect (13KB — near a full frame, but
+only on a press, never continuously).
 
 ### The capture screen, as the owner specified it on 2026-07-30
 
