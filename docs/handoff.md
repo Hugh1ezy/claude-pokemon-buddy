@@ -420,17 +420,32 @@ cursor, **KEY long** turns the page, **KEY double** opens the confirm screen,
 commits and **short** cancels — the swap is the one irreversible thing in here,
 so it takes the deliberate gesture and the easy one backs out.
 
-**Return is BOOT *short*, and that is not a preference.** The owner asked for
-BOOT double; it cannot be that. `firmware/main/main.cpp` acts on BOOT double
-**by itself** — `enter_local_clock_mode(true)`, which stops the WiFi radio and
-drops to the clock face without consulting the host. Returning on BOOT double
-would therefore exit the pokedex *into power-save with the radio off*, and the
-host could not paint its way back out because there would no longer be a link to
-paint over. BOOT short does nothing device-side in normal mode, so it is the one
-that can be borrowed. Moving return to BOOT double is a **firmware** change (the
-device would have to be told a host screen is up, which the protocol has no way
-to say today) plus a reflash — not a host change. Tests pin that BOOT double and
-BOOT long still pass straight through.
+### The BOOT rule, whole (owner, 2026-07-30)
+
+BOOT is now the navigation button, and the three rules fit together:
+
+| Where you are | Gesture | Goes to |
+|---|---|---|
+| any host screen (pokedex, confirm, capture) | **BOOT short** | the buddy panel |
+| the buddy panel | **BOOT double** | the device's own clock face |
+| the device's own clock face | **BOOT short** | the buddy panel |
+
+**Only the first row is host code.** The other two are already the firmware's
+behaviour and were not touched: `enter_local_clock_mode` on BOOT double, and
+"ANY BOOT press gets you out" on the way back (`main.cpp`). That the owner's
+rules and the firmware's agree is luck worth noticing — it means the whole
+scheme needed no reflash.
+
+It also means **BOOT short is the only gesture the host may take.** BOOT double
+is spoken for device-side: the firmware acts on it *by itself*, stopping the
+WiFi radio before the host hears anything. A host screen that returned on BOOT
+double would exit into power-save with the radio off and no link left to paint
+back over. Tests pin that BOOT double and BOOT long still pass straight through.
+
+**Backing out of a capture is navigation, not an outcome.** BOOT short during
+the capture screen leaves the offer standing — nothing was thrown, so nothing
+fled, and coming back within `offerMs` finds the same pokemon there. It is the
+one session result that queues nothing.
 
 Because the page is now turned by hand, the **cursor is scoped to the page** it
 is on rather than to the whole roster: turning to a page holding nothing you own

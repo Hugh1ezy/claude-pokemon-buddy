@@ -27,6 +27,7 @@ export async function runCaptureSession({
   rng = Math.random,
   pressed,        // () => boolean, cleared by takePress
   takePress,      // () => void
+  aborted = () => false,   // BOOT short: back out to the buddy panel
   phases,         // { THROW, WOBBLE, CAUGHT, RETRY, ESCAPED } durations
   PHASE,
   logger = null,
@@ -42,6 +43,10 @@ export async function runCaptureSession({
 
     let verdict = null;
     while (verdict == null) {
+      // Backing out is navigation, not an outcome: the offer is left standing,
+      // so walking away from the screen and coming back within offerMs finds
+      // the same pokemon still there. Nothing was thrown, so nothing fled.
+      if (aborted()) return { outcome: "aborted" };
       if (now() >= deadline) {
         // The offer ran out while aiming. This is an escape, not a bug: the
         // five minutes are the encounter's, not the screen's.

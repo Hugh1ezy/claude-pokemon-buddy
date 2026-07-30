@@ -127,3 +127,28 @@ test("the press that opened the screen does not count as the throw", async () =>
   assert.equal(result.reason, "expired", "with the stale press discarded and none following, it should time out");
   assert.ok(pushed.filter((f) => f.phase === PHASE.AIM).length > 10);
 });
+
+// BOOT short is the universal way back to the buddy panel. Backing out is
+// navigation, not an outcome: nothing was thrown, so nothing fled, and the
+// offer has to still be there when you come back.
+test("BOOT short backs out without throwing and without ending the encounter", async () => {
+  let clock = 0;
+  const pushed = [];
+  let abort = false;
+
+  const result = await runCaptureSession({
+    species: "pidgey", zh: "波波", params: PARAMS, offerMsLeft: 300_000,
+    now: () => clock,
+    sleep: async (ms) => { clock += ms; if (clock >= 300) abort = true; },
+    push: async (f) => { pushed.push(f); },
+    render: async ({ phase, elapsed }) => ({ phase, elapsed }),
+    pressed: () => false,
+    takePress: () => {},
+    aborted: () => abort,
+    phases: PHASES, PHASE, rng: () => 0.5,
+  });
+
+  assert.deepEqual(result, { outcome: "aborted" });
+  const seen = [...new Set(pushed.map((f) => f.phase))];
+  assert.deepEqual(seen, [PHASE.AIM], "backing out must not play a throw, a wobble or a flee");
+});

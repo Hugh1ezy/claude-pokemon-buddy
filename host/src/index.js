@@ -152,6 +152,7 @@ export function createButtonDispatcher({
   let dexView = null;
   let captureActive = false;
   let capturePress = false;
+  let captureAbort = false;
   const off = transport?.onButton?.((event) => {
     // The firmware logs every press it sends; the host logged nothing, so
     // "I pressed KEY and nothing happened" had no evidence on this side at
@@ -176,6 +177,9 @@ export function createButtonDispatcher({
     // the throw animation cannot start a second one.
     if (captureActive) {
       if (event?.key === "KEY") capturePress = true;
+      // BOOT short is the universal way back to the buddy panel, from any screen
+      // the host is holding. It leaves the offer standing -- see the session.
+      else if (isDexCloseGesture(event)) captureAbort = true;
       return;
     }
 
@@ -230,6 +234,7 @@ export function createButtonDispatcher({
     if (!offer || captureActive) return;
     captureActive = true;
     capturePress = false;
+    captureAbort = false;
 
     actions.run(async () => {
       animator.pause();
@@ -245,11 +250,12 @@ export function createButtonDispatcher({
           sleep: captureSleep,
           pressed: () => capturePress,
           takePress: () => { capturePress = false; },
+          aborted: () => captureAbort,
           phases: PHASE_MS,
           PHASE,
           logger,
         });
-        captureResults.push({ species: offer.species, outcome: result.outcome });
+        if (result.outcome !== "aborted") captureResults.push({ species: offer.species, outcome: result.outcome });
         logger?.log?.(`capture: ${zhName(offer.species)} ${result.outcome}${result.reason ? ` (${result.reason})` : ""}`);
       } finally {
         captureActive = false;
