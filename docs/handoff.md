@@ -3,12 +3,20 @@
 Rolling note between the home PC and the work PC. Last updated **2026-07-30
 (late evening, HOME PC)**.
 
-> **The home checklist is now consumed.** Done on the evening of 07-30, in this
-> order: pulled to `7edcac1`, confirmed the save already matched, re-baked all
-> 156 sprites, added the home SSID to `config.json`'s `places`, restarted the
-> host. The device is attached at home and the pokedex, both left-panel rows and
-> the capture screen are all live and were seen working. The owner caught their
-> first wild pokemon the same evening.
+> **The home checklist is consumed and the evening went well past it.** Done in
+> order: pulled to `7edcac1`, confirmed the save matched, re-baked all 156 sprites,
+> added the home SSID to `config.json`'s `places`, restarted the host. The pokedex,
+> both left-panel rows and the capture screen are live and were seen working, and
+> the owner caught their first wild pokemon.
+>
+> Then, the same evening: encounter weights rebuilt from canonical Gen-1 data,
+> cries extended from 18 species to 156, six sound triggers wired, audio renamed to
+> pinyin, cries moved to on-demand synthesis, and **the firmware rebuilt and flashed
+> from home** with both wifi networks in it. Everything is pushed; the tree and the
+> save were both in sync at handoff.
+>
+> **Nothing audible has ever been verified** — the speaker module is at work. That
+> is the first thing to do there. See the checklist below.
 >
 > **Read `CLAUDE.md` (new, repo root) before doing any of this again.** It holds
 > the sync routine as a single checklist, because the reason a whole work day
@@ -83,93 +91,86 @@ they have been stripped twice. See the fixture note under the capture section.
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
-git rev-parse --abbrev-ref HEAD@{upstream}   # want hugh/main -- see the remotes note
+git rev-parse --abbrev-ref HEAD@{upstream}          # want hugh/main, see the remotes note
 git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
+grep -cE '^\s*\{\s*".*",\s*".*"\s*\}' firmware/main/wifi_creds.h   # want 2
 cd host
-node scripts/save-sync-cli.mjs status   # both saves + which way to sync, no writes
-node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save, once the device is at work
+node scripts/save-sync-cli.mjs status               # both saves, no writes
+node scripts/save-sync-cli.mjs pull                 # once the device is at work
 ```
 
-1. **Check the branch tracking first** — the line above. `main` shipped tracking
-   `origin/main` (aquamarinz), which is why a bare `git pull` has never brought
-   the other machine's work over. The home PC was fixed on 07-30; **git does not
-   carry this**, so the work PC is almost certainly still wrong.
-2. **Take the save once the device is actually at work.** It spent the night at
-   home with the host running and attached, so home is the owner and `pull` is
-   the right direction.
-3. **No re-bake needed.** Nothing since 07-29 touched the artwork; the home PC
-   re-baked all 156 on 07-30 and the bake is deterministic.
-4. **Restart the host.** Tonight's commits change the tick and the capture
-   screen.
-5. **Do not reflash yet, and do NOT flash the current `species_cries.inc`
-   without doing the PSRAM change first.** The sound table went from 21 sounds to
-   159 on the evening of 07-30. `main.cpp`'s `synth_all()` pre-synthesizes every
-   one at boot into PSRAM, which is now **2.36 MB**, and the board is
-   `CONFIG_SPIRAM_TYPE_AUTO` so the size is not knowable from the config or from
-   this machine.
+Then restart the host. In detail:
 
-   The fix is small and is the right shape anyway: synthesize **on demand** into
-   one reusable buffer instead of precomputing all of them. A cry is ~21KB of
-   trivial arithmetic (a square wave and a linear sweep), so precomputing 156 of
-   them to save microseconds is the wrong trade, and once it is on demand the
-   count stops mattering forever. It is deliberately NOT written yet: it cannot be
-   compiled or tested from the home PC, and untested firmware is worse than a
-   documented pending task.
+1. **Check the branch tracking first.** `main` shipped tracking `origin/main`
+   (aquamarinz), which is why a bare `git pull` never brought the other machine's
+   work over. Fixed on the home PC 07-30; **git does not carry it**, so this
+   machine is probably still wrong. `git branch --set-upstream-to=hugh/main main`.
+2. **Check `wifi_creds.h` has 2 entries** before ever flashing from here. The home
+   copy had only one on 07-30 and now has both. This file is per-machine.
+3. **Take the save once the device is actually at work.** It spent the night at
+   home with the host attached, so home is the owner and `pull` is the direction.
+   The replaced file lands at `state.json.presync` as a one-step undo.
+4. **Restart the host.** A lot of 07-30-evening work changes the tick.
+5. **No re-bake.** Nothing since 07-29 touched the artwork.
+6. **No reflash needed** — the device is already running the 07-30 evening image,
+   flashed from home, and it carries **both** networks, so it will join the work
+   wifi on its own. If it does not, that is news; probe TCP 7311 before assuming.
 
-   Failure mode if flashed as-is: `synth_tone` logs an alloc failure and leaves
-   that sound silent. Not a brick — but do not gamble on which sounds survive.
+### The device already has tonight's firmware
 
-`status` actually shows the remote's save as of 07-29 — it printed only the
-remote's *name* before, so the "stop if the remote is behind" instruction below
-could not be followed. Expect it to say the remote holds a turn this machine did
-not take, and to recommend the `pull`.
+Flashed from the home PC over COM3 on the evening of 07-30 and verified: hashes
+checked, device rejoined the home network, panel drawing normally. The sound table
+is 159 entries and cries are synthesized on demand, so the PSRAM warning that used
+to live here is gone — the board has **8MB** (esptool prints it on every connect)
+and the buffer is now one ~37KB scratch instead of 2.36MB of pre-rendered audio.
 
-1. **Take the synced save — but only once the device is actually at home.** The
-   work PC has held it continuously since 07-28 and publishes on every change,
-   so `pull` is the right direction and `push` is not. The replaced file lands
-   at `state.json.presync` as a one-step undo (deliberately not `.bak`, which
-   `loadState` falls back to). Steps 2-4 do not depend on the device and can be
-   done any time.
-2. **Re-bake the sprites — not optional this time, even though this machine has
-   baked before.** The `BOOST` table changed on 07-29 for 22 species, so an
-   existing `seed/sprites/` is stale for those and *nothing in git will tell
-   you*: the images are untracked, and a stale sprite is a valid PNG that simply
-   looks wrong. A plain `node scripts/bake-assets.mjs` re-bakes all 156 and is
-   the safe move; re-baking only the 22 is possible by passing their keys
-   (`node scripts/bake-assets.mjs gastly rattata`). It takes a few minutes.
+### ▶ The first thing worth doing at work: actually listen
 
-   **The bake is deterministic** — verified on the work PC 07-29 by re-baking
-   two species and diffing the checksums, which came back byte-identical. So a
-   re-bake is safe to run at any time, and `md5sum` against the other machine is
-   a real check that two machines are showing the same buddy. It does need the
-   network: the artwork is fetched from PokeAPI, not stored.
-3. **Add the home WiFi to `config.json`** — this is NEW and the home PC does not
-   have it. Row 3 of the left panel shows `工作要耐心礼貌哦` or
-   `在家要好好休息哦` depending on which network the host is on, and an SSID
-   nobody has named draws **nothing at all** (deliberately — guessing wrong
-   would tell him to rest while he is at his desk). One line, alongside the
-   existing keys:
+**The speaker module is at work, and nothing has ever been heard.** Every sound
+change on 07-30 was verified by rendering WAVs on the home PC and by reading the
+code — never on real hardware. Six places should now cry:
 
-   ```json
-   "places": { "<the home SSID>": "home" }
-   ```
+| when | what plays |
+|---|---|
+| KEY short press | the buddy's own cry (played by the firmware, not the host) |
+| a wild pokemon appears | that species' cry |
+| a capture succeeds | the evolution fanfare |
+| the pokedex cursor lands on a species you own | that species' cry |
+| an evolution animation | the evolution fanfare |
+| top of the hour | the chime |
 
-   Find it with `netsh wlan show interfaces`. The work PC's entry is already
-   set; the SSIDs stay out of git because `config.json` is untracked.
-4. **Restart the host** so it picks up the pulled code — and mean it. The work
-   PC skipped this for two days and spent them running an engine-less tick; see
-   the note at the top. Nothing else is needed: the home PC already has its
-   `config.json` (bar the `places` block above) and its `wifi_creds.h`.
-5. **No reflash.** Nothing since 07-28 has touched `firmware/`.
+`node scripts/play-test.js` auditions the three system sounds over serial without
+waiting for an event. `node scripts/cries-to-wav.mjs <pinyin>` renders any cry to a
+WAV on the PC for comparison — the synthesis there is a sample-for-sample port of
+`synth_tone`, so the two should sound identical. If they do not, that mismatch is
+the finding.
 
-**A lot landed on 07-30** and the home PC has none of it: the left panel's rows
-3 and 4, the capture minigame, the pokedex screen, swapping the buddy, the
-keepsake rule, and the WiFi place detection. The phase table below is current.
+Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 
-If `status` shows the remote *behind* what is on this machine, stop and read
-"the two-buddy trap" below before running anything.
+### Still open, in rough priority order
 
----
+1. **The 138 generated cries have never been heard.** They are derived from real
+   height/weight/type, not tuned by ear. Expect some to be wrong and plan to fix
+   them by hand — the owner should say which ids sound wrong.
+2. **`bubble` text for the 138 generated species is placeholder** — the last two
+   characters of the Chinese name. It is the only non-derived thing in
+   `seed/species-cries.json` and wants replacing with real onomatopoeia over time.
+3. **Evolution plays the generic fanfare, not the new form's own cry.** The one
+   sound trigger still missing something.
+4. **SD card cannot be used yet.** `codec_board` has the whole `mount_sdcard()`
+   API and `cfg_parse.c` understands an `sdcard:` section, but no board in
+   `board_cfg.txt` declares one — including this device's `S3_RLCD_4_2`. The slot's
+   wiring has to come from the board's documentation or schematic. Do not guess
+   GPIOs: a wrong pin here can collide with the LCD or the codec bus. The card is
+   physically inserted already.
+5. **The app partition is 92% full** (965,392 of 1,048,576 bytes). The 156 note
+   tables are most of the growth. The next feature needing flash may have to grow
+   the partition.
+6. **`pollUsage failed: no-token`** on the home PC every tick — no usage token
+   configured there, so the WEEK bar and the 5h/wk figures stay blank at home.
+
+If `status` shows the remote *behind* what is on this machine, stop and read "the
+two-buddy trap" below before running anything.
 
 ## Session record: 2026-07-30 late evening, home PC
 
@@ -490,7 +491,7 @@ transport, or the animator. The device is running exactly what it ran before.
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
 | P4 notification row + capture screen | **done (2026-07-30)** — rows 3-4 draw the offer and the dex counts, and the capture screen plays. Not yet played on hardware by the owner |
 | P5 pokedex screen + swapping the active buddy | **done (2026-07-30)** — all 151 on three pages, a cursor over what you own, a confirm screen, and the swap. Not yet driven on hardware by the owner |
-| P6 real cries | not started — waiting on a microSD card the owner does not have yet |
+| P6 cries | **synthesized cries done for all 151 (2026-07-30)**, plus the six trigger points, all flashed. Never heard: the speaker module is at work. *Recorded* cries are still blocked — the microSD card is now physically in the device, but no board in `board_cfg.txt` declares SD pins, so the slot cannot be mounted yet |
 
 ### P4, where it actually stands
 
