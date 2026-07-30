@@ -101,9 +101,23 @@ node scripts/save-sync-cli.mjs pull     # ⚠ replaces the local save, once the 
    re-baked all 156 on 07-30 and the bake is deterministic.
 4. **Restart the host.** Tonight's commits change the tick and the capture
    screen.
-5. **No reflash** — but read the cries note in the session record below before
-   deciding to, because that is the one thing left in the sound work that needs
-   one.
+5. **Do not reflash yet, and do NOT flash the current `species_cries.inc`
+   without doing the PSRAM change first.** The sound table went from 21 sounds to
+   159 on the evening of 07-30. `main.cpp`'s `synth_all()` pre-synthesizes every
+   one at boot into PSRAM, which is now **2.36 MB**, and the board is
+   `CONFIG_SPIRAM_TYPE_AUTO` so the size is not knowable from the config or from
+   this machine.
+
+   The fix is small and is the right shape anyway: synthesize **on demand** into
+   one reusable buffer instead of precomputing all of them. A cry is ~21KB of
+   trivial arithmetic (a square wave and a linear sweep), so precomputing 156 of
+   them to save microseconds is the wrong trade, and once it is on demand the
+   count stops mattering forever. It is deliberately NOT written yet: it cannot be
+   compiled or tested from the home PC, and untested firmware is worse than a
+   documented pending task.
+
+   Failure mode if flashed as-is: `synth_tone` logs an alloc failure and leaves
+   that sound silent. Not a brick — but do not gamble on which sounds survive.
 
 `status` actually shows the remote's save as of 07-29 — it printed only the
 remote's *name* before, so the "stop if the remote is behind" instruction below
@@ -225,6 +239,64 @@ these machines that regeneration cannot be verified by the suite.
 
 Before flashing anything, re-read the `wifi_creds.h` rule below: a build listing
 only the network you are standing in is how the work network got dropped on 07-27.
+
+### Encounter rarity now comes from canonical data, and completion got FASTER
+
+The owner noticed a stage-2 pokemon turning up as casually as a stage-1 one and
+asked for the games' real numbers rather than anyone's judgement. New:
+`scripts/gen-wild-rarity.mjs` → `seed/wild-rarity.json`, pulled from PokeAPI for
+Generation 1 and counting **walk encounters only** (rods, surf, gift, trade and
+static are recorded but do not count as wild presence). Cached, so re-running is
+free. That file holds facts about the real games and is **not** a spoiler — it
+says nothing about which species this project surfaces under which conditions.
+
+The generator's weights are now `capture_rate × availability`. Those answer
+different questions and both are real: capture_rate is "how hard once found",
+availability is "how often found", and using only the former was the gap.
+
+The part worth remembering is the mistake in the middle. Full canonical rarity
+first measured 0/40 runs completing, which read as proof that canonical rarity and
+a completable pokedex were incompatible. **It was not.** Completion time is
+dominated by the tail, and the tail was being starved by encounters spent
+re-offering species already collected. Dropping `caughtWeight` from 0.008 to
+0.0015 made full canonical affordable *and* faster than the original:
+
+| | complete | median | slowest |
+|---|---|---|---|
+| before | 40/40 | 331 | 393 |
+| now, pure canonical | 40/40 | **316** | **351** |
+
+Raising `perTickChance` (0.0065 → 0.0095) bought only 13 days by comparison —
+throughput is not the constraint. The full measurement table is in the generator.
+
+Aggregates only, since the mapping stays secret: second-stage share of the pool
+4.1% → 2.0%, the 61 species that never appear on foot 18.4% → 8.7%, base forms
+69.2% → 78.6%.
+
+### Sound: five of the six places that should cry now do
+
+Audited on request. Before tonight: KEY press (played by the **firmware** from
+`setActiveCry`, which is why `signature-anim.js` deliberately does not also call
+playSound), evolution, hatching and the top-of-hour chime. Added: the wild
+encounter, the successful capture, and the pokedex cursor. Still bare: evolution
+plays the generic fanfare rather than the new form's own cry.
+
+The cry list went 18 → 156 (`scripts/gen-species-cries.mjs`), derived from real
+height and weight for pitch, evolution stage for length, and primary type for
+contour. **Order is an ABI**: `cryAudioId` is `soundBase + index` and the firmware
+table is generated from the same order, so reordering silently remaps every sound.
+The first attempt rebuilt the list from the 151-entry pokedex, which dropped the
+five non-Gen-1 eeveelutions and shifted everything after them — the cry list is
+not the dex. The original 18 are byte-identical at their original indices, so a
+device on old firmware still plays ids 3..20 correctly and ignores the rest.
+
+One self-inflicted outage worth recording: entries also need
+`bubble{idle,happy,strained}` for the on-screen speech balloon, and the first
+generated batch omitted it, so `cries.js` threw at **import** time — one pokemon
+without a catchphrase stopped the entire host from starting. `cries.js` now falls
+back to "♪". The generated bubbles are placeholder text (last two characters of
+the Chinese name, the shape of the hand-written 蛙草!) and are the only
+non-derived thing in that file.
 
 ### Two loose ends, deliberately not touched
 
