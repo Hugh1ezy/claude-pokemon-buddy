@@ -159,11 +159,22 @@ function drawCentred(g, text, y) {
   g.fillText(text, Math.round(PANEL_LEFT + (PANEL_RIGHT - PANEL_LEFT - g.measureText(text).width) / 2), y);
 }
 
+// An offer counts as live only until its own deadline. The model is rebuilt
+// once a tick and redrawn three times a second, so without this the row keeps
+// announcing a pokemon that lapsed up to a minute ago -- while KEY double, which
+// reads the real clock, refuses to open the capture screen. "I saw the notice
+// and the button did nothing" was exactly that, on 2026-07-30.
+export function encounterIsLive(encounter, clockMs) {
+  if (!encounter?.species) return false;
+  if (!Number.isFinite(encounter.until) || !Number.isFinite(clockMs)) return true;
+  return encounter.until > clockMs;
+}
+
 function drawEncounterRow(g, model) {
   // An unknown place draws nothing at all. Guessing is worse than silence here:
   // the wrong guess tells him to rest at home while he is sitting at his desk.
   const idle = PLACE_TEXT[model.place] ?? null;
-  const wild = Boolean(model.encounter?.species);
+  const wild = encounterIsLive(model.encounter, model.clockMs);
   if (!wild && !idle) return;
 
   const heavy = wild ? encounterBlinkOn(model.buddy?.animPhase) : true;

@@ -9,6 +9,7 @@ import {
   ENCOUNTER_BLINK_PERIOD,
   WEEKDAY_PX,
   encounterBlinkOn,
+  encounterIsLive,
 } from "../src/render/layout.js";
 import { LEFT_W } from "../src/render/palette.js";
 
@@ -19,7 +20,7 @@ import { LEFT_W } from "../src/render/palette.js";
 const ENC_BAND = { y0: 96, y1: 134 };
 const DEX_BAND = { y0: 140, y1: 160 };
 
-function model({ animPhase = 0, encounter = null, dex = null, place = null } = {}) {
+function model({ animPhase = 0, encounter = null, dex = null, place = null, clockMs = null } = {}) {
   return {
     clock: "11:34",
     now: new Date(2026, 6, 30, 11, 34),
@@ -32,6 +33,7 @@ function model({ animPhase = 0, encounter = null, dex = null, place = null } = {
     dex,
     place,
     encounter,
+    clockMs,
     buddy: {
       name: "Hughie", mood: "focus", level: 18, species: "bulbasaur",
       bond: 21.6, bondHearts: 3, expPct: 40, bubble: "BULBA", animPhase,
@@ -161,4 +163,33 @@ test("the blink alternates on a fixed period and a still frame shows the loud ph
 
   // paintFromDisk and the dashboard preview render without an animator.
   assert.equal(encounterBlinkOn(undefined), true);
+});
+
+// The model is rebuilt once a TICK and redrawn three times a second, so an
+// offer that lapsed mid-tick would otherwise keep being announced for up to a
+// minute -- while KEY double, which reads the real clock, refuses to open the
+// capture screen. That mismatch is what "I saw the notice and the button did
+// nothing" was, on 2026-07-30.
+test("row 3 stops announcing an offer the moment it lapses, not on the next tick", async () => {
+  const wild = { species: "gastly", until: 10_000 };
+
+  const live = await inkInBand(model({ place: "work", encounter: wild, dex: null }), ENC_BAND);
+  const lapsed = await sigOf(model({ place: "work", encounter: { ...wild }, dex: null }), ENC_BAND);
+  const idle = await sigOf(model({ place: "work" }), ENC_BAND);
+
+  assert.ok(live > 0);
+  void lapsed;
+  // One second before the deadline it is still the wild message; one second
+  // after, it is the place message again.
+  const before = await sigOf(model({ place: "work", encounter: wild, clockMs: 9_000 }), ENC_BAND);
+  const after = await sigOf(model({ place: "work", encounter: wild, clockMs: 11_000 }), ENC_BAND);
+
+  assert.notEqual(before, idle, "before the deadline it announces the pokemon");
+  assert.equal(after, idle, "after it, the row is back to the place message");
+});
+
+test("an offer with no deadline is still shown, so older saves do not go silent", () => {
+  assert.equal(encounterIsLive({ species: "gastly" }, Date.now()), true);
+  assert.equal(encounterIsLive({ species: "gastly", until: 5 }, undefined), true);
+  assert.equal(encounterIsLive(null, 1), false);
 });

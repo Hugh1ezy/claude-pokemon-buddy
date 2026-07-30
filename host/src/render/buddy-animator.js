@@ -19,7 +19,11 @@ export function createBuddyAnimator({
         try {
           const model = getModel();
           if (model) {
-            const frame = await render({ ...model, buddy: { ...model.buddy, animPhase: phase } });
+            // clockMs is refreshed per FRAME, not per tick. The model itself is a
+            // minute old by the end of a tick, and anything in it with a deadline
+            // -- the encounter row -- has to be judged against now, not against
+            // when the tick happened to run.
+            const frame = await render({ ...model, clockMs: Date.now(), buddy: { ...model.buddy, animPhase: phase } });
             if (pauseDepth === 0 && running) {
               phase = (phase + 1) % 1_000_000;
               await transport.push(frame);

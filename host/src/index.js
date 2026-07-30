@@ -495,7 +495,22 @@ export async function buildRenderModel({ pet, usage, weather, room, now, buddyNa
     // Row 3 says only THAT something is out there, never what -- the species is
     // the capture screen's to reveal. The key is carried anyway because the
     // renderer needs to know whether an offer is live at all.
-    encounter: pet.encounter?.species ? { species: pet.encounter.species } : null,
+    //
+    // `until` is carried because this model is rebuilt once a TICK while the
+    // animator redraws it three times a second. Without a deadline the row goes
+    // on blinking for up to a minute after the offer has actually lapsed, and
+    // KEY double -- which checks the real clock -- correctly refuses to open the
+    // capture screen. That is exactly the "I saw the notice and the button did
+    // nothing" the owner hit on 07-30.
+    encounter: pet.encounter?.species
+      ? {
+        species: pet.encounter.species,
+        until: Number.isFinite(Number(pet.encounter.offeredAt))
+          ? Number(pet.encounter.offeredAt) + ENCOUNTER_DEFAULTS.offerMs
+          : null,
+      }
+      : null,
+    clockMs: now instanceof Date ? now.getTime() : null,
     buddy: {
       name: buddyName,
       spriteGray: sprite.gray,
