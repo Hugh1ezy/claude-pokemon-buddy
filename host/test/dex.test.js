@@ -216,3 +216,28 @@ test("a corrupted save salvages the pokedex rather than dropping it", () => {
   assert.equal(loaded.box[0].level, 4);
   assert.equal(loaded.level, 9);
 });
+
+// The fixture flag has to survive the save, and normalizeEncounter rebuilds the
+// encounter from named fields on every round trip. It was carried on the object
+// and not listed there, so it vanished between the fixture writing it and the
+// tick reading it -- and five test catches went into the real collection.
+test("a test-marked offer keeps its flag through a save round trip", () => {
+  const path = statePath("test-encounter");
+  saveState(path, {
+    species: "bulbasaur", level: 9, hatched: true,
+    encounter: { species: "pidgey", offeredAt: 1_700_000_000_000, test: true },
+  });
+
+  assert.equal(loadState(path).encounter.test, true);
+});
+
+test("only an explicit true survives, so a hand-edited save cannot switch a real capture off", () => {
+  const path = statePath("test-encounter-junk");
+  for (const flag of ["true", 1, {}, null]) {
+    saveState(path, {
+      species: "bulbasaur", level: 9, hatched: true,
+      encounter: { species: "pidgey", offeredAt: 1_700_000_000_000, test: flag },
+    });
+    assert.equal(loadState(path).encounter.test, undefined, `test: ${JSON.stringify(flag)}`);
+  }
+});

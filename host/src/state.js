@@ -138,6 +138,13 @@ function normalizeEncounter(raw) {
   const species = typeof raw.species === "string" && isDexSpecies(raw.species) ? raw.species : null;
   const offeredAt = epochMs(raw.offeredAt);
   const lastEndedAt = epochMs(raw.lastEndedAt);
+  // Marks an offer placed by out/arm-encounter.mjs: the capture plays in full
+  // and records nothing. It has to be listed HERE, not just carried on the
+  // object, because this function rebuilds the encounter from named fields on
+  // every save/load -- which is the right discipline, and is exactly why the
+  // flag silently vanished before it was added. Strictly `=== true`, so junk in
+  // a hand-edited save cannot switch a real capture off.
+  const test = raw.test === true;
 
   // An offer without the moment it was made cannot be expired, so it would hang
   // on the panel forever. Drop the species and keep the cooldown.
@@ -145,9 +152,10 @@ function normalizeEncounter(raw) {
     return lastEndedAt == null ? null : { species: null, lastEndedAt };
   }
   if (species) {
-    return lastEndedAt == null
+    const base = lastEndedAt == null
       ? { species, offeredAt }
       : { species, offeredAt, lastEndedAt };
+    return test ? { ...base, test: true } : base;
   }
   return lastEndedAt == null ? null : { species: null, lastEndedAt };
 }

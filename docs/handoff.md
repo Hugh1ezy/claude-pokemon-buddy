@@ -47,12 +47,16 @@ Three remotes now:
 | `upstream` | `aquamarinz/claude-pokemon-buddy` — original, read-only |
 | `save` | `Hugh1ezy/cpb-save` — **private**, holds only `state.json` (`docs/save-sync.md`) |
 
-Buddy as of this note: **妙蛙种子 (bulbasaur) 慢性子, Lv.18, exp 20.38, bond 21.6,
-streak 5**, published to `save` from the **work PC** on the morning of 07-30 and
-verified identical against the remote. Same lineage throughout — the nature has
-matched at every check, so the two-buddy trap below has not recurred. The home
-PC's setup is complete and its host is running, but it has not held the device
-since 07-28.
+Buddy as of this note: **妙蛙草 (ivysaur) 慢性子** — it evolved from 妙蛙种子 on
+07-30 — published to `save` from the **work PC** at the end of 07-30. Same
+lineage throughout; the nature has matched at every check, so the two-buddy trap
+below has not recurred. The home PC's setup is complete and its host is running,
+but **it has not held the device since 07-28** and has not run the checklist
+below even once.
+
+**图鉴 2/151 · 捕捉 0** is the true state. Both entries came from `recordSeen`
+(the starter line), not from catches — every catch so far was a fixture, and
+they have been stripped twice. See the fixture note under the capture section.
 
 ---
 
@@ -91,11 +95,28 @@ not take, and to recommend the `pull`.
    re-bake is safe to run at any time, and `md5sum` against the other machine is
    a real check that two machines are showing the same buddy. It does need the
    network: the artwork is fetched from PokeAPI, not stored.
-3. **Restart the host** so it picks up the pulled code — and mean it. The work
+3. **Add the home WiFi to `config.json`** — this is NEW and the home PC does not
+   have it. Row 3 of the left panel shows `工作要耐心礼貌哦` or
+   `在家要好好休息哦` depending on which network the host is on, and an SSID
+   nobody has named draws **nothing at all** (deliberately — guessing wrong
+   would tell him to rest while he is at his desk). One line, alongside the
+   existing keys:
+
+   ```json
+   "places": { "<the home SSID>": "home" }
+   ```
+
+   Find it with `netsh wlan show interfaces`. The work PC's entry is already
+   set; the SSIDs stay out of git because `config.json` is untracked.
+4. **Restart the host** so it picks up the pulled code — and mean it. The work
    PC skipped this for two days and spent them running an engine-less tick; see
    the note at the top. Nothing else is needed: the home PC already has its
-   `config.json` and its `wifi_creds.h`.
-4. **No reflash.** Nothing since 07-28 has touched `firmware/`.
+   `config.json` (bar the `places` block above) and its `wifi_creds.h`.
+5. **No reflash.** Nothing since 07-28 has touched `firmware/`.
+
+**A lot landed on 07-30** and the home PC has none of it: the left panel's rows
+3 and 4, the capture minigame, the pokedex screen, swapping the buddy, the
+keepsake rule, and the WiFi place detection. The phase table below is current.
 
 If `status` shows the remote *behind* what is on this machine, stop and read
 "the two-buddy trap" below before running anything.
