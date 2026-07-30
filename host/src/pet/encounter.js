@@ -14,10 +14,16 @@
 const MINUTE = 60_000;
 
 export const ENCOUNTER_DEFAULTS = {
-  // Rolled once per host tick (~60s). 0.0028 x ~900 waking ticks/day lands
-  // near 2.5 encounters a day; see sim-encounters.mjs for what that does to
-  // the completion curve.
-  perTickChance: 0.0065,
+  // Rolled once per host tick (~60s), against ~900 waking ticks a day, so this
+  // lands near 8.5 encounters a day. Raised from 0.0065 on 2026-07-30 while
+  // retuning the pool toward canonical wild rarity -- and worth knowing: it
+  // bought only 13 days of the ~330-day completion curve. Throughput is NOT what
+  // makes the pokedex slow; the tail is (see gen-encounters.mjs's caughtWeight
+  // note). Do not reach for this knob first.
+  //
+  // The comment here previously described 0.0028 and "near 2.5 a day" long after
+  // the value had moved past it. Change the number, change the sentence.
+  perTickChance: 0.0095,
   // Nothing new while one is already on offer, and a quiet spell afterwards so
   // a busy afternoon cannot turn into a queue of notifications.
   cooldownMs: 40 * MINUTE,
