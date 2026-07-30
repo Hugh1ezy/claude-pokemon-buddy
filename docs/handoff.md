@@ -298,6 +298,62 @@ back to "♪". The generated bubbles are placeholder text (last two characters o
 the Chinese name, the shape of the hand-written 蛙草!) and are the only
 non-derived thing in that file.
 
+### ⚠ The home PC's `wifi_creds.h` has only ONE network, and it is the home one
+
+Found 2026-07-30 while checking whether the home PC could flash. It can — ESP-IDF
+5.4 is at `~/esp/esp-idf` and the device sits on **COM3** — and that is exactly why
+this matters: **flashing from home right now would produce an image that knows only
+the home wifi**, and the device would fail to join at work the next morning. That
+is the 07-27 incident again, whose symptom (stuck on the clock face, button
+apparently dead) reads as broken hardware.
+
+The work passphrase is not on this machine, and it must not go into a tracked file.
+So either add the work entry to `firmware/main/wifi_creds.h` on the home PC (two
+entries, format in `wifi_creds.h.example`), or only ever flash from the work PC.
+
+**This is independent of any particular change** — it is a standing trap. Anyone
+who flashes from home once strands the device at work. Check the entry count
+before every flash: `grep -cE '^\s*\{\s*".*",\s*".*"\s*\}' firmware/main/wifi_creds.h`
+must print 2.
+
+Also worth knowing, from getting the toolchain to run here: `export.bat` refuses to
+run when `MSYSTEM` is set, which it is under Git Bash, and PowerShell's execution
+policy blocks `export.ps1` outright. What works is a script file run with
+`powershell -ExecutionPolicy Bypass -File`, dot-sourcing `export.ps1` and then
+calling `python $env:IDF_PATH\tools\idf.py` — `idf.py` is not directly callable
+because `.PY` is not in PATHEXT. Do not change the machine's execution policy for
+this.
+
+### Cries are synthesized on demand now, and the app partition is 92% full
+
+`synth_all()` became `synth_init()`: one PSRAM buffer sized to the longest sound
+(~37KB) instead of one buffer per sound (2.36MB at 156 cries). Built and verified
+with `idf.py build`; **not flashed**, see the wifi note above.
+
+`SND_COUNT` had been a literal 21 and the existing `static_assert` caught it when
+the table reached 159 — the assert earning its keep. It is derived now, and a second
+assert pins the real ceiling: a sound id is a single byte in the PLAY and CONFIG
+payloads, so the table can never exceed 255 entries.
+
+**New constraint to watch:** `pokemon_buddy_fw.bin` is 965,392 bytes against a
+1,048,576-byte app partition — **8% free**. The 156 note tables are most of the
+growth. The next feature that needs flash may have to grow the partition.
+
+### SD card: the pins are not in the board package
+
+`codec_board` already exposes `mount_sdcard()` / `get_sdcard_handle()` /
+`get_sdcard_config()`, and `cfg_parse.c` understands an `sdcard:` section with
+clk/cmd/d0..d3/power. But **no board in `board_cfg.txt` declares one**, including
+this device's `S3_RLCD_4_2` (it has i2c, i2s, out, in and nothing else). So the SD
+slot's wiring has to come from the board's own documentation or schematic before
+any of that API can be called. Deliberately not guessed: wrong GPIOs here could
+collide with the LCD or the codec bus.
+
+Also: the home PC has **no card reader** (no SD device in PnP at all), so copying
+files onto the card cannot be done here even with the card out of the device. The
+better end state avoids readers entirely — once the firmware can mount the card,
+the host can stream files over the existing protocol and let the device write them.
+
 ### Two loose ends, deliberately not touched
 
 - **`捕捉` reads 3 but only 1 is real.** The 07-30 work-PC note recorded the true
