@@ -6,6 +6,11 @@ host/config.json
 # saveConfig() writes this beside it on every settings change, and it holds the
 # same wifi token. The repo is public; one `git add -A` is all it would take.
 host/config.json.bak
+# Any other sidecar of the config too -- it carries the pairing token and the
+# repo is public, so an exact-path rule is one careless backup name away from
+# committing it. Widened 2026-07-30 after a .presync-places copy landed outside
+# the rules.
+host/config.json.*
 *.bin
 start-buddy.vbs
 *.bsp
