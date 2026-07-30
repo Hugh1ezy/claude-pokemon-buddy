@@ -55,7 +55,7 @@ test("moving the cursor does not stack more pauses, and closing releases exactly
 
   assert.equal(h.animator.depth, 1, "each cursor move must not add another pause");
 
-  await h.press("KEY", "long");
+  await h.press("BOOT", "short");
   assert.equal(h.dispatcher.isDexOpen(), false);
   assert.equal(h.animator.depth, 0, "closing must leave the animator running again");
 });
@@ -108,17 +108,21 @@ test("a short KEY press turns the page instead of playing the signature", async 
   assert.equal(h.pushed.filter((f) => f === "signature").length, 1, "no second greet");
 });
 
-test("BOOT is left alone entirely, even with the screen open", async () => {
+// BOOT short is the return gesture; the OTHER BOOT gestures must still pass
+// straight through, because the firmware acts on BOOT double by itself.
+test("BOOT double and long are left alone, so power-save keeps working", async () => {
   const h = harness();
   await h.press("KEY", "double");
   const before = h.pushed.length;
 
-  await h.press("BOOT", "short");
   await h.press("BOOT", "double");
   await h.press("BOOT", "long");
 
-  assert.equal(h.pushed.length, before, "BOOT must not redraw or close the screen");
-  assert.equal(h.dispatcher.isDexOpen(), true);
+  assert.equal(h.pushed.length, before, "they must not redraw the screen");
+  assert.equal(h.dispatcher.isDexOpen(), true, "nor close it");
+
+  await h.press("BOOT", "short");
+  assert.equal(h.dispatcher.isDexOpen(), false, "BOOT short is the one that returns");
 });
 
 test("the idle close releases the animator too, not just the flag", async () => {

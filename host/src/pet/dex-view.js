@@ -2,32 +2,49 @@
 // transient: this is UI state, not save state, so it never reaches state.json
 // and a restart simply closes the screen.
 //
-// The gesture budget is small. BOOT belongs entirely to power-save
-// (docs/local-clock-mode.md) and must not be borrowed -- reusing it is exactly
-// the mistake that killed the radio on 07-27. That leaves KEY, whose short
-// press is already the greet gesture and the working-day bond credit, and whose
-// long press is already the evolution confirm. KEY *double* was the one gesture
-// the firmware sends, the dispatcher already queues, and nothing consumed.
+// Gestures, set by the owner 2026-07-30:
+//
+//   KEY short    move the cursor to the next owned species on this page
+//   KEY long     turn the page
+//   KEY double   open the confirm screen / confirm the swap
+//   BOOT short   back to the buddy panel
+//
+// BOOT short rather than BOOT double, and this is NOT a preference. The
+// firmware acts on BOOT double **by itself** (main.cpp, enter_local_clock_mode)
+// -- it stops the WiFi radio and drops to the clock face without asking the
+// host. A BOOT double here would therefore exit the pokedex INTO power-save
+// with the radio off, and the host could not paint its way back out because
+// there is no longer a link to paint over. BOOT short does nothing device-side
+// in normal mode, so it is the one that can be borrowed safely. Moving return
+// to BOOT double needs a firmware change (and a reflash), not a host change.
 export const DEX_OPEN_GESTURE = { key: "KEY", kind: "double" };
+export const DEX_CLOSE_GESTURE = { key: "BOOT", kind: "short" };
 
 export function isDexOpenGesture(event) {
   return event?.key === DEX_OPEN_GESTURE.key && event?.kind === DEX_OPEN_GESTURE.kind;
 }
 
-// `view` is null when closed, otherwise { cursor, confirming, idleTicks }.
-// `cursor` indexes the ROSTER -- the species actually owned -- not the 151
-// cells. Stepping cell by cell would be 151 presses to reach the end and every
-// stop but a handful would be a silhouette you cannot pick anyway; hopping
-// between owned entries makes the walk as long as the collection is.
+export function isDexCloseGesture(event) {
+  return event?.key === DEX_CLOSE_GESTURE.key && event?.kind === DEX_CLOSE_GESTURE.kind;
+}
+
+// `view` is null when closed, otherwise { page, cursor, confirming, idleTicks }.
 //
-// Returns { view, action } where action is "swap" on the press that confirms
-// one. The caller applies it; this file never touches the save.
-export function stepDexView(view, event, { rosterSize = 0 } = {}) {
+// The page is explicit and the cursor is scoped to it. The cursor indexes the
+// OWNED species on the current page, not the 60 cells: all but a handful of
+// cells are silhouettes that cannot be picked, and stepping through them would
+// be 151 presses to cross the dex. Turning the page is its own gesture so the
+// whole 151 can still be browsed, including pages holding nothing you own.
+//
+// Returns { view, action }; action is "swap" on the press that confirms one.
+// The caller applies it -- this file never touches the save.
+export function stepDexView(view, event, { pages = 1, pageCursorCount = 0 } = {}) {
   if (view == null) {
     return isDexOpenGesture(event)
-      ? { view: { cursor: 0, confirming: false, idleTicks: 0 }, action: null }
+      ? { view: { page: 0, cursor: 0, confirming: false, idleTicks: 0 }, action: null }
       : { view: null, action: null };
   }
+  if (isDexCloseGesture(event)) return { view: null, action: null };
   if (event?.key !== "KEY") return { view, action: null };
 
   const fresh = (over) => ({ ...view, idleTicks: 0, ...over });
@@ -38,15 +55,20 @@ export function stepDexView(view, event, { rosterSize = 0 } = {}) {
       // deliberate gesture and the easy one cancels.
       case "double": return { view: fresh({ confirming: false }), action: "swap" };
       case "short": return { view: fresh({ confirming: false }), action: null };
-      case "long": return { view: null, action: null };
       default: return { view, action: null };
     }
   }
 
   switch (event.kind) {
-    case "short": return { view: fresh({ cursor: wrap(view.cursor + 1, rosterSize) }), action: null };
-    case "double": return { view: fresh({ confirming: true }), action: null };
-    case "long": return { view: null, action: null };
+    case "short": return { view: fresh({ cursor: wrap(view.cursor + 1, pageCursorCount) }), action: null };
+    // A new page gets a fresh cursor rather than carrying the old index across:
+    // index 3 of one page has nothing to do with index 3 of the next, and a
+    // carried index would land on an arbitrary species or off the end.
+    case "long": return { view: fresh({ page: wrap(view.page + 1, pages), cursor: 0 }), action: null };
+    // Nothing to confirm on a page holding nothing you own.
+    case "double": return pageCursorCount > 0
+      ? { view: fresh({ confirming: true }), action: null }
+      : { view: fresh({}), action: null };
     default: return { view, action: null };
   }
 }
@@ -64,15 +86,7 @@ export function ageDexView(view, { limit = DEX_IDLE_TICKS_BEFORE_CLOSE } = {}) {
   return idleTicks >= limit ? null : { ...view, idleTicks };
 }
 
-// The page the grid must show to have the cursor on it. Derived rather than
-// stored, so the two can never disagree about where the cursor is.
-export function pageForCursor(view, roster, pageSize, dexIndexOf) {
-  const species = roster?.[view?.cursor ?? 0]?.species;
-  const index = species == null ? 0 : dexIndexOf(species);
-  return Math.max(0, Math.floor(index / pageSize));
-}
-
-function wrap(cursor, size) {
+function wrap(value, size) {
   const total = Math.max(1, size);
-  return ((cursor % total) + total) % total;
+  return ((value % total) + total) % total;
 }

@@ -28,11 +28,11 @@ import { createSaveSync } from "./save-sync.js";
 import { createTransport } from "./transport/index.js";
 import { captureParams } from "./pet/capture-tuning.js";
 import { runCaptureSession } from "./pet/capture-session.js";
-import { ageDexView, isDexOpenGesture, pageForCursor, stepDexView } from "./pet/dex-view.js";
+import { ageDexView, isDexCloseGesture, isDexOpenGesture, stepDexView } from "./pet/dex-view.js";
 import { ENCOUNTER_DEFAULTS } from "./pet/encounter.js";
 import { resolvePlace } from "./place.js";
 import { PHASE, PHASE_MS, renderCaptureFrame } from "./render/capture-screen.js";
-import { DEX_PAGE_SIZE, renderDexConfirm, renderDexPage } from "./render/dex-screen.js";
+import { DEX_PAGE_SIZE, dexPageCount, renderDexConfirm, renderDexPage } from "./render/dex-screen.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
 import { pollUsageOnce } from "./usage-poll.mjs";
@@ -210,6 +210,11 @@ export function createButtonDispatcher({
     }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
   });
 
+  // Dex page a species sits on. SPECIES_DEX is 1-based; the grid is not.
+  function dexPageOf(species) {
+    return Math.floor(((SPECIES_DEX[species] ?? 1) - 1) / DEX_PAGE_SIZE);
+  }
+
   function liveEncounter() {
     const pet = getPet();
     const species = pet?.encounter?.species;
@@ -259,13 +264,16 @@ export function createButtonDispatcher({
     const source = dexSource();
     const roster = rosterEntries(source?.dex ?? {});
     const was = dexView;
-    const { view: next, action } = stepDexView(dexView, event, { rosterSize: roster.length });
+    const { view: next, action } = stepDexView(dexView, event, {
+      pages: dexPageCount(source?.progress?.dexTotal ?? 0),
+      pageCursorCount: onPage(roster, was?.page ?? 0).length,
+    });
     if (next === was && action == null) return;
     dexView = next;
 
     // Read before the queue runs: `action` is decided against the roster the
     // press was made against, and a tick could land in between.
-    const chosen = action === "swap" ? roster[was?.cursor ?? 0] : null;
+    const chosen = action === "swap" ? onPage(roster, was?.page ?? 0)[was?.cursor ?? 0] : null;
 
     actions.run(async () => {
       if (chosen && !chosen.active) {
@@ -288,14 +296,21 @@ export function createButtonDispatcher({
     });
   }
 
+  // The owned species that fall on a given page, in dex order. The cursor
+  // indexes THIS, not the roster as a whole, so turning to a page holding
+  // nothing you own simply leaves no cursor rather than pointing off it.
+  function onPage(roster, page) {
+    return roster.filter((entry) => dexPageOf(entry.species) === page);
+  }
+
   function renderDexScreen(view, roster, source) {
-    const entry = roster[view.cursor] ?? null;
+    const entry = onPage(roster, view.page)[view.cursor] ?? null;
     if (view.confirming && entry) {
       return renderConfirm({ entry, zh: zhName(entry.species), caughtAtText: entry.caughtAt ?? "--" });
     }
     return renderDex({
       dex: source.dex,
-      page: pageForCursor(view, roster, DEX_PAGE_SIZE, (species) => (SPECIES_DEX[species] ?? 1) - 1),
+      page: view.page,
       progress: source.progress,
       cursorSpecies: entry?.species ?? null,
     });

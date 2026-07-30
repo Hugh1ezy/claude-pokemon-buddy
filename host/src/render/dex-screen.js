@@ -25,6 +25,9 @@ const CELL = 36;
 const CELL_GAP_Y = 6;
 const GRID_TOP = 32;
 const HEADER_Y = 18;
+// Five hearts at the width drawHearts lays them out with, so the confirm
+// screen's value column can be measured before anything is drawn.
+const HEARTS_W = 5 * 18;
 const FOOTER_Y = 294;
 
 export function dexPageCount(total) {
@@ -173,7 +176,9 @@ export async function renderDexPage({ dex, page = 0, progress, cursorSpecies = n
   }
 
   g.font = `700 12px ${CJK}`;
-  const hint = cursorSpecies ? "KEY 移动 · 双击选择 · 长按返回" : "KEY 翻页 · 长按返回";
+  const hint = cursorSpecies
+    ? "KEY 移动 · 长按翻页 · 双击选择 · BOOT 返回"
+    : "长按翻页 · BOOT 返回";
   g.fillText(hint, Math.round((W - g.measureText(hint).width) / 2), FOOTER_Y);
 
   return imageDataToFrame(g.getImageData(0, 0, W, H), W, H);
@@ -201,43 +206,53 @@ export async function renderDexConfirm({ entry, zh, caughtAtText }) {
   g.fillRect(0, 0, W, H);
   g.fillStyle = INK;
 
+  // Sprite and details are laid out as ONE block and that block is centred, so
+  // the screen reads as a card rather than as two things that happen to be on
+  // it. The label column is measured rather than guessed, because 等级/获得/
+  // 亲密度 are not the same width and a hardcoded gap leaves the values ragged.
   const sprite = await loadBuddySprite(entry.species);
   const slot = 120;
-  drawSprite(g, sprite.gray, {
-    x: 30, y: 60, maxSize: slot, srcW: sprite.w, srcH: sprite.h,
-  });
-
-  g.font = `800 14px ${CJK}`;
-  g.fillText(zh, 176, 78);
-
-  g.font = `700 12px ${CJK}`;
+  const gap = 22;
   const rows = [
     ["等级", entry.frozen ? "Lv -" : `Lv ${entry.level ?? "-"}`],
     ["获得", caughtAtText ?? "--"],
     ["亲密度", null],
   ];
-  rows.forEach(([label, value], i) => {
-    const y = 108 + i * 26;
-    g.fillText(label, 176, y);
-    if (value != null) g.fillText(value, 232, y);
-  });
-  drawHearts(g, 232, 108 + 2 * 26 - 12, entry.frozen ? 0 : heartCount(entry.bond ?? 0));
-
-  // Says WHY rather than just showing dashes, because "Lv -" on its own reads
-  // as missing data rather than as a rule.
-  if (entry.frozen) {
-    g.font = `700 12px ${CJK}`;
-    const note = "已进化过 · 只能展示，无法成长";
-    g.fillText(note, Math.round((W - g.measureText(note).width) / 2), 218);
-  }
-  if (entry.active) {
-    g.font = `700 12px ${CJK}`;
-    const note = "正在展示中";
-    g.fillText(note, Math.round((W - g.measureText(note).width) / 2), 240);
-  }
 
   g.font = `700 12px ${CJK}`;
-  const hint = entry.active ? "长按返回" : "双击确认展示 · KEY 取消";
+  const labelW = Math.max(...rows.map(([label]) => g.measureText(label).width));
+  g.font = `800 14px ${CJK}`;
+  const nameW = g.measureText(zh).width;
+  g.font = `700 12px ${CJK}`;
+  const valueW = Math.max(
+    nameW,
+    HEARTS_W,
+    ...rows.map(([, value]) => (value == null ? 0 : g.measureText(value).width)),
+  );
+
+  const detailW = labelW + 12 + valueW;
+  const blockW = slot + gap + detailW;
+  const blockX = Math.round((W - blockW) / 2);
+  const detailX = blockX + slot + gap;
+  const blockTop = Math.round((H - slot) / 2) - 10;
+
+  drawSprite(g, sprite.gray, {
+    x: blockX, y: blockTop, maxSize: slot, srcW: sprite.w, srcH: sprite.h,
+  });
+
+  g.font = `800 14px ${CJK}`;
+  g.fillText(zh, detailX, blockTop + 18);
+
+  g.font = `700 12px ${CJK}`;
+  rows.forEach(([label, value], i) => {
+    const y = blockTop + 48 + i * 26;
+    g.fillText(label, detailX, y);
+    if (value != null) g.fillText(value, detailX + labelW + 12, y);
+  });
+  drawHearts(g, detailX + labelW + 12, blockTop + 48 + 2 * 26 - 12, entry.frozen ? 0 : heartCount(entry.bond ?? 0));
+
+  g.font = `700 12px ${CJK}`;
+  const hint = entry.active ? "BOOT 返回" : "双击确认展示 · KEY 取消";
   g.fillText(hint, Math.round((W - g.measureText(hint).width) / 2), FOOTER_Y);
 
   return imageDataToFrame(g.getImageData(0, 0, W, H), W, H);

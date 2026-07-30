@@ -4,52 +4,81 @@ import assert from "node:assert/strict";
 import {
   DEX_IDLE_TICKS_BEFORE_CLOSE,
   ageDexView,
+  isDexCloseGesture,
   isDexOpenGesture,
-  pageForCursor,
   stepDexView,
 } from "../src/pet/dex-view.js";
 
 const press = (key, kind) => ({ key, kind });
-const open = (over = {}) => ({ cursor: 0, confirming: false, idleTicks: 0, ...over });
-const step = (view, event, size = 3) => stepDexView(view, event, { rosterSize: size });
+const open = (over = {}) => ({ page: 0, cursor: 0, confirming: false, idleTicks: 0, ...over });
+const step = (view, event, count = 3, pages = 3) =>
+  stepDexView(view, event, { pageCursorCount: count, pages });
 
 test("KEY double opens it, and nothing else does", () => {
   assert.deepEqual(step(null, press("KEY", "double")).view, open());
 
   for (const event of [
     press("KEY", "short"), press("KEY", "long"), press("KEY", "down"),
-    press("BOOT", "double"), press("BOOT", "short"), null, undefined, {},
+    press("BOOT", "double"), press("BOOT", "short"), press("BOOT", "long"),
+    null, undefined, {},
   ]) {
     assert.equal(step(null, event).view, null, `${JSON.stringify(event)} must not open it`);
   }
 });
 
-// BOOT is power-save's alone. Borrowing it is what stopped the radio on 07-27,
-// and the symptom read as dead hardware rather than as a button conflict.
-test("BOOT never does anything, in any state", () => {
-  for (const kind of ["short", "long", "double"]) {
-    assert.deepEqual(step(open(), press("BOOT", kind)).view, open());
-    assert.deepEqual(step(open({ confirming: true }), press("BOOT", kind)).view, open({ confirming: true }));
-    assert.equal(step(null, press("BOOT", kind)).view, null);
-  }
+// BOOT short is the return gesture, set by the owner 2026-07-30. It is short
+// and NOT double on purpose: the firmware acts on BOOT double by itself
+// (enter_local_clock_mode), stopping the radio and dropping to the clock face,
+// so a BOOT double here would exit the pokedex into power-save with no link
+// left for the host to paint back over.
+test("BOOT short closes the screen from either state", () => {
+  assert.deepEqual(step(open({ page: 2, cursor: 1 }), press("BOOT", "short")), { view: null, action: null });
+  assert.deepEqual(step(open({ confirming: true }), press("BOOT", "short")), { view: null, action: null });
 });
 
-// The cursor walks the ROSTER, not the 151 cells: stepping cell by cell would
-// be 151 presses to reach the end, and all but a handful of stops would be a
-// silhouette that cannot be picked anyway.
-test("a short press moves the cursor along the roster and wraps", () => {
+test("no other BOOT gesture is touched, so power-save keeps working", () => {
+  for (const kind of ["double", "long"]) {
+    assert.deepEqual(step(open(), press("BOOT", kind)).view, open(), `BOOT ${kind} must pass through`);
+  }
+  assert.equal(isDexCloseGesture(press("BOOT", "short")), true);
+  assert.equal(isDexCloseGesture(press("BOOT", "double")), false);
+  assert.equal(isDexCloseGesture(press("KEY", "short")), false);
+});
+
+// The cursor indexes the owned species ON THIS PAGE, not the 60 cells: all but
+// a handful of cells are silhouettes that cannot be picked, and stepping
+// through them would be 151 presses to cross the dex.
+test("a short press moves the cursor along the page and wraps", () => {
   let view = open();
   view = step(view, press("KEY", "short")).view;
   assert.equal(view.cursor, 1);
   view = step(view, press("KEY", "short")).view;
   assert.equal(view.cursor, 2);
   view = step(view, press("KEY", "short")).view;
-  assert.equal(view.cursor, 0, "the last entry wraps to the first");
+  assert.equal(view.cursor, 0, "the last entry on the page wraps to the first");
 });
 
-test("a roster of one never moves the cursor off itself", () => {
+test("a page with one or no owned species never moves the cursor off it", () => {
   assert.equal(step(open(), press("KEY", "short"), 1).view.cursor, 0);
-  assert.equal(step(open(), press("KEY", "short"), 0).view.cursor, 0, "an empty roster must not divide by zero");
+  assert.equal(step(open(), press("KEY", "short"), 0).view.cursor, 0, "an empty page must not divide by zero");
+});
+
+test("a long press turns the page and wraps at the end", () => {
+  let view = open();
+  view = step(view, press("KEY", "long")).view;
+  assert.equal(view.page, 1);
+  view = step(view, press("KEY", "long")).view;
+  assert.equal(view.page, 2);
+  view = step(view, press("KEY", "long")).view;
+  assert.equal(view.page, 0, "the last page wraps back to the first");
+});
+
+// Index 3 of one page has nothing to do with index 3 of the next, and a carried
+// index would land on an arbitrary species or off the end of the page.
+test("turning the page starts the cursor over", () => {
+  const view = step(open({ cursor: 2 }), press("KEY", "long")).view;
+  assert.equal(view.page, 1);
+  assert.equal(view.cursor, 0);
 });
 
 test("a double press opens the confirm screen without swapping anything yet", () => {
@@ -57,6 +86,12 @@ test("a double press opens the confirm screen without swapping anything yet", ()
   assert.equal(view.confirming, true);
   assert.equal(view.cursor, 2, "confirming must be about the entry under the cursor");
   assert.equal(action, null, "opening the confirm screen is not itself a swap");
+});
+
+test("a page holding nothing you own has nothing to confirm", () => {
+  const { view, action } = step(open(), press("KEY", "double"), 0);
+  assert.equal(view.confirming, false);
+  assert.equal(action, null);
 });
 
 // The swap is the one irreversible thing in here, so it takes the deliberate
@@ -74,9 +109,11 @@ test("on the confirm screen, double swaps and short cancels", () => {
   assert.equal(no.view.cursor, 1, "cancelling must not move the cursor");
 });
 
-test("a long press closes the screen from either state, and never swaps", () => {
-  assert.deepEqual(step(open({ cursor: 2 }), press("KEY", "long")), { view: null, action: null });
-  assert.deepEqual(step(open({ confirming: true }), press("KEY", "long")), { view: null, action: null });
+test("a long press on the confirm screen does not turn the page under it", () => {
+  const { view, action } = step(open({ page: 1, confirming: true }), press("KEY", "long"));
+  assert.equal(action, null);
+  assert.equal(view.page, 1, "paging belongs to the grid, not to the confirm screen");
+  assert.equal(view.confirming, true);
 });
 
 test("it closes itself after a stretch of no input", () => {
@@ -92,8 +129,9 @@ test("it closes itself after a stretch of no input", () => {
 // Otherwise reading the pokedex for a few minutes closes it under you.
 test("any press resets the idle countdown", () => {
   const stale = open({ idleTicks: DEX_IDLE_TICKS_BEFORE_CLOSE - 1 });
-  assert.equal(step(stale, press("KEY", "short")).view.idleTicks, 0);
-  assert.equal(step(stale, press("KEY", "double")).view.idleTicks, 0);
+  for (const kind of ["short", "long", "double"]) {
+    assert.equal(step(stale, press("KEY", kind)).view.idleTicks, 0, `KEY ${kind}`);
+  }
 });
 
 test("the open gesture is recognised on its own, for the dispatcher's benefit", () => {
@@ -101,16 +139,4 @@ test("the open gesture is recognised on its own, for the dispatcher's benefit", 
   assert.equal(isDexOpenGesture(press("KEY", "short")), false);
   assert.equal(isDexOpenGesture(press("BOOT", "double")), false);
   assert.equal(isDexOpenGesture(undefined), false);
-});
-
-// The page is derived from where the cursor is rather than stored beside it, so
-// the two cannot disagree about which page the cursor is on.
-test("the page follows the cursor rather than being turned separately", () => {
-  const roster = [{ species: "a" }, { species: "b" }, { species: "c" }];
-  const dexIndexOf = (species) => ({ a: 0, b: 59, c: 60 })[species];
-
-  assert.equal(pageForCursor(open({ cursor: 0 }), roster, 60, dexIndexOf), 0);
-  assert.equal(pageForCursor(open({ cursor: 1 }), roster, 60, dexIndexOf), 0, "entry 60 is still page 1");
-  assert.equal(pageForCursor(open({ cursor: 2 }), roster, 60, dexIndexOf), 1, "entry 61 starts page 2");
-  assert.equal(pageForCursor(open({ cursor: 9 }), roster, 60, dexIndexOf), 0, "a cursor past the roster falls back");
 });

@@ -414,10 +414,29 @@ actually owned, in dex order, and the page follows the cursor. `pageForCursor`
 derives the page rather than storing it beside the cursor, so the two cannot
 disagree about which page the cursor is on.
 
-Gestures inside the screen: **short** moves, **double** opens the confirm
-screen, **long** returns. On the confirm screen, **double** commits and
-**short** cancels — the swap is the one irreversible thing in here, so it takes
-the deliberate gesture and the easy one backs out.
+Gestures inside the screen, set by the owner 2026-07-30: **KEY short** moves the
+cursor, **KEY long** turns the page, **KEY double** opens the confirm screen,
+**BOOT short** returns to the buddy panel. On the confirm screen, **double**
+commits and **short** cancels — the swap is the one irreversible thing in here,
+so it takes the deliberate gesture and the easy one backs out.
+
+**Return is BOOT *short*, and that is not a preference.** The owner asked for
+BOOT double; it cannot be that. `firmware/main/main.cpp` acts on BOOT double
+**by itself** — `enter_local_clock_mode(true)`, which stops the WiFi radio and
+drops to the clock face without consulting the host. Returning on BOOT double
+would therefore exit the pokedex *into power-save with the radio off*, and the
+host could not paint its way back out because there would no longer be a link to
+paint over. BOOT short does nothing device-side in normal mode, so it is the one
+that can be borrowed. Moving return to BOOT double is a **firmware** change (the
+device would have to be told a host screen is up, which the protocol has no way
+to say today) plus a reflash — not a host change. Tests pin that BOOT double and
+BOOT long still pass straight through.
+
+Because the page is now turned by hand, the **cursor is scoped to the page** it
+is on rather than to the whole roster: turning to a page holding nothing you own
+simply leaves no cursor, and the whole 151 stays browsable. A new page starts
+the cursor over — index 3 of one page has nothing to do with index 3 of the
+next.
 
 The cursor is drawn as **corner brackets around** the cell, not as an inversion
 of it: half the cells are solid silhouettes, and inverting one would turn the
