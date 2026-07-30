@@ -25,12 +25,16 @@ const HP_Y = 26;
 const HP_H = 20;
 const TITLE_Y = 248;   // just above the timing bar, at the owner's ask
 const SPRITE_SLOT = 132;
-const SPRITE_TOP = 80;
+const SPRITE_TOP = 62;
 const GROUND_Y = SPRITE_TOP + SPRITE_SLOT;
 // Narrower and flatter than the buddy panel's, because this screen has the
-// title 36px below the ground line and a full-width ellipse would run into it.
+// title below the ground line and a full-width ellipse would run into it.
 const SHADOW_RX = 46;
 const SHADOW_RY = 7;
+// The ellipse sits BELOW the feet rather than across them. At GROUND_Y - 6 it
+// cut through the sprite's legs and read as occlusion instead of as ground, so
+// the figure moved up and the shadow moved down until only its top edge touches.
+const SHADOW_Y = GROUND_Y + 6;
 
 // The wobble, timed from its parts rather than from a total, so halving the
 // rock speed cannot silently leave the phase ending mid-rock. Halved on
@@ -90,7 +94,7 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   // The ground. Same dithered ellipse the buddy panel puts under the buddy, so
   // the two screens agree about what a floor looks like. Drawn before whatever
   // stands on it, and kept below the sprite's feet and above the title.
-  if (!hidden) drawShadow(g, W / 2, GROUND_Y - 6, SHADOW_RX, SHADOW_RY);
+  if (!hidden) drawShadow(g, W / 2, SHADOW_Y, SHADOW_RX, SHADOW_RY);
   if (!hidden) {
     const flee = phase === PHASE.ESCAPED ? Math.round((elapsed / PHASE_MS[PHASE.ESCAPED]) * 90) : 0;
     // A struck pokemon flinches sideways -- the cheapest hit feedback that is
@@ -105,11 +109,11 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   if (phase === PHASE.HIT) drawSparks(g, W / 2, SPRITE_TOP + SPRITE_SLOT / 2, elapsed);
   if (phase === PHASE.WOBBLE) {
     const { fall, tilt } = wobbleAt(elapsed);
-    drawShadow(g, W / 2, GROUND_Y - 6, BALL_R, SHADOW_RY);
+    drawShadow(g, W / 2, SHADOW_Y, BALL_R, SHADOW_RY);
     drawBall(g, W / 2, GROUND_Y - BALL_R + 4 - fall, tilt);
   }
   if (phase === PHASE.CAUGHT) {
-    drawShadow(g, W / 2, GROUND_Y - 6, BALL_R, SHADOW_RY);
+    drawShadow(g, W / 2, SHADOW_Y, BALL_R, SHADOW_RY);
     drawBall(g, W / 2, GROUND_Y - BALL_R + 4, 0);
     drawCaughtStars(g, W / 2, GROUND_Y - BALL_R + 4, elapsed);
   }
