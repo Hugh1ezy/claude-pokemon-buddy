@@ -51,7 +51,74 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const POKEDEX = JSON.parse(readFileSync(new URL("../seed/pokedex.json", import.meta.url), "utf8"));
+const RARITY = JSON.parse(readFileSync(new URL("../seed/wild-rarity.json", import.meta.url), "utf8"));
 const OUT = fileURLToPath(new URL("../seed/encounters.json", import.meta.url));
+
+const WILD = new Map(RARITY.species.map((entry) => [entry.key, entry]));
+
+// How AVAILABLE the games make a species, as opposed to how catchable.
+//
+// `capture_rate` (baseWeight, below) answers "how hard is this to catch once you
+// have found it". It says nothing about how often you find it, and using it alone
+// was wrong in a way the owner spotted on 2026-07-30: a stage-2 pokemon turned up
+// as casually as a stage-1 one, which is not how the games behave. Canonically,
+// on foot in Generation 1:
+//
+//   base forms      49 of 68 meetable, median walkChanceSum 80
+//   first evos      39 of 64 meetable, median 30
+//   second evos      2 of 19 meetable, median 18
+//   and 61 of the 151 cannot be met on foot at all
+//
+// So availability is its own axis and it comes from seed/wild-rarity.json, which
+// is generated from PokeAPI by scripts/gen-wild-rarity.mjs -- not from anyone's
+// sense of which pokemon feel rare. Re-run that script, not your memory.
+//
+// The 61 that never appear on foot are floored rather than removed. Removing them
+// would make the pokedex uncompletable, since nothing here obtains a species by
+// trade, by a fishing rod or from a static encounter; the games' answer for those
+// is a mechanic this project does not have. They stay findable, just barely.
+//
+// STRENGTH blends the canonical ratio toward neutral, and it exists because the
+// raw ratio at full force is unshippable. Measured with sim-encounters.mjs, 40
+// runs, 400-day horizon, same code and seeds throughout:
+//
+//   pre-change table        40/40 complete, median 331, slowest 393
+//   STRENGTH 1.0            0/40  -- and 3 species never caught in any run
+//   STRENGTH 0.65           31/40, median 343
+//   STRENGTH 0.45           37/40, median 344
+//   STRENGTH 0.30 (current) 37/40, median 336
+//
+// Note the baseline's slowest run is 393 against a 400-day horizon: it was
+// already 7 days from the edge, so the 3 unfinished runs are mostly that margin
+// disappearing rather than a collapse. The median cost is 5 days.
+//
+// THE REAL FIX IS STRUCTURAL, and this knob is a stopgap for it. Canonically 17
+// of the 19 second-stage pokemon cannot be met in the wild at all, because in the
+// games you get them by EVOLVING one you caught. Here the pokedex only fills by
+// catching, so those 17 have to stay huntable and cannot be as rare as they
+// should be. Let a caught pokemon in the box evolve and fill its own dex entry --
+// which is exactly what recordSeen already does for the buddy's own line -- and
+// the wild rate for second stages can drop to canonical while completion gets
+// FASTER rather than slower. Until then, STRENGTH trades one against the other.
+//
+// Re-run scripts/sim-encounters.mjs after touching any of these. The generator's
+// own header says not to reason about weights in your head, and it is right.
+const STRENGTH = 0.30;
+const NEVER_ON_FOOT = 0.40;
+const AVAILABILITY_REFERENCE = 80;   // the median base form, i.e. "ordinary"
+const AVAILABILITY_CEILING = 1.6;
+
+function availability(species) {
+  const wild = WILD.get(species.key);
+  if (!wild) return 1;                       // absent from the dataset: unchanged
+  const raw = wild.walkAreas === 0
+    // Square-rooted, not linear: the busiest species is ~330 against a median of
+    // 80, and a raw ratio would let it eat the pool the way the old flat
+    // capture_rate curve let evolved forms eat it.
+    ? NEVER_ON_FOOT
+    : Math.min(AVAILABILITY_CEILING, Math.max(NEVER_ON_FOOT, Math.sqrt(wild.walkChanceSum / AVAILABILITY_REFERENCE)));
+  return 1 + STRENGTH * (raw - 1);
+}
 
 // Base weight by how catchable the games say it is. The curve is deliberately
 // flatter than capture_rate itself (255 vs 3 is 85x; this is 100 vs 1.5) --
@@ -191,9 +258,11 @@ const NEEDS = {
   mew: { dexAtLeast: 145, ...LOYAL, ...WELL_CARED, ...LONG_STREAK, ...INDOORS_COLD },
 };
 
+// Rounded to 3dp so the generated file stays diffable; the engine normalises
+// against the running total, so the absolute scale never matters.
 const species = POKEDEX.species.map((s) => ({
   species: s.key,
-  weight: baseWeight(s),
+  weight: Number((baseWeight(s) * availability(s)).toFixed(3)),
   ...(NEEDS[s.key] && Object.keys(NEEDS[s.key]).length > 0 ? { needs: NEEDS[s.key] } : {}),
 }));
 

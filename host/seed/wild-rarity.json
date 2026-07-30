@@ -1,0 +1,2399 @@
+{
+  "source": "pokeapi, generation i (red/blue/yellow)",
+  "species": [
+    {
+      "key": "bulbasaur",
+      "dex": 1,
+      "areas": 2,
+      "chanceSum": 200,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "ivysaur",
+      "dex": 2,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "bulbasaur",
+      "legendary": false
+    },
+    {
+      "key": "venusaur",
+      "dex": 3,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "ivysaur",
+      "legendary": false
+    },
+    {
+      "key": "charmander",
+      "dex": 4,
+      "areas": 2,
+      "chanceSum": 200,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "charmeleon",
+      "dex": 5,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "charmander",
+      "legendary": false
+    },
+    {
+      "key": "charizard",
+      "dex": 6,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "charmeleon",
+      "legendary": false
+    },
+    {
+      "key": "squirtle",
+      "dex": 7,
+      "areas": 2,
+      "chanceSum": 200,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "wartortle",
+      "dex": 8,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "squirtle",
+      "legendary": false
+    },
+    {
+      "key": "blastoise",
+      "dex": 9,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "wartortle",
+      "legendary": false
+    },
+    {
+      "key": "caterpie",
+      "dex": 10,
+      "areas": 4,
+      "chanceSum": 70,
+      "chanceMax": 20,
+      "walkAreas": 4,
+      "walkChanceSum": 70,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "metapod",
+      "dex": 11,
+      "areas": 3,
+      "chanceSum": 60,
+      "chanceMax": 20,
+      "walkAreas": 3,
+      "walkChanceSum": 60,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "caterpie",
+      "legendary": false
+    },
+    {
+      "key": "butterfree",
+      "dex": 12,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "metapod",
+      "legendary": false
+    },
+    {
+      "key": "weedle",
+      "dex": 13,
+      "areas": 4,
+      "chanceSum": 70,
+      "chanceMax": 20,
+      "walkAreas": 4,
+      "walkChanceSum": 70,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "kakuna",
+      "dex": 14,
+      "areas": 3,
+      "chanceSum": 60,
+      "chanceMax": 20,
+      "walkAreas": 3,
+      "walkChanceSum": 60,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "weedle",
+      "legendary": false
+    },
+    {
+      "key": "beedrill",
+      "dex": 15,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "kakuna",
+      "legendary": false
+    },
+    {
+      "key": "pidgey",
+      "dex": 16,
+      "areas": 16,
+      "chanceSum": 295,
+      "chanceMax": 20,
+      "walkAreas": 16,
+      "walkChanceSum": 295,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "pidgeotto",
+      "dex": 17,
+      "areas": 13,
+      "chanceSum": 93,
+      "chanceMax": 15,
+      "walkAreas": 13,
+      "walkChanceSum": 93,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "pidgey",
+      "legendary": false
+    },
+    {
+      "key": "pidgeot",
+      "dex": 18,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "pidgeotto",
+      "legendary": false
+    },
+    {
+      "key": "rattata",
+      "dex": 19,
+      "areas": 18,
+      "chanceSum": 330,
+      "chanceMax": 20,
+      "walkAreas": 18,
+      "walkChanceSum": 330,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "raticate",
+      "dex": 20,
+      "areas": 11,
+      "chanceSum": 134,
+      "chanceMax": 20,
+      "walkAreas": 11,
+      "walkChanceSum": 134,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 127,
+      "stage": 1,
+      "evolvesFrom": "rattata",
+      "legendary": false
+    },
+    {
+      "key": "spearow",
+      "dex": 21,
+      "areas": 10,
+      "chanceSum": 180,
+      "chanceMax": 20,
+      "walkAreas": 10,
+      "walkChanceSum": 180,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "fearow",
+      "dex": 22,
+      "areas": 5,
+      "chanceSum": 46,
+      "chanceMax": 20,
+      "walkAreas": 5,
+      "walkChanceSum": 46,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "spearow",
+      "legendary": false
+    },
+    {
+      "key": "ekans",
+      "dex": 23,
+      "areas": 6,
+      "chanceSum": 85,
+      "chanceMax": 20,
+      "walkAreas": 6,
+      "walkChanceSum": 85,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "arbok",
+      "dex": 24,
+      "areas": 3,
+      "chanceSum": 20,
+      "chanceMax": 10,
+      "walkAreas": 3,
+      "walkChanceSum": 20,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "ekans",
+      "legendary": false
+    },
+    {
+      "key": "pikachu",
+      "dex": 25,
+      "areas": 3,
+      "chanceSum": 119,
+      "chanceMax": 100,
+      "walkAreas": 2,
+      "walkChanceSum": 19,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 1,
+      "evolvesFrom": "pichu",
+      "legendary": false
+    },
+    {
+      "key": "raichu",
+      "dex": 26,
+      "areas": 3,
+      "chanceSum": 18,
+      "chanceMax": 10,
+      "walkAreas": 3,
+      "walkChanceSum": 18,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 2,
+      "evolvesFrom": "pikachu",
+      "legendary": false
+    },
+    {
+      "key": "sandshrew",
+      "dex": 27,
+      "areas": 8,
+      "chanceSum": 99,
+      "chanceMax": 20,
+      "walkAreas": 8,
+      "walkChanceSum": 99,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "sandslash",
+      "dex": 28,
+      "areas": 4,
+      "chanceSum": 30,
+      "chanceMax": 10,
+      "walkAreas": 4,
+      "walkChanceSum": 30,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "sandshrew",
+      "legendary": false
+    },
+    {
+      "key": "nidoran-f",
+      "dex": 29,
+      "areas": 9,
+      "chanceSum": 240,
+      "chanceMax": 100,
+      "walkAreas": 8,
+      "walkChanceSum": 140,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 235,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "nidorina",
+      "dex": 30,
+      "areas": 8,
+      "chanceSum": 265,
+      "chanceMax": 100,
+      "walkAreas": 6,
+      "walkChanceSum": 65,
+      "methods": [
+        "gift",
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "nidoran-f",
+      "legendary": false
+    },
+    {
+      "key": "nidoqueen",
+      "dex": 31,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "nidorina",
+      "legendary": false
+    },
+    {
+      "key": "nidoran-m",
+      "dex": 32,
+      "areas": 8,
+      "chanceSum": 140,
+      "chanceMax": 20,
+      "walkAreas": 8,
+      "walkChanceSum": 140,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 235,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "nidorino",
+      "dex": 33,
+      "areas": 7,
+      "chanceSum": 165,
+      "chanceMax": 100,
+      "walkAreas": 6,
+      "walkChanceSum": 65,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "nidoran-m",
+      "legendary": false
+    },
+    {
+      "key": "nidoking",
+      "dex": 34,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "nidorino",
+      "legendary": false
+    },
+    {
+      "key": "clefairy",
+      "dex": 35,
+      "areas": 4,
+      "chanceSum": 110,
+      "chanceMax": 100,
+      "walkAreas": 3,
+      "walkChanceSum": 10,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 150,
+      "stage": 1,
+      "evolvesFrom": "cleffa",
+      "legendary": false
+    },
+    {
+      "key": "clefable",
+      "dex": 36,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 25,
+      "stage": 2,
+      "evolvesFrom": "clefairy",
+      "legendary": false
+    },
+    {
+      "key": "vulpix",
+      "dex": 37,
+      "areas": 7,
+      "chanceSum": 180,
+      "chanceMax": 100,
+      "walkAreas": 6,
+      "walkChanceSum": 80,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "ninetales",
+      "dex": 38,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "vulpix",
+      "legendary": false
+    },
+    {
+      "key": "jigglypuff",
+      "dex": 39,
+      "areas": 5,
+      "chanceSum": 25,
+      "chanceMax": 5,
+      "walkAreas": 5,
+      "walkChanceSum": 25,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 170,
+      "stage": 1,
+      "evolvesFrom": "igglybuff",
+      "legendary": false
+    },
+    {
+      "key": "wigglytuff",
+      "dex": 40,
+      "areas": 2,
+      "chanceSum": 105,
+      "chanceMax": 100,
+      "walkAreas": 1,
+      "walkChanceSum": 5,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 50,
+      "stage": 2,
+      "evolvesFrom": "jigglypuff",
+      "legendary": false
+    },
+    {
+      "key": "zubat",
+      "dex": 41,
+      "areas": 13,
+      "chanceSum": 245,
+      "chanceMax": 20,
+      "walkAreas": 13,
+      "walkChanceSum": 245,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "golbat",
+      "dex": 42,
+      "areas": 11,
+      "chanceSum": 160,
+      "chanceMax": 20,
+      "walkAreas": 11,
+      "walkChanceSum": 160,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "zubat",
+      "legendary": false
+    },
+    {
+      "key": "oddish",
+      "dex": 43,
+      "areas": 9,
+      "chanceSum": 180,
+      "chanceMax": 20,
+      "walkAreas": 9,
+      "walkChanceSum": 180,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "gloom",
+      "dex": 44,
+      "areas": 6,
+      "chanceSum": 35,
+      "chanceMax": 10,
+      "walkAreas": 6,
+      "walkChanceSum": 35,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "oddish",
+      "legendary": false
+    },
+    {
+      "key": "vileplume",
+      "dex": 45,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "gloom",
+      "legendary": false
+    },
+    {
+      "key": "paras",
+      "dex": 46,
+      "areas": 6,
+      "chanceSum": 65,
+      "chanceMax": 15,
+      "walkAreas": 6,
+      "walkChanceSum": 65,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "parasect",
+      "dex": 47,
+      "areas": 5,
+      "chanceSum": 130,
+      "chanceMax": 100,
+      "walkAreas": 4,
+      "walkChanceSum": 30,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "paras",
+      "legendary": false
+    },
+    {
+      "key": "venonat",
+      "dex": 48,
+      "areas": 8,
+      "chanceSum": 90,
+      "chanceMax": 15,
+      "walkAreas": 8,
+      "walkChanceSum": 90,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "venomoth",
+      "dex": 49,
+      "areas": 7,
+      "chanceSum": 52,
+      "chanceMax": 20,
+      "walkAreas": 7,
+      "walkChanceSum": 52,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "venonat",
+      "legendary": false
+    },
+    {
+      "key": "diglett",
+      "dex": 50,
+      "areas": 1,
+      "chanceSum": 20,
+      "chanceMax": 20,
+      "walkAreas": 1,
+      "walkChanceSum": 20,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "dugtrio",
+      "dex": 51,
+      "areas": 2,
+      "chanceSum": 104,
+      "chanceMax": 100,
+      "walkAreas": 1,
+      "walkChanceSum": 4,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 50,
+      "stage": 1,
+      "evolvesFrom": "diglett",
+      "legendary": false
+    },
+    {
+      "key": "meowth",
+      "dex": 52,
+      "areas": 4,
+      "chanceSum": 55,
+      "chanceMax": 20,
+      "walkAreas": 4,
+      "walkChanceSum": 55,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "persian",
+      "dex": 53,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "meowth",
+      "legendary": false
+    },
+    {
+      "key": "psyduck",
+      "dex": 54,
+      "areas": 13,
+      "chanceSum": 243,
+      "chanceMax": 25,
+      "walkAreas": 5,
+      "walkChanceSum": 80,
+      "methods": [
+        "super-rod",
+        "surf",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "golduck",
+      "dex": 55,
+      "areas": 4,
+      "chanceSum": 10,
+      "chanceMax": 4,
+      "walkAreas": 3,
+      "walkChanceSum": 6,
+      "methods": [
+        "surf",
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "psyduck",
+      "legendary": false
+    },
+    {
+      "key": "mankey",
+      "dex": 56,
+      "areas": 8,
+      "chanceSum": 115,
+      "chanceMax": 20,
+      "walkAreas": 8,
+      "walkChanceSum": 115,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "primeape",
+      "dex": 57,
+      "areas": 1,
+      "chanceSum": 4,
+      "chanceMax": 4,
+      "walkAreas": 1,
+      "walkChanceSum": 4,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "mankey",
+      "legendary": false
+    },
+    {
+      "key": "growlithe",
+      "dex": 58,
+      "areas": 6,
+      "chanceSum": 80,
+      "chanceMax": 20,
+      "walkAreas": 6,
+      "walkChanceSum": 80,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "arcanine",
+      "dex": 59,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "growlithe",
+      "legendary": false
+    },
+    {
+      "key": "poliwag",
+      "dex": 60,
+      "areas": 30,
+      "chanceSum": 1500,
+      "chanceMax": 50,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "good-rod",
+        "super-rod"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "poliwhirl",
+      "dex": 61,
+      "areas": 4,
+      "chanceSum": 80,
+      "chanceMax": 25,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "super-rod"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "poliwag",
+      "legendary": false
+    },
+    {
+      "key": "poliwrath",
+      "dex": 62,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "poliwhirl",
+      "legendary": false
+    },
+    {
+      "key": "abra",
+      "dex": 63,
+      "areas": 7,
+      "chanceSum": 170,
+      "chanceMax": 100,
+      "walkAreas": 6,
+      "walkChanceSum": 70,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 200,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "kadabra",
+      "dex": 64,
+      "areas": 3,
+      "chanceSum": 24,
+      "chanceMax": 15,
+      "walkAreas": 3,
+      "walkChanceSum": 24,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 100,
+      "stage": 1,
+      "evolvesFrom": "abra",
+      "legendary": false
+    },
+    {
+      "key": "alakazam",
+      "dex": 65,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 50,
+      "stage": 2,
+      "evolvesFrom": "kadabra",
+      "legendary": false
+    },
+    {
+      "key": "machop",
+      "dex": 66,
+      "areas": 6,
+      "chanceSum": 89,
+      "chanceMax": 20,
+      "walkAreas": 6,
+      "walkChanceSum": 89,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 180,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "machoke",
+      "dex": 67,
+      "areas": 4,
+      "chanceSum": 114,
+      "chanceMax": 100,
+      "walkAreas": 3,
+      "walkChanceSum": 14,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "machop",
+      "legendary": false
+    },
+    {
+      "key": "machamp",
+      "dex": 68,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "machoke",
+      "legendary": false
+    },
+    {
+      "key": "bellsprout",
+      "dex": 69,
+      "areas": 9,
+      "chanceSum": 180,
+      "chanceMax": 20,
+      "walkAreas": 9,
+      "walkChanceSum": 180,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "weepinbell",
+      "dex": 70,
+      "areas": 6,
+      "chanceSum": 35,
+      "chanceMax": 10,
+      "walkAreas": 6,
+      "walkChanceSum": 35,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "bellsprout",
+      "legendary": false
+    },
+    {
+      "key": "victreebel",
+      "dex": 71,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "weepinbell",
+      "legendary": false
+    },
+    {
+      "key": "tentacool",
+      "dex": 72,
+      "areas": 15,
+      "chanceSum": 495,
+      "chanceMax": 40,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "super-rod",
+        "surf"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "tentacruel",
+      "dex": 73,
+      "areas": 3,
+      "chanceSum": 50,
+      "chanceMax": 30,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "super-rod"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "tentacool",
+      "legendary": false
+    },
+    {
+      "key": "geodude",
+      "dex": 74,
+      "areas": 8,
+      "chanceSum": 150,
+      "chanceMax": 20,
+      "walkAreas": 8,
+      "walkChanceSum": 150,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "graveler",
+      "dex": 75,
+      "areas": 6,
+      "chanceSum": 70,
+      "chanceMax": 15,
+      "walkAreas": 6,
+      "walkChanceSum": 70,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 1,
+      "evolvesFrom": "geodude",
+      "legendary": false
+    },
+    {
+      "key": "golem",
+      "dex": 76,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "graveler",
+      "legendary": false
+    },
+    {
+      "key": "ponyta",
+      "dex": 77,
+      "areas": 5,
+      "chanceSum": 55,
+      "chanceMax": 15,
+      "walkAreas": 5,
+      "walkChanceSum": 55,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "rapidash",
+      "dex": 78,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "ponyta",
+      "legendary": false
+    },
+    {
+      "key": "slowpoke",
+      "dex": 79,
+      "areas": 13,
+      "chanceSum": 270,
+      "chanceMax": 25,
+      "walkAreas": 5,
+      "walkChanceSum": 80,
+      "methods": [
+        "super-rod",
+        "surf",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "slowbro",
+      "dex": 80,
+      "areas": 8,
+      "chanceSum": 89,
+      "chanceMax": 25,
+      "walkAreas": 3,
+      "walkChanceSum": 6,
+      "methods": [
+        "super-rod",
+        "surf",
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "slowpoke",
+      "legendary": false
+    },
+    {
+      "key": "magnemite",
+      "dex": 81,
+      "areas": 2,
+      "chanceSum": 40,
+      "chanceMax": 20,
+      "walkAreas": 2,
+      "walkChanceSum": 40,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "magneton",
+      "dex": 82,
+      "areas": 2,
+      "chanceSum": 30,
+      "chanceMax": 15,
+      "walkAreas": 2,
+      "walkChanceSum": 30,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "magnemite",
+      "legendary": false
+    },
+    {
+      "key": "farfetchd",
+      "dex": 83,
+      "areas": 3,
+      "chanceSum": 108,
+      "chanceMax": 100,
+      "walkAreas": 2,
+      "walkChanceSum": 8,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "doduo",
+      "dex": 84,
+      "areas": 5,
+      "chanceSum": 100,
+      "chanceMax": 20,
+      "walkAreas": 5,
+      "walkChanceSum": 100,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "dodrio",
+      "dex": 85,
+      "areas": 3,
+      "chanceSum": 31,
+      "chanceMax": 20,
+      "walkAreas": 3,
+      "walkChanceSum": 31,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "doduo",
+      "legendary": false
+    },
+    {
+      "key": "seel",
+      "dex": 86,
+      "areas": 6,
+      "chanceSum": 180,
+      "chanceMax": 100,
+      "walkAreas": 5,
+      "walkChanceSum": 80,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "dewgong",
+      "dex": 87,
+      "areas": 4,
+      "chanceSum": 112,
+      "chanceMax": 100,
+      "walkAreas": 3,
+      "walkChanceSum": 12,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "seel",
+      "legendary": false
+    },
+    {
+      "key": "grimer",
+      "dex": 88,
+      "areas": 5,
+      "chanceSum": 90,
+      "chanceMax": 20,
+      "walkAreas": 5,
+      "walkChanceSum": 90,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "muk",
+      "dex": 89,
+      "areas": 6,
+      "chanceSum": 132,
+      "chanceMax": 100,
+      "walkAreas": 5,
+      "walkChanceSum": 32,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "grimer",
+      "legendary": false
+    },
+    {
+      "key": "shellder",
+      "dex": 90,
+      "areas": 15,
+      "chanceSum": 300,
+      "chanceMax": 30,
+      "walkAreas": 5,
+      "walkChanceSum": 75,
+      "methods": [
+        "super-rod",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "cloyster",
+      "dex": 91,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "shellder",
+      "legendary": false
+    },
+    {
+      "key": "gastly",
+      "dex": 92,
+      "areas": 5,
+      "chanceSum": 100,
+      "chanceMax": 20,
+      "walkAreas": 5,
+      "walkChanceSum": 100,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "haunter",
+      "dex": 93,
+      "areas": 5,
+      "chanceSum": 29,
+      "chanceMax": 10,
+      "walkAreas": 5,
+      "walkChanceSum": 29,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 1,
+      "evolvesFrom": "gastly",
+      "legendary": false
+    },
+    {
+      "key": "gengar",
+      "dex": 94,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "haunter",
+      "legendary": false
+    },
+    {
+      "key": "onix",
+      "dex": 95,
+      "areas": 5,
+      "chanceSum": 39,
+      "chanceMax": 10,
+      "walkAreas": 5,
+      "walkChanceSum": 39,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "drowzee",
+      "dex": 96,
+      "areas": 1,
+      "chanceSum": 10,
+      "chanceMax": 10,
+      "walkAreas": 1,
+      "walkChanceSum": 10,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "hypno",
+      "dex": 97,
+      "areas": 1,
+      "chanceSum": 20,
+      "chanceMax": 20,
+      "walkAreas": 1,
+      "walkChanceSum": 20,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "drowzee",
+      "legendary": false
+    },
+    {
+      "key": "krabby",
+      "dex": 98,
+      "areas": 22,
+      "chanceSum": 523,
+      "chanceMax": 40,
+      "walkAreas": 5,
+      "walkChanceSum": 95,
+      "methods": [
+        "super-rod",
+        "walk"
+      ],
+      "captureRate": 225,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "kingler",
+      "dex": 99,
+      "areas": 9,
+      "chanceSum": 136,
+      "chanceMax": 20,
+      "walkAreas": 4,
+      "walkChanceSum": 35,
+      "methods": [
+        "super-rod",
+        "walk"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "krabby",
+      "legendary": false
+    },
+    {
+      "key": "voltorb",
+      "dex": 100,
+      "areas": 2,
+      "chanceSum": 120,
+      "chanceMax": 100,
+      "walkAreas": 2,
+      "walkChanceSum": 40,
+      "methods": [
+        "static",
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "electrode",
+      "dex": 101,
+      "areas": 4,
+      "chanceSum": 225,
+      "chanceMax": 100,
+      "walkAreas": 2,
+      "walkChanceSum": 25,
+      "methods": [
+        "npc-trade",
+        "static",
+        "walk"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "voltorb",
+      "legendary": false
+    },
+    {
+      "key": "exeggcute",
+      "dex": 102,
+      "areas": 4,
+      "chanceSum": 60,
+      "chanceMax": 15,
+      "walkAreas": 4,
+      "walkChanceSum": 60,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 90,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "exeggutor",
+      "dex": 103,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "exeggcute",
+      "legendary": false
+    },
+    {
+      "key": "cubone",
+      "dex": 104,
+      "areas": 8,
+      "chanceSum": 50,
+      "chanceMax": 10,
+      "walkAreas": 8,
+      "walkChanceSum": 50,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "marowak",
+      "dex": 105,
+      "areas": 6,
+      "chanceSum": 45,
+      "chanceMax": 20,
+      "walkAreas": 6,
+      "walkChanceSum": 45,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "cubone",
+      "legendary": false
+    },
+    {
+      "key": "hitmonlee",
+      "dex": 106,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "tyrogue",
+      "legendary": false
+    },
+    {
+      "key": "hitmonchan",
+      "dex": 107,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "tyrogue",
+      "legendary": false
+    },
+    {
+      "key": "lickitung",
+      "dex": 108,
+      "areas": 2,
+      "chanceSum": 104,
+      "chanceMax": 100,
+      "walkAreas": 1,
+      "walkChanceSum": 4,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "koffing",
+      "dex": 109,
+      "areas": 4,
+      "chanceSum": 80,
+      "chanceMax": 20,
+      "walkAreas": 4,
+      "walkChanceSum": 80,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 190,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "weezing",
+      "dex": 110,
+      "areas": 4,
+      "chanceSum": 28,
+      "chanceMax": 10,
+      "walkAreas": 4,
+      "walkChanceSum": 28,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "koffing",
+      "legendary": false
+    },
+    {
+      "key": "rhyhorn",
+      "dex": 111,
+      "areas": 4,
+      "chanceSum": 60,
+      "chanceMax": 20,
+      "walkAreas": 4,
+      "walkChanceSum": 60,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 120,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "rhydon",
+      "dex": 112,
+      "areas": 3,
+      "chanceSum": 130,
+      "chanceMax": 100,
+      "walkAreas": 2,
+      "walkChanceSum": 30,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "rhyhorn",
+      "legendary": false
+    },
+    {
+      "key": "chansey",
+      "dex": 113,
+      "areas": 5,
+      "chanceSum": 24,
+      "chanceMax": 10,
+      "walkAreas": 5,
+      "walkChanceSum": 24,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 30,
+      "stage": 1,
+      "evolvesFrom": "happiny",
+      "legendary": false
+    },
+    {
+      "key": "tangela",
+      "dex": 114,
+      "areas": 4,
+      "chanceSum": 110,
+      "chanceMax": 100,
+      "walkAreas": 3,
+      "walkChanceSum": 10,
+      "methods": [
+        "npc-trade",
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "kangaskhan",
+      "dex": 115,
+      "areas": 3,
+      "chanceSum": 15,
+      "chanceMax": 10,
+      "walkAreas": 3,
+      "walkChanceSum": 15,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "horsea",
+      "dex": 116,
+      "areas": 14,
+      "chanceSum": 265,
+      "chanceMax": 40,
+      "walkAreas": 5,
+      "walkChanceSum": 70,
+      "methods": [
+        "super-rod",
+        "walk"
+      ],
+      "captureRate": 225,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "seadra",
+      "dex": 117,
+      "areas": 7,
+      "chanceSum": 110,
+      "chanceMax": 25,
+      "walkAreas": 2,
+      "walkChanceSum": 5,
+      "methods": [
+        "super-rod",
+        "walk"
+      ],
+      "captureRate": 75,
+      "stage": 1,
+      "evolvesFrom": "horsea",
+      "legendary": false
+    },
+    {
+      "key": "goldeen",
+      "dex": 118,
+      "areas": 30,
+      "chanceSum": 1500,
+      "chanceMax": 50,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "good-rod",
+        "super-rod"
+      ],
+      "captureRate": 225,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "seaking",
+      "dex": 119,
+      "areas": 6,
+      "chanceSum": 132,
+      "chanceMax": 30,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "super-rod"
+      ],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "goldeen",
+      "legendary": false
+    },
+    {
+      "key": "staryu",
+      "dex": 120,
+      "areas": 11,
+      "chanceSum": 290,
+      "chanceMax": 40,
+      "walkAreas": 5,
+      "walkChanceSum": 75,
+      "methods": [
+        "super-rod",
+        "surf",
+        "walk"
+      ],
+      "captureRate": 225,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "starmie",
+      "dex": 121,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 60,
+      "stage": 1,
+      "evolvesFrom": "staryu",
+      "legendary": false
+    },
+    {
+      "key": "mr-mime",
+      "dex": 122,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "npc-trade"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "mime-jr",
+      "legendary": false
+    },
+    {
+      "key": "scyther",
+      "dex": 123,
+      "areas": 4,
+      "chanceSum": 109,
+      "chanceMax": 100,
+      "walkAreas": 3,
+      "walkChanceSum": 9,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "jynx",
+      "dex": 124,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "npc-trade"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "smoochum",
+      "legendary": false
+    },
+    {
+      "key": "electabuzz",
+      "dex": 125,
+      "areas": 1,
+      "chanceSum": 4,
+      "chanceMax": 4,
+      "walkAreas": 1,
+      "walkChanceSum": 4,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "elekid",
+      "legendary": false
+    },
+    {
+      "key": "magmar",
+      "dex": 126,
+      "areas": 2,
+      "chanceSum": 14,
+      "chanceMax": 10,
+      "walkAreas": 2,
+      "walkChanceSum": 14,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "magby",
+      "legendary": false
+    },
+    {
+      "key": "pinsir",
+      "dex": 127,
+      "areas": 5,
+      "chanceSum": 110,
+      "chanceMax": 100,
+      "walkAreas": 4,
+      "walkChanceSum": 10,
+      "methods": [
+        "gift",
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "tauros",
+      "dex": 128,
+      "areas": 3,
+      "chanceSum": 21,
+      "chanceMax": 10,
+      "walkAreas": 3,
+      "walkChanceSum": 21,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "magikarp",
+      "dex": 129,
+      "areas": 32,
+      "chanceSum": 3200,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift",
+        "old-rod",
+        "super-rod"
+      ],
+      "captureRate": 255,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "gyarados",
+      "dex": 130,
+      "areas": 1,
+      "chanceSum": 10,
+      "chanceMax": 10,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "super-rod"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "magikarp",
+      "legendary": false
+    },
+    {
+      "key": "lapras",
+      "dex": 131,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "ditto",
+      "dex": 132,
+      "areas": 8,
+      "chanceSum": 89,
+      "chanceMax": 20,
+      "walkAreas": 8,
+      "walkChanceSum": 89,
+      "methods": [
+        "walk"
+      ],
+      "captureRate": 35,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "eevee",
+      "dex": 133,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "vaporeon",
+      "dex": 134,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "eevee",
+      "legendary": false
+    },
+    {
+      "key": "jolteon",
+      "dex": 135,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "eevee",
+      "legendary": false
+    },
+    {
+      "key": "flareon",
+      "dex": 136,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "eevee",
+      "legendary": false
+    },
+    {
+      "key": "porygon",
+      "dex": 137,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "omanyte",
+      "dex": 138,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "omastar",
+      "dex": 139,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "omanyte",
+      "legendary": false
+    },
+    {
+      "key": "kabuto",
+      "dex": 140,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "kabutops",
+      "dex": 141,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "kabuto",
+      "legendary": false
+    },
+    {
+      "key": "aerodactyl",
+      "dex": 142,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "snorlax",
+      "dex": 143,
+      "areas": 2,
+      "chanceSum": 200,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "pokeflute"
+      ],
+      "captureRate": 25,
+      "stage": 1,
+      "evolvesFrom": "munchlax",
+      "legendary": false
+    },
+    {
+      "key": "articuno",
+      "dex": 144,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "static"
+      ],
+      "captureRate": 3,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": true
+    },
+    {
+      "key": "zapdos",
+      "dex": 145,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "static"
+      ],
+      "captureRate": 3,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": true
+    },
+    {
+      "key": "moltres",
+      "dex": 146,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "static"
+      ],
+      "captureRate": 3,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": true
+    },
+    {
+      "key": "dratini",
+      "dex": 147,
+      "areas": 5,
+      "chanceSum": 200,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "gift",
+        "super-rod"
+      ],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": false
+    },
+    {
+      "key": "dragonair",
+      "dex": 148,
+      "areas": 1,
+      "chanceSum": 10,
+      "chanceMax": 10,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "super-rod"
+      ],
+      "captureRate": 45,
+      "stage": 1,
+      "evolvesFrom": "dratini",
+      "legendary": false
+    },
+    {
+      "key": "dragonite",
+      "dex": 149,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 2,
+      "evolvesFrom": "dragonair",
+      "legendary": false
+    },
+    {
+      "key": "mewtwo",
+      "dex": 150,
+      "areas": 1,
+      "chanceSum": 100,
+      "chanceMax": 100,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [
+        "static"
+      ],
+      "captureRate": 3,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": true
+    },
+    {
+      "key": "mew",
+      "dex": 151,
+      "areas": 0,
+      "chanceSum": 0,
+      "chanceMax": 0,
+      "walkAreas": 0,
+      "walkChanceSum": 0,
+      "methods": [],
+      "captureRate": 45,
+      "stage": 0,
+      "evolvesFrom": null,
+      "legendary": true
+    }
+  ]
+}
