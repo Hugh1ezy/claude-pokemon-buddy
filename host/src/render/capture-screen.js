@@ -25,7 +25,7 @@ const HP_Y = 26;
 const HP_H = 20;
 const TITLE_Y = 248;   // just above the timing bar, at the owner's ask
 const SPRITE_SLOT = 132;
-const SPRITE_TOP = 62;
+const SPRITE_TOP = 68;
 const GROUND_Y = SPRITE_TOP + SPRITE_SLOT;
 // Narrower and flatter than the buddy panel's, because this screen has the
 // title below the ground line and a full-width ellipse would run into it.
@@ -33,8 +33,13 @@ const SHADOW_RX = 46;
 const SHADOW_RY = 7;
 // The ellipse sits BELOW the feet rather than across them. At GROUND_Y - 6 it
 // cut through the sprite's legs and read as occlusion instead of as ground, so
-// the figure moved up and the shadow moved down until only its top edge touches.
-const SHADOW_Y = GROUND_Y + 6;
+// the figure moved up and the shadow moved down. Widened to +12 on a second
+// look: at +6 the ellipse still met the feet, and the owner wanted daylight.
+//
+// Because GROUND_Y is derived from SPRITE_TOP, moving the sprite carries the
+// ball and this shadow with it -- the three stay one group by construction
+// rather than by three edits that have to agree.
+const SHADOW_Y = GROUND_Y + 12;
 
 // The wobble, timed from its parts rather than from a total, so halving the
 // rock speed cannot silently leave the phase ending mid-rock. Halved on
