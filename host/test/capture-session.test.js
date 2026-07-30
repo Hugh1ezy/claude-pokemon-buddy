@@ -146,3 +146,20 @@ test("a teleporter gets one throw and it is the capture", async () => {
   const kinds = h.pushed.filter((f) => f.phase === PHASE.AIM).map((f) => f.kind);
   assert.ok(!kinds.includes("attack"), "its only throw is the capture");
 });
+
+// The title read "投球！" through both attacks because play() forwarded the
+// phase but not the kind, so every frame that was not an aiming frame lost
+// track of what the throw was for.
+test("every frame of an attack knows it is an attack, not just the aiming ones", async () => {
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+  const h = harness({ target: start, aimOffsets: [FRAME_MS, FRAME_MS, FRAME_MS] });
+  await runCaptureSession(h.io);
+
+  const attackPhases = h.pushed.filter((f) => f.kind === "attack").map((f) => f.phase);
+  assert.ok(attackPhases.includes(PHASE.THROW), "the throw frames of an attack must carry kind");
+  assert.ok(attackPhases.includes(PHASE.HIT), "so must the hit frames");
+  assert.ok(
+    h.pushed.filter((f) => f.phase === PHASE.WOBBLE).every((f) => f.kind === "capture"),
+    "and the wobble only ever belongs to the capture",
+  );
+});

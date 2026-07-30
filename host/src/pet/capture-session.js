@@ -40,9 +40,12 @@ export async function runCaptureSession({
   // that moved would make them worthless.
   const slider = createEncounterThrow({ params, rng });
   let rules = createEncounter({ teleports: Boolean(params?.teleports) });
+  // Function-scoped so play() below can see it -- it is what tells a frame
+  // whether this throw is an attack or the capture.
+  let kind = null;
 
   for (;;) {
-    const kind = stepKind(rules);
+    kind = stepKind(rules);
     const aimStart = now();
     takePress();                       // discard the press that opened the screen
 
@@ -97,11 +100,14 @@ export async function runCaptureSession({
     await play(PHASE.RETRY, phases[PHASE.RETRY]);
   }
 
+  // `kind` has to be forwarded, not just the phase. Without it every frame that
+  // is not an aiming frame lost track of whether this throw was an attack or
+  // the capture, and the title fell through to "投球！" during both attacks.
   async function play(phase, ms, extra = {}) {
     const start = now();
     for (;;) {
       const elapsed = now() - start;
-      await push(await render({ species, zh, phase, elapsed, state: slider, rules, ...extra }));
+      await push(await render({ species, zh, phase, elapsed, state: slider, rules, kind, ...extra }));
       if (elapsed >= ms) return;
       if (aborted()) return;
       await sleep(FRAME_MS);

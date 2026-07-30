@@ -86,9 +86,15 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   }
 
   if (phase === PHASE.THROW) drawThrown(g, elapsed / PHASE_MS[PHASE.THROW], kind);
-  if (phase === PHASE.HIT) drawStars(g, W / 2, SPRITE_TOP + SPRITE_SLOT / 2, elapsed);
-  if (phase === PHASE.WOBBLE) drawBall(g, W / 2, GROUND_Y - 10, wobbleTilt(elapsed));
-  if (phase === PHASE.CAUGHT) { drawBall(g, W / 2, GROUND_Y - 10, 0); drawStars(g, W / 2, GROUND_Y - 10, elapsed); }
+  if (phase === PHASE.HIT) drawSparks(g, W / 2, SPRITE_TOP + SPRITE_SLOT / 2, elapsed);
+  if (phase === PHASE.WOBBLE) {
+    const { fall, tilt } = wobbleAt(elapsed);
+    drawBall(g, W / 2, GROUND_Y - 10 - fall, tilt);
+  }
+  if (phase === PHASE.CAUGHT) {
+    drawBall(g, W / 2, GROUND_Y - 10, 0);
+    drawCaughtStars(g, W / 2, GROUND_Y - 10, elapsed);
+  }
   if (phase === PHASE.RETRY) drawBurst(g, W / 2, GROUND_Y - 10, elapsed / PHASE_MS[PHASE.RETRY]);
 
   // The timing bar stays up through every phase except the two that end the
@@ -189,11 +195,32 @@ function drawBall(g, cx, cy, tilt) {
   g.restore();
 }
 
-// Three rocks, decaying -- the classic count, and it ends upright so a caught
-// frame does not jump.
-function wobbleTilt(elapsed) {
-  const u = Math.min(1, elapsed / PHASE_MS[PHASE.WOBBLE]);
-  return Math.sin(u * Math.PI * 6) * 0.45 * (1 - u);
+// The ball falls to the ground, then rocks three times -- one rock is one
+// check, which is the beat the games use and what the owner asked for. Discrete
+// rather than a decaying sine: a continuous wobble reads as "it is vibrating",
+// where three separate rocks with a pause between them read as three questions
+// being asked. It ends upright so the caught frame does not jump.
+const WOBBLE_DROP_MS = 260;
+export const WOBBLE_ROCKS = 3;
+
+export function wobbleAt(elapsed) {
+  const drop = Math.min(1, elapsed / WOBBLE_DROP_MS);
+  if (drop < 1) {
+    // Ease in, so it accelerates into the ground rather than drifting down.
+    return { fall: (1 - drop * drop) * 46, tilt: 0, rock: 0 };
+  }
+
+  const each = (PHASE_MS[PHASE.WOBBLE] - WOBBLE_DROP_MS) / WOBBLE_ROCKS;
+  const since = elapsed - WOBBLE_DROP_MS;
+  const index = Math.min(WOBBLE_ROCKS - 1, Math.floor(since / each));
+  const within = (since - index * each) / each;
+
+  // Rock for the first 65% of each slot and sit still for the rest: the pause
+  // is what separates one check from the next.
+  const swing = within < 0.65 ? Math.sin((within / 0.65) * Math.PI * 2) : 0;
+  // Alternate which way each rock leads, so three rocks look like three, not
+  // like one motion repeated.
+  return { fall: 0, tilt: swing * 0.42 * (index % 2 === 0 ? 1 : -1), rock: index + 1 };
 }
 
 // A ball for the capture, a wedge for an attack. They fly the same arc on
@@ -221,24 +248,56 @@ function drawStrike(g, cx, cy, u) {
   void u;
 }
 
-function drawStars(g, cx, cy, elapsed) {
-  const u = Math.min(1, elapsed / 700);
-  const spread = 14 + u * 26;
+// Three five-pointed stars ABOVE the ball, not a ring around it -- the owner
+// was specific, and it is what the games do: the ball sits still and the stars
+// pop over it.
+function drawCaughtStars(g, cx, cy, elapsed) {
+  const u = Math.min(1, elapsed / 620);
+  const rise = 10 * u;
+  const spots = [[-26, -30], [0, -40], [26, -30]];
+
   g.fillStyle = INK;
-  for (let i = 0; i < 6; i += 1) {
-    const angle = (i / 6) * Math.PI * 2 + u;
-    star(g, Math.round(cx + Math.cos(angle) * spread), Math.round(cy + Math.sin(angle) * spread), 5 - Math.round(u * 2));
-  }
+  spots.forEach(([dx, dy], i) => {
+    // Staggered, so they appear one after another rather than all at once.
+    const t = Math.min(1, Math.max(0, u * 1.6 - i * 0.2));
+    if (t <= 0) return;
+    drawStar5(g, cx + dx, Math.round(cy + dy - rise), Math.round(4 + t * 5));
+  });
 }
 
-// A four-point sparkle, drawn as two tapering bars: at this size a five-pointed
-// star turns into a blob.
-function star(g, cx, cy, r) {
-  if (r < 2) return;
-  for (let i = -r; i <= r; i += 1) {
-    const thin = Math.max(0, Math.round((r - Math.abs(i)) / 2));
-    g.fillRect(cx + i, cy - thin, 1, thin * 2 + 1);
-    g.fillRect(cx - thin, cy + i, thin * 2 + 1, 1);
+// A real five-pointed star: ten alternating points around a circle, filled.
+// The earlier version was a four-armed sparkle, which at this size reads as a
+// plus sign rather than as a star.
+function drawStar5(g, cx, cy, r) {
+  if (r < 3) return;
+  const inner = r * 0.42;
+  g.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const radius = i % 2 === 0 ? r : inner;
+    // -PI/2 puts a point straight up, which is what makes it read as a star
+    // rather than as a cog.
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    if (i === 0) g.moveTo(x, y);
+    else g.lineTo(x, y);
+  }
+  g.closePath();
+  g.fill();
+}
+
+// Impact on an attack. Deliberately NOT stars: stars mean "caught" on this
+// screen, and an attack that looked like a capture would be a lie.
+function drawSparks(g, cx, cy, elapsed) {
+  const u = Math.min(1, elapsed / 380);
+  const spread = 12 + u * 30;
+  g.fillStyle = INK;
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (i / 8) * Math.PI * 2 + 0.4;
+    const x = Math.round(cx + Math.cos(angle) * spread);
+    const y = Math.round(cy + Math.sin(angle) * spread);
+    const len = Math.max(1, Math.round(6 * (1 - u)));
+    g.fillRect(x - 1, y - len, 2, len * 2);
   }
 }
 
