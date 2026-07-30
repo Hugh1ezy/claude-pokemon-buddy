@@ -12,7 +12,8 @@ import { dexProgress, normalizeDex, recordCapture, recordSeen } from "./pet/dex.
 import { stepEncounter } from "./pet/encounter.js";
 import { buildEncounterContext } from "./pet/encounter-context.js";
 import { loadEncounterTable } from "./pet/encounter-table.js";
-import { isDexSpecies, zhName } from "./pet/species-meta.js";
+import { SPECIES_DEX, isDexSpecies, zhName } from "./pet/species-meta.js";
+import { isFrozenSpecies, pinFrozenGrowth, rosterEntries, swapActiveBuddy } from "./pet/roster.js";
 import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
 import { buildUsedDays, settleDays } from "./pet/settlement.js";
 import { applyPetTransitions, drainEvolutionIntents, ensurePet, evolutionContext } from "./pet/transitions.js";
@@ -27,11 +28,11 @@ import { createSaveSync } from "./save-sync.js";
 import { createTransport } from "./transport/index.js";
 import { captureParams } from "./pet/capture-tuning.js";
 import { runCaptureSession } from "./pet/capture-session.js";
-import { ageDexView, isDexOpenGesture, stepDexView } from "./pet/dex-view.js";
+import { ageDexView, isDexOpenGesture, pageForCursor, stepDexView } from "./pet/dex-view.js";
 import { ENCOUNTER_DEFAULTS } from "./pet/encounter.js";
 import { resolvePlace } from "./place.js";
 import { PHASE, PHASE_MS, renderCaptureFrame } from "./render/capture-screen.js";
-import { dexPageCount, renderDexPage } from "./render/dex-screen.js";
+import { DEX_PAGE_SIZE, renderDexConfirm, renderDexPage } from "./render/dex-screen.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
 import { pollUsageOnce } from "./usage-poll.mjs";
@@ -135,6 +136,8 @@ export function createButtonDispatcher({
   // same reason.
   dexSource = null,           // () => ({ dex, progress }) -- null disables the screen
   renderDex = renderDexPage,
+  renderConfirm = renderDexConfirm,
+  swapRequests = { push() {} },
   // The capture minigame. Results are queued rather than applied: the tick owns
   // the pet, and a second writer to the save is exactly the kind of thing that
   // loses a buddy. Same shape as the evolution intents.
@@ -254,13 +257,21 @@ export function createButtonDispatcher({
 
   function handleDexButton(event) {
     const source = dexSource();
-    const pages = dexPageCount(source?.progress?.dexTotal ?? 0);
+    const roster = rosterEntries(source?.dex ?? {});
     const was = dexView;
-    const next = stepDexView(dexView, event, { pages });
-    if (next === was) return;
+    const { view: next, action } = stepDexView(dexView, event, { rosterSize: roster.length });
+    if (next === was && action == null) return;
     dexView = next;
 
+    // Read before the queue runs: `action` is decided against the roster the
+    // press was made against, and a tick could land in between.
+    const chosen = action === "swap" ? roster[was?.cursor ?? 0] : null;
+
     actions.run(async () => {
+      if (chosen && !chosen.active) {
+        swapRequests.push({ species: chosen.species });
+        logger?.log?.(`pokedex: swapping to ${zhName(chosen.species)}`);
+      }
       if (next == null) {
         // Nothing repaints the panel here: resuming the animator does it within
         // one frame (333ms), and duplicating the tick's render just to be 300ms
@@ -269,11 +280,24 @@ export function createButtonDispatcher({
         return;
       }
       if (was == null) animator.pause();
-      await transport.push(await renderDex({ dex: source.dex, page: next.page, progress: source.progress }));
+      await transport.push(await renderDexScreen(next, roster, source));
     }).catch((error) => {
       logger?.warn?.(`pokedex screen failed: ${errorReason(error)}`);
       // Do not leave the animator parked on a screen that failed to draw.
       if (dexView != null) { dexView = null; animator.resume(); }
+    });
+  }
+
+  function renderDexScreen(view, roster, source) {
+    const entry = roster[view.cursor] ?? null;
+    if (view.confirming && entry) {
+      return renderConfirm({ entry, zh: zhName(entry.species), caughtAtText: entry.caughtAt ?? "--" });
+    }
+    return renderDex({
+      dex: source.dex,
+      page: pageForCursor(view, roster, DEX_PAGE_SIZE, (species) => (SPECIES_DEX[species] ?? 1) - 1),
+      progress: source.progress,
+      cursorSpecies: entry?.species ?? null,
     });
   }
 
@@ -333,6 +357,7 @@ export async function runOneTick({
   // looking -- it just does not push its frame over the screen.
   shouldPush = () => true,
   captureResults,
+  swapRequests,
   logger = console,
 } = {}) {
   if (!usage) throw new Error("usage is required");
@@ -350,6 +375,18 @@ export async function runOneTick({
     usedDays: buildUsedDays(pet, today, usage),
   });
 
+  // Swaps land first, so everything below -- the frozen check, the growth, the
+  // evolution, the render -- is about the pokemon actually on the panel now.
+  pet = applySwapRequests(pet, swapRequests, logger);
+
+  // A keepsake -- a form the trainer has already evolved past -- is displayed
+  // but does not live: no exp, no level, no bond, no evolution. The bookkeeping
+  // below still runs and is then pinned back, rather than being skipped, so the
+  // day anchors keep advancing and a later swap cannot claim a day the live
+  // buddy did not earn.
+  const frozen = isFrozenSpecies(pet.species, pet);
+  const beforeGrowth = pet;
+
   const creditedTokens =
     usage.todayPeriod == null || usage.todayPeriod === today ? usage.todayTokens : 0;
   pet = applyDailyGrowth(pet, { todayTokens: creditedTokens, today });
@@ -362,14 +399,21 @@ export async function runOneTick({
     clicked: buttonEvents.some((event) => event?.key === "KEY" && event?.kind === "short"),
   });
 
-  const transition = applyPetTransitions({
-    pet,
-    weather,
-    room: sensor,
-    now,
-    buttonEvents,
-    evolutionIntents: evolutionIntentEvents,
-  });
+  if (frozen) pet = pinFrozenGrowth(beforeGrowth, pet);
+
+  // Transitions are skipped outright for a keepsake rather than pinned: this is
+  // where evolution happens, and a form that has already been evolved past must
+  // not offer to evolve again into a species the trainer already has.
+  const transition = frozen
+    ? { pet, evolutionAnimation: null }
+    : applyPetTransitions({
+      pet,
+      weather,
+      room: sensor,
+      now,
+      buttonEvents,
+      evolutionIntents: evolutionIntentEvents,
+    });
   pet = transition.pet;
   const evolutionAnimation = transition.evolutionAnimation;
 
@@ -379,7 +423,7 @@ export async function runOneTick({
   // Before the encounter tick, so a capture clears the offer the same tick it
   // lands -- otherwise the engine would see the offer still standing and the
   // notification would blink for a pokemon already in the box.
-  pet = applyCaptureResults(pet, captureResults, logger);
+  pet = applyCaptureResults(pet, captureResults, logger, today);
 
   pet = applyEncounterTick(pet, { usage, weather, room: sensor, now, rng: encounterRng, logger });
 
@@ -432,10 +476,17 @@ export async function buildRenderModel({ pet, usage, weather, room, now, buddyNa
       species: pet.species,
       readyToEvolve: pet.readyToEvolve,
       bond: pet.bond,
+      // A keepsake shows what it IS -- a form already evolved past -- rather
+      // than numbers it can no longer move: `Lv -`, an empty bar, five empty
+      // hearts. Decided here rather than in the layout so the panel and the
+      // pokedex's confirm screen cannot disagree about who is frozen.
+      frozen: isFrozenSpecies(pet.species, pet),
       // Hearts show TODAY's bond, not the lifetime total the evolution threshold
       // tracks -- the row is a "did we spend time together today" gauge.
-      bondHearts: heartsFromHalves(pet.bondHalves),
-      expPct: Number.isFinite(pet.exp) ? Math.round((pet.exp / expToNextLevel(pet.level)) * 100) : 0,
+      bondHearts: isFrozenSpecies(pet.species, pet) ? 0 : heartsFromHalves(pet.bondHalves),
+      expPct: isFrozenSpecies(pet.species, pet) || !Number.isFinite(pet.exp)
+        ? 0
+        : Math.round((pet.exp / expToNextLevel(pet.level)) * 100),
       bubble: sprite.placeholder ? "BUDDY" : cryFor(pet.species, mood),
     },
   };
@@ -504,7 +555,7 @@ export function applyEncounterTick(pet, { usage, weather, room, now, rng = Math.
 // Folds what the capture screen decided into the pet. The screen itself never
 // writes the save -- it hands back a verdict and the tick applies it here, so
 // there is exactly one writer no matter how the minigame ends.
-export function applyCaptureResults(pet, captureResults, logger = console) {
+export function applyCaptureResults(pet, captureResults, logger = console, today = null) {
   const results = Array.isArray(captureResults)
     ? captureResults.splice(0)
     : typeof captureResults?.drain === "function" ? captureResults.drain() : [];
@@ -520,12 +571,32 @@ export function applyCaptureResults(pet, captureResults, logger = console) {
     }
     if (result.outcome !== "caught" || !isDexSpecies(result.species)) continue;
 
-    const recorded = recordCapture(next, { species: result.species, level: 5 });
+    // caughtAt is stamped here, at the only place a capture becomes real, so
+    // the confirm screen has a date to show for every pokemon that has one.
+    const recorded = recordCapture(next, { species: result.species, level: 5, caughtAt: today });
     next = { ...next, ...recorded.dex };
     logger?.log?.(
       `pokedex: ${zhName(result.species)} caught`
       + `${recorded.isNewToDex ? " (new)" : ""}${recorded.keptInBox ? "" : " (box full)"}`,
     );
+  }
+  return next;
+}
+
+// Puts a chosen pokemon on the panel. Queued from the button path and applied
+// here for the same reason capture verdicts are: the tick is the only writer.
+export function applySwapRequests(pet, swapRequests, logger = console) {
+  const requests = Array.isArray(swapRequests)
+    ? swapRequests.splice(0)
+    : typeof swapRequests?.drain === "function" ? swapRequests.drain() : [];
+  let next = pet;
+
+  for (const request of requests) {
+    if (!request || typeof request.species !== "string") continue;
+    const swapped = swapActiveBuddy(next, request.species);
+    if (swapped === next) continue;    // not owned, or already on the panel
+    next = swapped;
+    logger?.log?.(`buddy: now showing ${zhName(request.species)}`);
   }
   return next;
 }
@@ -603,6 +674,7 @@ export async function main({
     // Same queue shape, carrying capture verdicts from the button path to the
     // tick, which is the only thing that writes the pet.
     const captureResults = createEvolutionIntentQueue();
+    const swapRequests = createEvolutionIntentQueue();
     const buttonDispatcher = createButtonDispatcher({
       transport: hostTransport,
       getPet: () => runtime.pet,
@@ -613,6 +685,7 @@ export async function main({
       // Read at press time, not captured: the dex grows while the screen is
       // closed, and a stale snapshot would show yesterday's collection.
       dexSource: () => ({ dex: runtime.pet, progress: dexProgress(runtime.pet ?? {}) }),
+      swapRequests,
       captureResults,
       logger,
     });
@@ -773,6 +846,7 @@ export async function main({
               place,
               shouldPush: () => !buttonDispatcher.isDexOpen(),
               captureResults,
+              swapRequests,
               logger,
             });
           } catch (error) {

@@ -11,7 +11,9 @@ import { createCanvas } from "@napi-rs/canvas";
 
 import { dexEntries } from "../pet/dex.js";
 import { imageDataToFrame } from "./frame.js";
+import { drawHearts, heartCount } from "./layout.js";
 import { H, INK, LEFT_W, PAPER, W } from "./palette.js";
+import { drawSprite } from "./sprite-pipeline.js";
 import { loadBuddySprite } from "./sprites.js";
 
 const CJK = '"Zpix"';
@@ -135,7 +137,7 @@ function fillOutline(bits, w, h) {
   return out;
 }
 
-export async function renderDexPage({ dex, page = 0, progress }) {
+export async function renderDexPage({ dex, page = 0, progress, cursorSpecies = null }) {
   const entries = dexEntries(dex);
   const pages = dexPageCount(entries.length);
   const current = ((page % pages) + pages) % pages;      // wraps both ways
@@ -161,11 +163,81 @@ export async function renderDexPage({ dex, page = 0, progress }) {
     const col = i % DEX_COLS;
     const row = Math.floor(i / DEX_COLS);
     const cell = await cellFor(entry.species, entry.caught);
-    blit(g, cell, padX + col * (CELL + padX), GRID_TOP + row * (CELL + CELL_GAP_Y), CELL);
+    const bx = padX + col * (CELL + padX);
+    const by = GRID_TOP + row * (CELL + CELL_GAP_Y);
+    blit(g, cell, bx, by, CELL);
+    // The cursor is a box drawn AROUND the cell rather than an inversion of it:
+    // half these cells are solid silhouettes, and inverting one would turn the
+    // selection highlight into a hole.
+    if (entry.species === cursorSpecies) drawCursorBox(g, bx - 3, by - 3, CELL + 6);
   }
 
   g.font = `700 12px ${CJK}`;
-  const hint = "KEY 翻页 · 长按返回";
+  const hint = cursorSpecies ? "KEY 移动 · 双击选择 · 长按返回" : "KEY 翻页 · 长按返回";
+  g.fillText(hint, Math.round((W - g.measureText(hint).width) / 2), FOOTER_Y);
+
+  return imageDataToFrame(g.getImageData(0, 0, W, H), W, H);
+}
+
+// Corner brackets rather than a full rectangle: a closed box at this size sits
+// right against the neighbouring cells and reads as a grid line.
+function drawCursorBox(g, x, y, size) {
+  const arm = 10;
+  g.fillStyle = INK;
+  for (const [ox, oy, dx, dy] of [
+    [x, y, 1, 1], [x + size, y, -1, 1], [x, y + size, 1, -1], [x + size, y + size, -1, -1],
+  ]) {
+    g.fillRect(dx > 0 ? ox : ox - arm, dy > 0 ? oy : oy - 2, arm, 2);
+    g.fillRect(dx > 0 ? ox : ox - 2, dy > 0 ? oy : oy - arm, 2, arm);
+  }
+}
+
+// The confirm screen: everything you need to decide, at a size you can read.
+export async function renderDexConfirm({ entry, zh, caughtAtText }) {
+  const canvas = createCanvas(W, H);
+  const g = canvas.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = PAPER;
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = INK;
+
+  const sprite = await loadBuddySprite(entry.species);
+  const slot = 120;
+  drawSprite(g, sprite.gray, {
+    x: 30, y: 60, maxSize: slot, srcW: sprite.w, srcH: sprite.h,
+  });
+
+  g.font = `800 14px ${CJK}`;
+  g.fillText(zh, 176, 78);
+
+  g.font = `700 12px ${CJK}`;
+  const rows = [
+    ["等级", entry.frozen ? "Lv -" : `Lv ${entry.level ?? "-"}`],
+    ["获得", caughtAtText ?? "--"],
+    ["亲密度", null],
+  ];
+  rows.forEach(([label, value], i) => {
+    const y = 108 + i * 26;
+    g.fillText(label, 176, y);
+    if (value != null) g.fillText(value, 232, y);
+  });
+  drawHearts(g, 232, 108 + 2 * 26 - 12, entry.frozen ? 0 : heartCount(entry.bond ?? 0));
+
+  // Says WHY rather than just showing dashes, because "Lv -" on its own reads
+  // as missing data rather than as a rule.
+  if (entry.frozen) {
+    g.font = `700 12px ${CJK}`;
+    const note = "已进化过 · 只能展示，无法成长";
+    g.fillText(note, Math.round((W - g.measureText(note).width) / 2), 218);
+  }
+  if (entry.active) {
+    g.font = `700 12px ${CJK}`;
+    const note = "正在展示中";
+    g.fillText(note, Math.round((W - g.measureText(note).width) / 2), 240);
+  }
+
+  g.font = `700 12px ${CJK}`;
+  const hint = entry.active ? "长按返回" : "双击确认展示 · KEY 取消";
   g.fillText(hint, Math.round((W - g.measureText(hint).width) / 2), FOOTER_Y);
 
   return imageDataToFrame(g.getImageData(0, 0, W, H), W, H);

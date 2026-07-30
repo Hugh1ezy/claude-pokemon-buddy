@@ -205,7 +205,7 @@ transport, or the animator. The device is running exactly what it ran before.
 | P2 save model | **done** — `pet/dex.js`: 已捕获 count (duplicates included), pokedex count (distinct), and a box holding one pet per species, each with its own level and bond |
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
 | P4 notification row + capture screen | **done (2026-07-30)** — rows 3-4 draw the offer and the dex counts, and the capture screen plays. Not yet played on hardware by the owner |
-| P5 pokedex screen + swapping the active buddy | **screen done (2026-07-30)** — all 151 on three pages, KEY double to open. Swapping the active buddy is not started. See below |
+| P5 pokedex screen + swapping the active buddy | **done (2026-07-30)** — all 151 on three pages, a cursor over what you own, a confirm screen, and the swap. Not yet driven on hardware by the owner |
 | P6 real cries | not started — waiting on a microSD card the owner does not have yet |
 
 ### P4, where it actually stands
@@ -404,6 +404,60 @@ Cells are cached per species *and* state (the two renderings are different
 bitmaps), which is what makes a page turn 12ms instead of 190ms. `out/dex-screen-probe.mjs`
 has those timings and the page-turn dirty rect (13KB — near a full frame, but
 only on a press, never continuously).
+
+### Swapping the buddy, and the keepsake rule (2026-07-30)
+
+**The cursor walks the roster, not the grid.** Stepping cell by cell would be
+151 presses to reach the end and all but a handful of stops would be a
+silhouette that cannot be picked anyway, so KEY short hops between the species
+actually owned, in dex order, and the page follows the cursor. `pageForCursor`
+derives the page rather than storing it beside the cursor, so the two cannot
+disagree about which page the cursor is on.
+
+Gestures inside the screen: **short** moves, **double** opens the confirm
+screen, **long** returns. On the confirm screen, **double** commits and
+**short** cancels — the swap is the one irreversible thing in here, so it takes
+the deliberate gesture and the easy one backs out.
+
+The cursor is drawn as **corner brackets around** the cell, not as an inversion
+of it: half the cells are solid silhouettes, and inverting one would turn the
+highlight into a hole.
+
+**The keepsake rule, which is the owner's and is the interesting part.** You may
+display any species you own — including one you have already evolved past — but
+a form you have evolved past does not live. It shows `Lv -`, an empty exp bar
+and five empty hearts, and it earns nothing.
+
+The test is **"do I own something this evolves into"**, not "does this evolve".
+That distinction matters: a wild charmander you have never evolved is perfectly
+alive, and only 妙蛙种子 is frozen because 妙蛙草 is in the dex. Owning a
+*distant* descendant freezes the base form too, so skipping a middle stage does
+not leave a live duplicate behind.
+
+**Growth is pinned, not skipped**, and that is deliberate. `applyDailyGrowth`
+and `applyBondTick` still run for a keepsake and their result is then reverted
+(`pinFrozenGrowth`). Skipping them outright would freeze the day anchors
+(`lastGrowthDay`, `todayCreditedExp`) as well, and a later swap back to a live
+buddy would then let it claim a whole day's exp it did not earn — which is the
+same bug the anchors exist to prevent for a newborn. Transitions ARE skipped
+outright, because that is where evolution happens and a form already evolved
+past must not offer to evolve again.
+
+**The swap carries a short list on purpose**: species, level, exp, bond,
+personality, caughtAt. Everything else — `lastGrowthDay`, `lastSettled`,
+`todayCreditedExp/Bond`, `bondDay`, `bondHalves`, `streak`, `shield` — is the
+*trainer's* day bookkeeping and stays put. Carrying a week-old set in from the
+box would make the incoming pokemon either settle a week it did not live through
+or claim a day it did not earn. Leaving them alone means a boxed pokemon is
+simply paused, which is also what it looks like from outside.
+
+Swapping away and back returns the *same* pokemon, levels and nature intact —
+there is a test for exactly that round trip, because it is the property that
+makes the box a shelf rather than a shredder.
+
+`caughtAt` is stamped in `applyCaptureResults`, the one place a capture becomes
+real. Anything that entered the dex through `recordSeen` (the starter line) has
+no box entry and therefore no date, and the confirm screen shows `--`.
 
 ### The capture screen, as the owner specified it on 2026-07-30
 

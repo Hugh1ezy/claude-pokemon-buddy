@@ -271,12 +271,17 @@ const ROW1_BAR_H = 11;
 // re-deriving font metrics that only @napi-rs/canvas can answer.
 const measureCtx = createCanvas(1, 1).getContext("2d");
 
-export function row1Geometry(panelX, panelW, level, streak) {
+// A keepsake -- a form the trainer has already evolved past -- reads `Lv -`.
+// Not the level it stopped at, which would read as "this is its level" rather
+// than "this one does not level".
+export const FROZEN_LEVEL_TEXT = "-";
+
+export function row1Geometry(panelX, panelW, level, streak, { frozen = false } = {}) {
   const g = measureCtx;
   g.font = `800 ${ROW1_SMALL_PX}px ${MONO}`;
   const lvW = Math.ceil(g.measureText("Lv").width);
   g.font = `800 ${ROW1_BIG_PX}px ${MONO}`;
-  const levelText = String(level);
+  const levelText = frozen ? FROZEN_LEVEL_TEXT : String(level);
   const streakText = String(streak);
   const levelW = Math.ceil(g.measureText(levelText).width);
   const streakW = Math.ceil(g.measureText(streakText).width);
@@ -298,7 +303,7 @@ export function row1Geometry(panelX, panelW, level, streak) {
 }
 
 function drawLevelExpStreakRow(g, panelX, panelW, level, streak, buddy) {
-  const geo = row1Geometry(panelX, panelW, level, streak);
+  const geo = row1Geometry(panelX, panelW, level, streak, { frozen: Boolean(buddy?.frozen) });
   g.fillStyle = INK;
   g.textAlign = "left";
 
@@ -489,7 +494,7 @@ function drawAsterisk(g, x, y) {
   line(g, x + 2, y - 2, x - 2, y + 2);
 }
 
-function drawHearts(g, x, y, filled) {
+export function drawHearts(g, x, y, filled) {
   for (let i = 0; i < 5; i += 1) {
     drawHeart(g, x + i * 20, y, Math.max(0, Math.min(1, filled - i)));
   }

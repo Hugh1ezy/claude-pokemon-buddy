@@ -98,3 +98,32 @@ export function evolutionRoot(species) {
   }
   return current ?? species;
 }
+
+// The forward direction, built by inverting the parent links rather than
+// re-reading the evolutions table: the table has one row per evolution PATH
+// (with all its trigger conditions), and several species have more than one,
+// so counting rows would double-count eevee and miss nothing useful here.
+const EVOLVES_TO = (() => {
+  const out = {};
+  for (const [child, parent] of Object.entries({ ...EVOLVES_FROM, ...LEGACY_EVOLVES_FROM })) {
+    (out[parent] ??= []).push(child);
+  }
+  return out;
+})();
+
+// Everything this species can still turn into, at any depth. Same visited-set
+// discipline as evolutionRoot -- a bad generated pokedex should fail, not hang
+// the tick.
+export function evolutionDescendants(species) {
+  const out = [];
+  const seen = new Set([species]);
+  const stack = [...(EVOLVES_TO[species] ?? [])];
+  while (stack.length) {
+    const next = stack.pop();
+    if (seen.has(next)) continue;
+    seen.add(next);
+    out.push(next);
+    stack.push(...(EVOLVES_TO[next] ?? []));
+  }
+  return out;
+}

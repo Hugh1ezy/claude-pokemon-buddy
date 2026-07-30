@@ -14,25 +14,40 @@ export function isDexOpenGesture(event) {
   return event?.key === DEX_OPEN_GESTURE.key && event?.kind === DEX_OPEN_GESTURE.kind;
 }
 
-// `view` is null when the screen is closed, otherwise { page }.
-// Returns the next view, again null for closed.
+// `view` is null when closed, otherwise { cursor, confirming, idleTicks }.
+// `cursor` indexes the ROSTER -- the species actually owned -- not the 151
+// cells. Stepping cell by cell would be 151 presses to reach the end and every
+// stop but a handful would be a silhouette you cannot pick anyway; hopping
+// between owned entries makes the walk as long as the collection is.
 //
-// While it is open this takes over KEY entirely -- short turns the page instead
-// of greeting, long returns instead of confirming an evolution. That is the
-// point of a modal screen, and it is why the auto-close below matters: a
-// forgotten pokedex would otherwise swallow the greet gesture indefinitely.
-export function stepDexView(view, event, { pages = 1 } = {}) {
-  if (view == null) return isDexOpenGesture(event) ? { page: 0, idleTicks: 0 } : null;
-  if (event?.key !== "KEY") return view;
+// Returns { view, action } where action is "swap" on the press that confirms
+// one. The caller applies it; this file never touches the save.
+export function stepDexView(view, event, { rosterSize = 0 } = {}) {
+  if (view == null) {
+    return isDexOpenGesture(event)
+      ? { view: { cursor: 0, confirming: false, idleTicks: 0 }, action: null }
+      : { view: null, action: null };
+  }
+  if (event?.key !== "KEY") return { view, action: null };
+
+  const fresh = (over) => ({ ...view, idleTicks: 0, ...over });
+
+  if (view.confirming) {
+    switch (event.kind) {
+      // Confirming is the one irreversible thing in here, so it takes the
+      // deliberate gesture and the easy one cancels.
+      case "double": return { view: fresh({ confirming: false }), action: "swap" };
+      case "short": return { view: fresh({ confirming: false }), action: null };
+      case "long": return { view: null, action: null };
+      default: return { view, action: null };
+    }
+  }
 
   switch (event.kind) {
-    case "short":
-    case "double":
-      return { page: wrap(view.page + 1, pages), idleTicks: 0 };
-    case "long":
-      return null;
-    default:
-      return view;
+    case "short": return { view: fresh({ cursor: wrap(view.cursor + 1, rosterSize) }), action: null };
+    case "double": return { view: fresh({ confirming: true }), action: null };
+    case "long": return { view: null, action: null };
+    default: return { view, action: null };
   }
 }
 
@@ -49,7 +64,15 @@ export function ageDexView(view, { limit = DEX_IDLE_TICKS_BEFORE_CLOSE } = {}) {
   return idleTicks >= limit ? null : { ...view, idleTicks };
 }
 
-function wrap(page, pages) {
-  const total = Math.max(1, pages);
-  return ((page % total) + total) % total;
+// The page the grid must show to have the cursor on it. Derived rather than
+// stored, so the two can never disagree about where the cursor is.
+export function pageForCursor(view, roster, pageSize, dexIndexOf) {
+  const species = roster?.[view?.cursor ?? 0]?.species;
+  const index = species == null ? 0 : dexIndexOf(species);
+  return Math.max(0, Math.floor(index / pageSize));
+}
+
+function wrap(cursor, size) {
+  const total = Math.max(1, size);
+  return ((cursor % total) + total) % total;
 }
