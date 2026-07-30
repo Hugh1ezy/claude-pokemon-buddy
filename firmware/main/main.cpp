@@ -34,6 +34,7 @@
 // to keep USB and WiFi from interfering with each other -- see docs/wifi.md.
 
 #include <assert.h>
+#include <errno.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -66,6 +67,8 @@
 #include "shtc3.h"
 #include "multi_button.h"
 #include "codec_bsp.h"
+#include "codec_init.h"
+#include "sdmmc_cmd.h"
 
 static const char *TAG = "buddy-b5";
 
@@ -1436,6 +1439,62 @@ static void local_clock_task(void *)
     }
 }
 
+// ---- TF card probe (2026-07-31) --------------------------------------------
+// The board's own pinout sheet gives CMD 21 / CLK 38 / DATA 39 with a single
+// data line; those went into codec_board's board_cfg.txt, and codec_init.c
+// derives the 1-bit bus width from d3 being absent. Nothing in the product
+// uses the card yet -- this exists only to turn a claim on a diagram into a
+// measurement on real hardware, which is why it also writes and reads a file
+// back: a mount proves the pins, a round trip proves the filesystem.
+//
+// Reports through diag() rather than ESP_LOG, for the reason spelled out at
+// diag() itself. Deliberately non-fatal in every branch: no card, a wrong
+// pin or a corrupt filesystem must never cost a boot, because the buddy does
+// not need the card for anything yet.
+static void sdcard_probe(void)
+{
+    int err = mount_sdcard();
+    if (err != ESP_OK) {
+        diag("sdcard: mount failed err=0x%x (%s)", err, esp_err_to_name((esp_err_t) err));
+        return;
+    }
+
+    sdmmc_card_t *card = (sdmmc_card_t *) get_sdcard_handle();
+    if (card) {
+        uint64_t mb = ((uint64_t) card->csd.capacity * card->csd.sector_size) >> 20;
+        diag("sdcard: mounted %lluMB name=%.8s", mb, card->cid.name);
+    } else {
+        diag("sdcard: mounted but no card handle");
+    }
+
+    // Round trip through the FAT layer. Written to the mount root and removed
+    // again, so a probe leaves nothing behind on the owner's card.
+    //
+    // The name is 8.3 and must stay that way: this build has
+    // CONFIG_FATFS_LFN_NONE, so a longer stem fails fopen with EINVAL and
+    // nothing else says why. "cpb-probe.txt" (9-char stem) did exactly that
+    // and read as a broken card. Anything written to this card later -- the
+    // offline event log especially -- lives under the same rule until someone
+    // deliberately turns LFN on.
+    const char *path = "/sdcard/cpbprobe.txt";
+    FILE *w = fopen(path, "w");
+    if (!w) {
+        diag("sdcard: write open failed errno=%d", errno);
+        return;
+    }
+    fputs("cpb probe\n", w);
+    fclose(w);
+
+    char line[32] = { 0 };
+    FILE *r = fopen(path, "r");
+    if (r) {
+        if (!fgets(line, sizeof(line), r)) line[0] = '\0';
+        fclose(r);
+    }
+    remove(path);
+    diag("sdcard: readback %s", strncmp(line, "cpb probe", 9) == 0 ? "ok" : "FAILED");
+}
+
 extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "B3: init ST7305 panel");
@@ -1498,6 +1557,10 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "B5: codec up; %d system + %d species sounds, synthesized on demand "
                   "(KEY=active cry, PLAY=evolve/hour)",
              SND_SPECIES_BASE, SND_SPECIES_COUNT);
+    // After CodecPort, which is what tells codec_board which board's pin table
+    // to parse -- get_sdcard_config reads that same parsed section.
+    sdcard_probe();
+
     xTaskCreate(hello_task, "hello", 2048, nullptr, 3, nullptr);
 
     // Safe to run continuously now: local_clock_task only draws while

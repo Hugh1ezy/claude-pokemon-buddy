@@ -197,20 +197,98 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
    `seed/species-cries.json` and wants replacing with real onomatopoeia over time.
 3. **Evolution plays the generic fanfare, not the new form's own cry.** The one
    sound trigger still missing something.
-4. **SD card cannot be used yet.** `codec_board` has the whole `mount_sdcard()`
-   API and `cfg_parse.c` understands an `sdcard:` section, but no board in
-   `board_cfg.txt` declares one — including this device's `S3_RLCD_4_2`. The slot's
-   wiring has to come from the board's documentation or schematic. Do not guess
-   GPIOs: a wrong pin here can collide with the LCD or the codec bus. The card is
-   physically inserted already.
-5. **The app partition is 92% full** (965,392 of 1,048,576 bytes). The 156 note
-   tables are most of the growth. The next feature needing flash may have to grow
-   the partition.
+4. ~~**SD card cannot be used yet.**~~ **Resolved 2026-07-31 — the card works.**
+   The owner produced the board's pinout sheet; `sdcard: {clk: 38, cmd: 21, d0: 39}`
+   went into `board_cfg.txt` and was verified on hardware. See the 07-31 section.
+5. **The app partition is 98% full** (0xfa990 of 0x100000 — 22,128 bytes left)
+   after the SD probe. But the constraint is self-inflicted: the flash is
+   **16MB, measured** (`esptool flash_id`), and the partition table is still
+   IDF's `singleapp` default — `nvs` 24K, `phy_init` 4K, `factory` **1M**, and
+   then **15MB of nothing**. Growing `factory` extends into empty space; nothing
+   sits after it. This should be done before the next firmware feature, not
+   after it stops fitting.
 6. **`pollUsage failed: no-token`** on the home PC every tick — no usage token
    configured there, so the WEEK bar and the 5h/wk figures stay blank at home.
 
 If `status` shows the remote *behind* what is on this machine, stop and read "the
 two-buddy trap" below before running anything.
+
+## Session record: 2026-07-31 morning, work PC — the TF card works
+
+### The pins, and that they are now measured rather than claimed
+
+The owner has the board's own pinout sheet. TF slot: **CMD 21, CLK 38, DATA 39**,
+CD on GPIO 17 but marked NC. One data line, so **1-bit SDMMC** — and that falls
+out on its own, because `codec_init.c` derives the width as `cfg.d3 ? 4 : 1` and
+leaving `d1`/`d2`/`d3` out of the config selects 1-bit. None of 21/38/39 collides
+with anything in use (LCD 5/6/11/12/40/41, I2C 13/14/15, I2S 8/9/10/16/45/46,
+buttons 0/18, PSRAM 26/30).
+
+`sdcard_probe()` in `main.cpp` mounts the card at boot and round-trips a file
+through it, reporting on the `diag()` channel. Measured on hardware:
+
+    #CPB 864 sdcard: mounted 30474MB name=USD
+    #CPB 878 sdcard: readback ok
+
+A 32GB card, mounted, written, read back and the file removed, in 14ms. The probe
+is non-fatal in every branch and nothing in the product uses the card yet — it
+exists so the pin numbers are a measurement and not a diagram.
+
+### Filenames on this card are 8.3, and nothing tells you
+
+The first probe printed `sdcard: write open failed errno=22` and read exactly
+like a broken card or a wrong pin. It was neither: this build has
+**`CONFIG_FATFS_LFN_NONE`**, so a stem longer than 8 characters fails `fopen`
+with `EINVAL` and no other diagnostic. `cpb-probe.txt` is a 9-character stem.
+Renamed to `cpbprobe.txt` and it worked on the next flash. **Anything written to
+this card later — the offline event log especially — is under the same rule**
+until somebody deliberately enables LFN.
+
+### Capturing `diag()` output has two traps, and both cost a round
+
+- **`usb_serial_jtag_write_bytes` drops its output when nobody is reading.** The
+  probe runs in `app_main`, so the boot right after `idf.py flash` emits it into
+  a FIFO with no reader attached, the 100ms timeout expires, and the line is
+  gone. The reader has to be attached *before* the boot you want to see.
+- **Do not drive DTR/RTS from node to force that boot.** Doing so put the chip
+  into the ROM loader instead of the app — `rst:0x15 (USB_UART_CHIP_RESET),
+  boot:0x23 (DOWNLOAD)`, visible only because the reader dumped raw bytes. What
+  works: run `esptool --after hard_reset chip_id` and start the reader
+  immediately after it exits, letting the reader retry the open while the USB
+  device re-enumerates. `out/sd-probe-read.mjs` (untracked) does exactly that.
+
+### There was no rollback image on this machine, and now there is
+
+`cpb-firmware-merged.bin` in the repo root is from **07-27** (424KB) and
+`build/pokemon_buddy_fw.bin` was from **07-28** — but the device had been flashed
+**from home on 07-30**. So nothing on this machine matched what was running, and
+a bad build would have had nothing to go back to.
+
+Read off the device before flashing anything:
+
+    ~/cpb-fw-backup-2026-07-31/running-image-0x0.bin   (1,114,112 B, bootloader
+    + partition table + nvs + phy + app; reflash with write_flash 0x0)
+    sha256 c735fd019cbc79e7c80ea1cdf37defa7286da10bc93153fff12b82b9eae48086
+
+**Take this dump before every flash from a machine that did not produce the
+running image.** It costs 98 seconds and is the only exact copy.
+
+### Flashing does not touch the save, and that was verified rather than assumed
+
+The owner asked whether flashing risks the buddy's data. It does not: the save
+lives in `host/out/state.json` on the PC, and the firmware writes **nothing**
+persistent — `nvs_flash_init()` at `main.cpp:1059` is there because the wifi
+stack requires it, and no game state goes near it. Checked across the whole
+session: Lv.23 exp=1.4249… bond=29.199… before the first flash and identical
+after the second.
+
+### The board has a real RTC, and the codebase's comment was misread once
+
+`main.cpp:1155` says "No RTC chip driver exists in this codebase", which is true
+and is about the *driver*. The **board carries a PCF85063** on the same I2C bus
+(SDA 13 / SCL 14, INT on GPIO 15), backed by the 18650. So a device that keeps
+its battery keeps real time with no host and no network — which removes the
+reason to reach for SNTP in any offline work. Nobody has written the driver yet.
 
 ## Session record: 2026-07-30 late evening, home PC
 
@@ -1293,6 +1371,7 @@ Untracked helpers in `host/out/` on the work PC:
 | `wifi-probe.mjs` | talks the protocol over TCP: discovery, `T_AUTH`, one full frame, prints the ACK. Answers "link or device?" without USB. Stop the host first |
 | `serial-log.mjs` | timestamped reader for the `#CPB` diag lines. Host must not hold the port — but if it does not, the host has no transport, so start it over **wifi** by holding COM7 with this script and letting the host fall back |
 | `wake-probe.mjs` | times device-return vs host-reconnect. Its mDNS detection is unreliable, see above — trust the owner's stopwatch over it |
+| `sd-probe-read.mjs` | listens for `#CPB` lines and retries the open while the USB device re-enumerates. Run it right after `esptool --after hard_reset`; it never touches DTR/RTS itself (2026-07-31) |
 
 ---
 
