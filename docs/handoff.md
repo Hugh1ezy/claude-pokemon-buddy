@@ -213,6 +213,80 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 If `status` shows the remote *behind* what is on this machine, stop and read "the
 two-buddy trap" below before running anything.
 
+## Session record: 2026-07-31 morning, work PC — offline 亲密度
+
+Presses made away from a PC used to be worth nothing: the hourly slot is
+credited by the host, and a press that reaches no host never happened. The
+device now records the HOURS it was pressed in and the host credits them on
+reconnect. `T_OFFLINE 0x88 = [epoch_day u16][hours u24]`.
+
+**It is a bitmask of hours, not an event log, and that shape is the design.**
+Three properties fall out of it, and they answer the questions the owner
+actually asked ("won't it stack?", "what if the upload fails?"):
+
+- replaying it credits nothing, because the host already dedupes slots through
+  `bondSlots` — so there is no ack, no sequence number, and no delete-after-
+  upload step, which is the step that loses data when the upload fails;
+- it cannot grow: ten presses in an hour are one bit, a whole day is five bytes;
+- publishing needs no link-state machine. It rides the 30s sensor cadence
+  unconditionally; if nobody is listening the write just fails.
+
+The HOUR travels, not the slot index — hour→slot depends on the day's window
+(Thursday opens at 11) and that table is the host's policy. Storage is **NVS,
+not the SD card**: a handful of bytes that must survive a brownout is what NVS
+is for, and a FAT volume on a card that can be physically removed is the
+opposite. The card is for read-mostly bulk (sprites, glyph atlases) later.
+
+### The delivery check was wrong, and hardware said so immediately
+
+The first version recorded a press when the BUTTON broadcast "reached no link".
+**Both links lie about that.** `usb_serial_jtag_write_bytes` returns success as
+soon as the bytes fit the driver's 1KB TX ring buffer, whether or not anything
+is draining it — an 11-byte BUTTON frame always fits. And `wifi_write_raw`
+deliberately reports "no client connected" as success. The first on-hardware
+press recorded nothing, with no diagnostic, and looked exactly like a dead
+feature.
+
+Ask it in the direction that can be answered: **inbound**. A live host pushes a
+frame ~3x a second, so `HOST_SILENT_US` = 30s of silence on `g_last_frame_us` is
+unambiguous. Deliberately not `LOCAL_CLOCK_TIMEOUT_US` (120s) — that answers
+"has it been gone long enough to put the clock face up" and can afford to be
+slow; this one bounds how much of a commute's start is missed.
+
+False positives are harmless by construction: the pokedex and capture screens
+suppress pushes, so a press then looks absent — but those screens only exist
+because a host is drawing them, so the press is credited live and the recorded
+hour replays as a no-op.
+
+### What is verified and what is not
+
+Measured on hardware, host stopped, COM7:
+
+    OFFLINE-BOND frame: epochDay=20665 hours=[10]       (republished every 30s)
+    onOfflineBond #1: {"epochDay":20665,"hours":[10]}   (through the real transport)
+
+So: detection, recording, NVS persistence, publication, republication, framing
+and the host's parse/event path are all confirmed on the real device.
+
+**The credit itself was NOT demonstrated live**, and the reason is worth
+knowing: the hour that got pressed had already been credited that day, so the
+replay correctly did nothing and printed nothing. That IS the idempotency
+property, just invisible. It has unit tests (`test/offline-bond.test.js`, 13 of
+them). To see it for real, press KEY with no host during an hour whose slot is
+still unpaid and watch for `bond: credited N offline half-heart(s)`.
+
+**Known gap: a press after a reboot with no host since is dropped**, because
+time comes from the host's `T_TIME` and lives only in RAM. Absent, not guessed.
+The board's **PCF85063 RTC** closes this and has no driver yet — it is the
+obvious next piece.
+
+Two testing traps, both of which cost a round here: the `diag()` line at press
+time is lost unless a reader is already attached (see the USB-JTAG note in the
+07-31 TF-card section), and backgrounding the reader with a shell `&` inside an
+already-backgrounded task kills it as soon as the parent exits. `out/offline-bond-listen.mjs`
+(untracked) avoids all of it by watching for the republished frame instead of
+the press moment.
+
 ## Session record: 2026-07-31 morning, work PC — the TF card works
 
 ### The pins, and that they are now measured rather than claimed
@@ -1371,7 +1445,8 @@ Untracked helpers in `host/out/` on the work PC:
 | `wifi-probe.mjs` | talks the protocol over TCP: discovery, `T_AUTH`, one full frame, prints the ACK. Answers "link or device?" without USB. Stop the host first |
 | `serial-log.mjs` | timestamped reader for the `#CPB` diag lines. Host must not hold the port — but if it does not, the host has no transport, so start it over **wifi** by holding COM7 with this script and letting the host fall back |
 | `wake-probe.mjs` | times device-return vs host-reconnect. Its mDNS detection is unreliable, see above — trust the owner's stopwatch over it |
-| `sd-probe-read.mjs` | listens for `#CPB` lines and retries the open while the USB device re-enumerates. Run it right after `esptool --after hard_reset`; it never touches DTR/RTS itself (2026-07-31) |
+| `sd-probe-read.mjs` | listens for `#CPB` lines and retries the open while the USB device re-enumerates. Run it right after `esptool --after hard_reset`; it never touches DTR/RTS itself. Also decodes `T_OFFLINE` frames (2026-07-31) |
+| `offline-bond-listen.mjs` | builds the **real** serial transport and prints its `onOfflineBond` events — proves the host's own parse path, not a hand-rolled one (2026-07-31) |
 
 ---
 
