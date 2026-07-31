@@ -373,6 +373,30 @@ export function createButtonDispatcher({
     isCaptureOpen() {
       return captureActive;
     },
+    // Re-push the held screen's OWN frame, so a tick that skips the buddy panel
+    // does not also leave the device with nothing.
+    //
+    // The bug this exists for, seen 2026-08-01: the pokedex only draws on input,
+    // and `shouldPush` stops the tick from painting over it. Leave it open and
+    // untouched and the device receives no frame at all -- and the firmware
+    // auto-enters local-clock mode after LOCAL_CLOCK_TIMEOUT_US (120s, main.cpp),
+    // i.e. after two silent ticks. The pokedex's own idle-close is three ticks,
+    // so the offline clock face was GUARANTEED to appear over the screen the
+    // owner was looking at, for the ~60s between the two limits. Not a race: the
+    // two timeouts were simply never compared. Keep this repaint if either
+    // number is ever touched, and do not narrow the gap instead -- a screen with
+    // no time limit at all (the capture screen) has no gap to narrow.
+    //
+    // Capture is deliberately not handled here: its session pushes at 20fps for
+    // as long as it is up, so it feeds the link on its own.
+    async repaintHeldScreen() {
+      if (dexView == null) return false;
+      const source = dexSource();
+      // Called from inside the tick, which already holds `actions` -- going
+      // through actions.run() here would deadlock against it.
+      await transport.push(await renderDexScreen(dexView, rosterEntries(source?.dex ?? {}), source));
+      return true;
+    },
     // Driven by the tick, which is the only clock this state has. Closing on
     // its own matters because an open screen holds the animator paused and
     // swallows the greet gesture -- walking away should not cost either.
@@ -1000,6 +1024,10 @@ export async function main({
           const room = hostTransport.feedSensor();
           const pendingButtons = buttonDispatcher.drainTickEvents();
           buttonDispatcher.ageDex();
+          // Recorded from inside shouldPush rather than asked again afterwards,
+          // because a screen can open while the tick is rendering and the log
+          // has to say what actually happened, not what is true a second later.
+          let pushedToDevice = null;
           let pet;
           try {
             pet = await runOneTick({
@@ -1016,7 +1044,10 @@ export async function main({
               evolutionIntents,
               buddyName: config.name,
               place,
-              shouldPush: () => !buttonDispatcher.isDexOpen(),
+              shouldPush: () => {
+                pushedToDevice = !buttonDispatcher.isDexOpen();
+                return pushedToDevice;
+              },
               holdEncounter: () => buttonDispatcher.isCaptureOpen(),
               captureResults,
               swapRequests,
@@ -1033,7 +1064,16 @@ export async function main({
             lastHour = hour;
             hostTransport.playSound?.(SOUND.HOUR);       // top-of-hour chime
           }
-          console.log(`wrote ${framePath}`);
+          // This line used to print unconditionally, which is how a whole night
+          // of "wrote out/frame.png" every minute sat in the log while the device
+          // was receiving nothing and sitting on its offline clock face. A log
+          // that reports the render cannot be read as reporting the link.
+          if (pushedToDevice === false) {
+            const repainted = await buttonDispatcher.repaintHeldScreen();
+            console.log(`wrote ${framePath} (panel held by ${repainted ? "pokedex" : "capture screen"}; buddy panel not pushed)`);
+          } else {
+            console.log(`wrote ${framePath}`);
+          }
         } finally {
           animator.resume();
         }

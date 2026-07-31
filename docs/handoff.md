@@ -1,7 +1,7 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-07-31
-(evening, HOME PC)**.
+Rolling note between the home PC and the work PC. Last updated **2026-08-01
+(morning, HOME PC)**.
 
 ## ▶ What the WORK PC has to do next
 
@@ -41,6 +41,57 @@ Two things to check there:
 > `firmware/sdkconfig.bak-20260731` (gitignored, home PC only); delete it once
 > the next flash is confirmed good. The build then came out at 0xfba20 =
 > 1,030,176 bytes, 75% of the 4MB app partition free.
+
+> **2026-08-01 morning, home PC — the panel dropping to the offline clock face
+> was the pokedex, and it was certain to happen, not unlucky.**
+>
+> Symptom: "设备又卡在断网显示了", with a host log that looked perfectly healthy —
+> `wrote out/frame.png` every minute all night, no errors, no mock fallback.
+>
+> Cause, and all three parts matter:
+>
+> 1. The pokedex **draws only on input**, and `shouldPush` stops the tick painting
+>    over it. An open, untouched screen therefore sends the device **nothing**.
+> 2. The firmware auto-enters local-clock mode after `LOCAL_CLOCK_TIMEOUT_US` =
+>    **120s**, i.e. two silent ticks (main.cpp, sensor_task).
+> 3. The pokedex's own idle-close is `DEX_IDLE_TICKS_BEFORE_CLOSE` = **3 ticks**.
+>
+> 2 < 3, so the offline clock face was **guaranteed** to appear over the screen the
+> owner was looking at, for the ~60s between the two limits. The two timeouts were
+> simply never compared against each other. It self-heals when the screen closes
+> and the next frame arrives (auto-entered local-clock exits on any T_FRAME) — but
+> KEY does nothing in that mode, only BOOT gets you out, so from the front it reads
+> as a device that has hung.
+>
+> Fixed by making the tick **repaint the held screen's own frame** instead of
+> skipping the push entirely (`buttonDispatcher.repaintHeldScreen()`), so the link
+> is fed for as long as any screen is up. Do not "fix" this instead by shortening
+> the idle-close — the capture screen has no time limit at all and would still be
+> exposed.
+>
+> **The log was the reason this stayed invisible.** `wrote out/frame.png` printed
+> unconditionally, after the RENDER, with no idea whether `shouldPush` had let it
+> reach the device. A whole night of it sat there while the device got nothing. It
+> now says `(panel held by pokedex; buddy panel not pushed)` when the push was
+> skipped. **Treat any log line that reports one stage as evidence about another as
+> a bug** — this is the second time on this project (the other was
+> `ESP serial device detected`, 07-31 morning).
+>
+> Evidence for the diagnosis, since "it entered local-clock" has two causes: the
+> log's full button history was `KEY double`, `KEY short`, `BOOT short` and
+> **no `BOOT double` anywhere**, so it was the auto path, not the owner putting it
+> into manual power-save.
+>
+> **Unrelated, found while verifying: two tests in `host/test/integration.test.js`
+> are time-of-day dependent** and were pushed that way. "offline days ... (H1)" and
+> "genuine inactive day ..." pin `today` but inject no `now`, so they fall through
+> to the wall clock, which `bond.js`'s `bondSlotAt` reads. They passed at 20:00 on
+> 07-31 and fail at 09:00 on 08-01 **on the same commit** — bond 104.4 vs 104. This
+> came in with the work PC's 亲密度结算制 rewrite (`1c85208`, `0a147d3`). Not fixed
+> here. Until it is, **the Windows baseline below is two higher in the morning than
+> in the evening**, which is a great way to lose an hour. Full run after this
+> session's fix: **659 pass / 10 fail of 669** — the 8 environment failures, plus
+> these two. (The flaky quiet-boundary race passed this time; it is the 9th.)
 
 > **2026-07-31 evening, home PC — the home checklist above is consumed, and the
 > capture screen has music.** In order: pulled the 16 commits (`d3855b5` →

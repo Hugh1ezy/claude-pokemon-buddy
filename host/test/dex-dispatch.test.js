@@ -138,6 +138,44 @@ test("the idle close releases the animator too, not just the flag", async () => 
   assert.equal(h.dispatcher.ageDex(), false, "ageing a closed screen must not resume again");
 });
 
+// The 2026-08-01 bug: the pokedex draws only on input and `shouldPush` stops the
+// tick painting over it, so an open, untouched screen sent the device NOTHING.
+// The firmware auto-enters local-clock mode after 120s of no frames (two ticks)
+// while the screen's own idle-close is three ticks — so the offline clock face
+// was certain to appear over the pokedex the owner was looking at.
+test("an idle pokedex keeps feeding the device a frame every tick", async () => {
+  const h = harness();
+  await h.press("KEY", "double");
+  const afterOpen = h.pushed.length;
+
+  // Two ticks with no input at all -- the window in which the device used to
+  // give up on the host.
+  for (let i = 0; i < 2; i += 1) {
+    h.dispatcher.ageDex();
+    assert.equal(await h.dispatcher.repaintHeldScreen(), true, "the held screen must repaint itself");
+  }
+
+  assert.equal(h.pushed.length, afterOpen + 2, "one frame per silent tick, or the device times out");
+  assert.equal(h.dispatcher.isDexOpen(), true, "and it is still the pokedex on screen, not the buddy panel");
+  assert.deepEqual(h.pushed.slice(afterOpen), ["page-0", "page-0"],
+    "the repaint is the pokedex's own frame -- pushing the buddy panel would wipe the screen");
+});
+
+test("repaintHeldScreen does nothing when no screen is held", async () => {
+  const h = harness();
+  // Nothing open: the tick pushes the buddy panel itself, and a keepalive here
+  // would be a second writer racing it.
+  assert.equal(await h.dispatcher.repaintHeldScreen(), false);
+  assert.deepEqual(h.pushed, []);
+
+  // Closed again after having been open -- the same must hold.
+  await h.press("KEY", "double");
+  await h.press("BOOT", "short");
+  const afterClose = h.pushed.length;
+  assert.equal(await h.dispatcher.repaintHeldScreen(), false);
+  assert.equal(h.pushed.length, afterClose);
+});
+
 // Otherwise a render failure parks the animator forever and the panel freezes
 // on whatever was last pushed.
 test("a screen that fails to render closes itself and unparks the animator", async () => {
