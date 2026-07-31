@@ -787,6 +787,19 @@ export async function main({
     let stopped = false;
     let timer = null;
     let resolveLoopSleep = null;
+    // Ends the loop's sleep early. Declared HERE, next to what it closes over
+    // and above every use: it was first written down beside stop(), i.e. after
+    // the dispatcher that takes it, and `const` gave a temporal-dead-zone
+    // ReferenceError that killed the host on startup. The device sat on its
+    // local clock face until someone looked at the log.
+    //
+    // Safe to call at any moment: with no timer pending a tick is already
+    // running, and that tick picks the queue up on its own.
+    const wakeTick = () => {
+      if (!timer) return;
+      clearTimeout(timer);
+      resolveLoopSleep?.();   // clears both `timer` and itself, then resolves
+    };
     let runtime = {};
     let lastLoadUsageFailureReason = null;
     let lastPollUsageFailureReason = null;
@@ -849,14 +862,6 @@ export async function main({
           nowProvider,
         })
       : null;
-
-    // Ends the loop's sleep early. Safe to call at any moment: with no timer
-    // pending a tick is already running, and the next one picks the queue up.
-    const wakeTick = () => {
-      if (!timer) return;
-      clearTimeout(timer);
-      resolveLoopSleep?.();   // clears both `timer` and itself, then resolves
-    };
 
     const stop = () => {
       stopped = true;
