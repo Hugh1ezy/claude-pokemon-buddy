@@ -7,9 +7,8 @@
 //
 // The test is "do I own something this evolves into", not "does this evolve",
 // which matters: a wild charmander you have never evolved is perfectly alive.
-import { expForHalfHeart } from "./bond.js";
+import { settleBondExp } from "./bond.js";
 import { boxPet, normalizeDex } from "./dex.js";
-import { gainExp } from "./sim.js";
 import { SPECIES_DEX, evolutionDescendants, isDexSpecies } from "./species-meta.js";
 
 export function isFrozenSpecies(species, dex) {
@@ -76,21 +75,11 @@ export function swapActiveBuddy(pet, species) {
   // a week it did not live through or claim a day it did not earn. Leaving them
   // put means a boxed pokemon is simply paused, which is also what it looks
   // like from outside.
-  // Cashing today's hearts in, at the owner's ask (2026-07-31). Each half heart
-  // is worth half a percent of the level in progress, the same rate
-  // applyBondTick uses, so a full ten-half day hands the departing pokemon 5%
-  // of its bar on the way out.
-  //
-  // Stated plainly because it is a balance decision and not a bug fix: this is
-  // a SECOND payment. applyBondTick already granted the exp for each half at
-  // the moment it credited it, so the hearts were never unspent. The owner was
-  // told and asked for the step anyway. It is bounded -- a half can only be
-  // cashed once, since bondHalves resets here, so the most a day can hand over
-  // this way is the day's ten halves, and only to someone who swaps.
-  const cashed = Math.max(0, Number(pet.bondHalves ?? 0));
-  const paid = cashed > 0
-    ? gainExp(pet.level, pet.exp, expForHalfHeart(pet.level) * cashed)
-    : { level: pet.level, exp: pet.exp };
+  // Leaving the panel is one of the two moments 亲密度 is settled -- the other
+  // is the day's window shutting, in applyBondTick. Whichever comes first pays,
+  // and it pays ONCE: settleBondExp zeroes what it owed. Nothing is granted as
+  // the hearts are earned, so this cannot double up.
+  const paid = settleBondExp(pet);
 
   const outgoing = {
     species: pet.species,
@@ -120,10 +109,10 @@ export function swapActiveBuddy(pet, species) {
     // pays twice. Keeping it means the incoming pokemon earns from whatever is
     // left of the day, and the day's ten halves stay the day's ten halves.
     //
-    // No exp is "converted" here, because none is pending: applyBondTick grants
-    // the exp for a half heart at the moment it credits it, so the outgoing
-    // pokemon already has every point those hearts were worth.
+    // The incoming pokemon owes nothing and is owed nothing: whatever was
+    // unpaid belonged to the one that just left and was settled above.
     bondHalves: 0,
+    bondUnpaid: 0,
     dexCaught: dex.dexCaught.includes(species) ? dex.dexCaught : [...dex.dexCaught, species],
     capturedCount: dex.capturedCount,
     box: box.sort(byDexOrderOn("species")),

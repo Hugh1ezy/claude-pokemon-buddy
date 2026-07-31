@@ -37,6 +37,11 @@ const NUMBER_RANGES = {
   todayCreditedBond: { min: 0 },
   careCount: { min: 0 },
   bondHalves: { min: 0, max: SLOTS_PER_DAY },
+  // Halves earned but not yet turned into exp. Listed here for the same
+  // reason everything else is: this file rebuilds the save from NAMED fields,
+  // so a field merely carried on the object is dropped between one save and
+  // the next load. That is how the capture fixture flag once vanished.
+  bondUnpaid: { min: 0, max: SLOTS_PER_DAY },
   bondSlots: { min: 0, max: (1 << SLOTS_PER_DAY) - 1 },
 };
 
@@ -105,6 +110,7 @@ function salvageState(state) {
   copyNumber(out, state, "todayCreditedBond");
   copyNumber(out, state, "careCount");
   copyNumber(out, state, "bondHalves");
+  copyNumber(out, state, "bondUnpaid");
   copyNumber(out, state, "bondSlots");
   copyString(out, state, "lastSettled");
   copyString(out, state, "lastGrowthDay");
@@ -196,6 +202,7 @@ function normalizePet(state) {
   normalizeNumber(out, "todayCreditedBond");
   normalizeNumber(out, "careCount");
   normalizeNumber(out, "bondHalves");
+  normalizeNumber(out, "bondUnpaid");
   normalizeNumber(out, "bondSlots");
   clampExpToLevel(out);
   // Only when the save already carries a dex. A save from before the pokedex

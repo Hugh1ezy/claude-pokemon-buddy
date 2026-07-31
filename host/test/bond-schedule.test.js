@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { applyBondTick, bondSlotAt, heartsFromHalves, MAX_HEARTS, SLOTS_PER_DAY } from "../src/pet/bond.js";
+import { applyBondTick, bondSlotAt, settleBondExp, heartsFromHalves, MAX_HEARTS, SLOTS_PER_DAY } from "../src/pet/bond.js";
 import { expToNextLevel, PARAMS } from "../src/pet/sim.js";
 
 const MON = (h, m = 0) => new Date(2026, 6, 27, h, m); // 2026-07-27 is a Monday
@@ -86,12 +86,29 @@ test("hearts reset with the day", () => {
   assert.equal(today.bondDay, YMD.thu);
 });
 
-test("each half heart is worth half a percent of the level's bar", () => {
+// The rate is unchanged; WHEN it lands is what moved on 2026-07-31. A half
+// heart is owed as it is earned and paid when the day's window shuts or the
+// pokemon leaves the panel -- see settleBondExp.
+test("each half heart is owed half a percent of the level's bar", () => {
   const level = 5;
   const bar = expToNextLevel(level);
   const p = applyBondTick(pet({ level }), { now: MON(9, 30), today: YMD.mon, clicked: true });
 
-  assert.ok(Math.abs(p.exp - bar * 0.005) < 1e-9, `expected 0.5% of ${bar}, got ${p.exp}`);
+  assert.equal(p.exp, 0, "nothing is paid while the window is still open");
+  assert.equal(p.bondUnpaid, 1);
+
+  const paid = settleBondExp(p);
+  assert.ok(Math.abs(paid.exp - bar * 0.005) < 1e-9, `expected 0.5% of ${bar}, got ${paid.exp}`);
+  assert.equal(paid.bondUnpaid, 0);
+});
+
+// Settling twice must not pay twice -- this is the property that replaced the
+// short-lived "cash in on swap" step, which paid on top of an already-granted
+// amount.
+test("settling again pays nothing", () => {
+  const p = applyBondTick(pet({ level: 5 }), { now: MON(9, 30), today: YMD.mon, clicked: true });
+  const once = settleBondExp(p);
+  assert.deepEqual(settleBondExp(once), once);
 });
 
 test("a full five-heart day hands over 5% of the level", () => {
@@ -101,8 +118,13 @@ test("a full five-heart day hands over 5% of the level", () => {
   for (let hour = 9; hour < 19; hour += 1) {
     p = applyBondTick(p, { now: MON(hour, 30), today: YMD.mon, clicked: true });
   }
-  assert.equal(p.level, level, "5% of a bar must not be enough to level on its own");
-  assert.ok(Math.abs(p.exp - bar * 0.05) < 1e-9, `expected 5% of ${bar}, got ${p.exp}`);
+  // 19:00 closes the window, and the tick that lands after it settles the day.
+  const closed = applyBondTick(p, { now: MON(19, 5), today: YMD.mon, clicked: false });
+
+  assert.equal(closed.level, level, "5% of a bar must not be enough to level on its own");
+  assert.ok(Math.abs(closed.exp - bar * 0.05) < 1e-9, `expected 5% of ${bar}, got ${closed.exp}`);
+  assert.equal(closed.bondHalves, 10, "the hearts stay on the panel after settling");
+  assert.equal(closed.bondUnpaid, 0);
 });
 
 test("bond EXP can still tip a nearly-full bar over into the next level", () => {
@@ -110,7 +132,7 @@ test("bond EXP can still tip a nearly-full bar over into the next level", () => 
   const bar = expToNextLevel(level);
   // 0.4% short of the next level -- one half heart (0.5%) covers the gap.
   const p = applyBondTick(pet({ level, exp: bar * 0.996 }), { now: MON(9, 30), today: YMD.mon, clicked: true });
-  assert.equal(p.level, level + 1);
+  assert.equal(settleBondExp(p).level, level + 1);
 });
 
 test("lifetime bond keeps its old pace so friendship evolutions still take ~2 weeks", () => {

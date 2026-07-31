@@ -29,6 +29,29 @@ export function bondWindow(date) {
   return WINDOWS[date.getDay()];
 }
 
+// True once the day's ten slots are behind us -- 19:00 on an ordinary day,
+// 21:00 on a Thursday. bondSlotAt() returns null both before the window opens
+// and after it shuts, so "closed" needs asking separately.
+export function bondWindowClosed(date) {
+  const { startHour } = bondWindow(date);
+  return date.getHours() + date.getMinutes() / 60 >= startHour + SLOTS_PER_DAY;
+}
+
+// Turns whatever hearts are owed into exp, once. Half a heart is worth half a
+// percent of the level in progress, so a full ten-half day is 5% of the bar.
+//
+// Owner's rule, 2026-07-31: the exp is NOT granted as each half is earned. It
+// is settled when the day's window shuts, or when the pokemon leaves the panel,
+// whichever comes first -- and it is paid exactly once either way, which is why
+// `bondUnpaid` is zeroed here rather than being derived from bondHalves.
+export function settleBondExp(pet) {
+  const unpaid = Math.max(0, Number(pet.bondUnpaid ?? 0));
+  if (unpaid <= 0) return pet.bondUnpaid === 0 ? pet : { ...pet, bondUnpaid: 0 };
+
+  const grown = gainExp(pet.level, pet.exp, expForHalfHeart(pet.level) * unpaid);
+  return { ...pet, level: grown.level, exp: grown.exp, bondUnpaid: 0 };
+}
+
 // Index of the hour slot `date` falls in, or null when the window is closed.
 export function bondSlotAt(date) {
   const { startHour } = bondWindow(date);
@@ -90,23 +113,31 @@ export function applyBondTick(pet, { now, clicked = false, today } = {}) {
   if (typeof today !== "string" || today.length === 0) throw new Error("today is required");
 
   const fresh = pet.bondDay === today;
-  const halves = fresh ? Math.max(0, Number(pet.bondHalves ?? 0)) : 0;
-  const credited = fresh ? Math.max(0, Number(pet.bondSlots ?? 0)) : 0;
+  // A day that rolled over without ever reaching its own 19:00 -- the device
+  // was off, or the host was -- still owes whatever it earned. Settle before
+  // resetting, or the halves are simply lost.
+  const carried = fresh ? pet : settleBondExp(pet);
+  const halves = fresh ? Math.max(0, Number(carried.bondHalves ?? 0)) : 0;
+  const credited = fresh ? Math.max(0, Number(carried.bondSlots ?? 0)) : 0;
+  const unpaid = fresh ? Math.max(0, Number(carried.bondUnpaid ?? 0)) : 0;
 
-  const base = { ...pet, bondDay: today, bondHalves: halves, bondSlots: credited };
+  const base = {
+    ...carried, bondDay: today, bondHalves: halves, bondSlots: credited, bondUnpaid: unpaid,
+  };
 
   const slot = bondSlotAt(now);
-  if (slot == null) return base;
+  // Past the day's last slot: pay out and leave the hearts on the panel, which
+  // are the day's record and stay until midnight rolls them over.
+  if (slot == null) return bondWindowClosed(now) ? settleBondExp(base) : base;
 
   const mask = 1 << slot;
   if ((credited & mask) !== 0) return base;
   if (!bondWindow(now).auto && !clicked) return base;
 
-  const grown = gainExp(base.level, base.exp, expForHalfHeart(base.level));
+  // No exp here. It is owed, not paid -- see settleBondExp.
   return {
     ...base,
-    level: grown.level,
-    exp: grown.exp,
+    bondUnpaid: Math.min(SLOTS_PER_DAY, unpaid + 1),
     // The cumulative bond that drives friendship evolutions keeps its old pace:
     // ten half hearts add up to exactly one active day's worth under the previous
     // rules, so the ~2-week Eevee threshold still means ~2 weeks.

@@ -99,10 +99,10 @@ test("swapping away and back preserves the buddy exactly", () => {
 
   assert.equal(round.species, "ivysaur");
   assert.equal(round.level, 18);
-  // Not 20 any more: on the way out it cashed today's four halves into exp
-  // (owner's ask, 2026-07-31). The round trip still returns the SAME pokemon,
-  // which is what this test guards -- it just comes back slightly further along.
-  assert.equal(round.exp, 20 + (expToNextLevel(18) / 200) * 4);
+  // The fixture owes nothing (bondUnpaid defaults to 0), so leaving the panel
+  // settles nothing and the exp comes back untouched. What a swap DOES pay is
+  // pinned by the settlement tests below.
+  assert.equal(round.exp, 20);
   assert.equal(round.bond, 21);
   // NOT bondHalves. This asserted 4 until 2026-07-31, when the owner ruled that
   // today's hearts belong to whoever is on the panel earning them rather than
@@ -181,9 +181,9 @@ test("swapping does not hand the day's hearts back to the one that earned them",
 // Owner's ask, 2026-07-31. Knowingly a second payment -- applyBondTick already
 // granted the exp when it credited each half -- so the test pins the RATE and
 // the bound rather than pretending it is a correction.
-test("the departing pokemon cashes today's hearts into exp", () => {
+test("leaving the panel settles what the day still owes", () => {
   const before = pet({
-    level: 10, exp: 0, bondHalves: 4,
+    level: 10, exp: 0, bondHalves: 4, bondUnpaid: 4,
     dexCaught: ["ivysaur", "pidgey"],
     box: [{ species: "pidgey", level: 7, bond: 3 }],
   });
@@ -192,11 +192,12 @@ test("the departing pokemon cashes today's hearts into exp", () => {
 
   // Half a percent of the level in progress per half heart, four of them.
   assert.equal(stored.exp, (expToNextLevel(10) / 200) * 4);
+  assert.equal(after.bondUnpaid, 0, "the incoming pokemon is owed nothing");
 });
 
-test("a swap with no hearts earned today pays nothing", () => {
+test("a swap with nothing owed pays nothing", () => {
   const before = pet({
-    level: 10, exp: 5, bondHalves: 0,
+    level: 10, exp: 5, bondHalves: 0, bondUnpaid: 0,
     dexCaught: ["ivysaur", "pidgey"],
     box: [{ species: "pidgey", level: 7, bond: 3 }],
   });
@@ -208,9 +209,9 @@ test("a swap with no hearts earned today pays nothing", () => {
 
 // The bound that keeps this from being farmable: a half heart can only be
 // cashed once, because the swap that cashes it also zeroes the counter.
-test("swapping twice in a row cannot cash the same hearts again", () => {
+test("swapping twice in a row cannot settle the same hearts again", () => {
   const before = pet({
-    level: 10, exp: 0, bondHalves: 4,
+    level: 10, exp: 0, bondHalves: 4, bondUnpaid: 4,
     dexCaught: ["ivysaur", "pidgey"],
     box: [{ species: "pidgey", level: 7, bond: 3 }],
   });

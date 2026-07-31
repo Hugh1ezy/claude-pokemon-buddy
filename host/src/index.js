@@ -157,6 +157,11 @@ export function createButtonDispatcher({
   let signatureInFlight = false;
   let dexView = null;
   let captureActive = false;
+  // `offeredAt` of an encounter this session has already played out. Session
+  // state, not save state: it only has to cover the gap between the capture
+  // ending and the tick clearing the offer, and a restart re-reads a save the
+  // tick has by then already cleaned up.
+  let resolvedOfferAt = null;
   let capturePress = false;
   let captureAbort = false;
   const off = transport?.onButton?.((event) => {
@@ -231,8 +236,17 @@ export function createButtonDispatcher({
     if (typeof species !== "string" || !isDexSpecies(species)) return null;
     const offeredAt = Number(pet.encounter.offeredAt);
     if (!Number.isFinite(offeredAt)) return null;
+    // An offer this session has already played is over, whatever the save still
+    // says. The tick is what clears it and the tick is 60 seconds wide, so
+    // without this the notice stays up after a catch and the same pokemon can
+    // be caught again -- which is exactly what happened on 2026-07-31, twice
+    // into the same collection. Keyed on offeredAt so the NEXT offer of the
+    // same species is a different encounter and plays normally.
+    if (resolvedOfferAt === offeredAt) return null;
     const left = offeredAt + ENCOUNTER_DEFAULTS.offerMs - captureNow();
-    return left > 0 ? { species, offerMsLeft: left, test: pet.encounter.test === true } : null;
+    return left > 0
+      ? { species, offeredAt, offerMsLeft: left, test: pet.encounter.test === true }
+      : null;
   }
 
   function startCapture() {
@@ -263,6 +277,12 @@ export function createButtonDispatcher({
         });
         if (result.outcome !== "aborted") {
           captureResults.push({ species: offer.species, outcome: result.outcome, test: offer.test });
+          // Closed here rather than after the tick writes the save: the whole
+          // point is to stop the gap between the two being playable. Backing
+          // out (`aborted`) deliberately does not, because nothing was thrown
+          // and the offer is meant to still be there.
+          resolvedOfferAt = offer.offeredAt;
+          wakeTick();
         }
         logger?.log?.(`capture: ${zhName(offer.species)} ${result.outcome}${result.reason ? ` (${result.reason})` : ""}`);
       } finally {
