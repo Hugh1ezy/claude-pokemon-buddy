@@ -91,6 +91,21 @@ export function swapActiveBuddy(pet, species) {
   return {
     ...pet,
     ...withPetFields(incoming, species),
+    // Today's hearts belong to the pokemon that earned them, and they were
+    // earned by the one leaving. Owner's call, 2026-07-31: he swapped to a
+    // freshly caught pokemon and it arrived showing a heart and a half, which
+    // reads as "this one already likes you" when nothing had happened yet.
+    //
+    // `bondSlots` deliberately does NOT reset with it. That mask is which HOURS
+    // of today have already paid out, and resetting it would let a swap re-earn
+    // hours already collected -- swap away and back a few times and the day
+    // pays twice. Keeping it means the incoming pokemon earns from whatever is
+    // left of the day, and the day's ten halves stay the day's ten halves.
+    //
+    // No exp is "converted" here, because none is pending: applyBondTick grants
+    // the exp for a half heart at the moment it credits it, so the outgoing
+    // pokemon already has every point those hearts were worth.
+    bondHalves: 0,
     dexCaught: dex.dexCaught.includes(species) ? dex.dexCaught : [...dex.dexCaught, species],
     capturedCount: dex.capturedCount,
     box: box.sort(byDexOrderOn("species")),

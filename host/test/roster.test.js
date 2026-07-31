@@ -100,7 +100,11 @@ test("swapping away and back preserves the buddy exactly", () => {
   assert.equal(round.level, 18);
   assert.equal(round.exp, 20);
   assert.equal(round.bond, 21);
-  assert.equal(round.bondHalves, 4);
+  // NOT bondHalves. This asserted 4 until 2026-07-31, when the owner ruled that
+  // today's hearts belong to whoever is on the panel earning them rather than
+  // riding along with the pokemon. Lifetime `bond` above is the one that
+  // travels; see the two tests at the end of this file.
+  assert.equal(round.bondHalves, 0);
   assert.equal(round.nature, "慢性子");
 });
 
@@ -137,4 +141,35 @@ test("swapping to a species with no box entry still works", () => {
   assert.equal(after.species, "bulbasaur");
   assert.equal(Number.isFinite(after.level), true, "a missing record must not produce level undefined");
   assert.equal(after.bond, 0);
+});
+
+// Owner, 2026-07-31: he swapped to a pokemon caught minutes earlier and it came
+// up already showing a heart and a half. Those halves were the day's, earned by
+// the buddy that just left.
+test("a swapped-in pokemon starts today's hearts at zero", () => {
+  const before = pet({
+    bondHalves: 3,
+    bondSlots: 0b111,
+    dexCaught: ["ivysaur", "pidgey"],
+    box: [{ species: "pidgey", level: 7, bond: 3 }],
+  });
+  const after = swapActiveBuddy(before, "pidgey");
+
+  assert.equal(after.bondHalves, 0, "the new buddy has earned nothing today");
+  // The slot mask is the DAY's, not the pokemon's. Resetting it too would let a
+  // swap re-collect hours already paid, so a few swaps would pay the day twice.
+  assert.equal(after.bondSlots, 0b111, "hours already paid stay paid");
+});
+
+test("swapping does not hand the day's hearts back to the one that earned them", () => {
+  const before = pet({
+    bondHalves: 3,
+    dexCaught: ["ivysaur", "pidgey"],
+    box: [{ species: "pidgey", level: 7, bond: 3 }],
+  });
+  const round = swapActiveBuddy(swapActiveBuddy(before, "pidgey"), "ivysaur");
+
+  assert.equal(round.species, "ivysaur");
+  assert.equal(round.bondHalves, 0, "the halves are spent, not stored on the pokemon");
+  assert.equal(round.bond, 21, "lifetime bond still travels with the pokemon");
 });

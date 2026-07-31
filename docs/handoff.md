@@ -213,6 +213,61 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 If `status` shows the remote *behind* what is on this machine, stop and read "the
 two-buddy trap" below before running anything.
 
+## Open, and the owner is waiting on it: wild availability is not being honoured
+
+The owner caught a species that **cannot be obtained in the wild in Gen 1** —
+verified against Serebii, it is a trade-evolution only. He spotted it himself.
+
+The interesting part: **`seed/wild-rarity.json` is already correct.** That entry
+carries `areas: 0, methods: []`, i.e. the canonical data says exactly what it
+should. So the defect is in the step that turns that data into encounter
+weights, not in the data. Anything with `areas: 0` (equivalently, an empty
+`methods`) must not be offerable at all.
+
+**Not fixed yet, and deliberately so:** the generator is one of the four spoiler
+files the owner has asked not to be read, and the fix raises a design question
+that is his rather than mine — **if wild-unobtainable species are excluded, how
+are they ever obtained?** In Gen 1 that set is the trade evolutions, and the
+answer is presumably "by evolving the one below it", which needs a box pokemon
+to be able to evolve; today only the active buddy does. Ask before changing.
+
+When it is fixed: re-run the simulation and check the dex is still completable.
+The handoff's own warning applies — the first table looked reasonable and left
+16 species unreachable, and only the simulation caught it. Report the summary
+numbers only; its output names species.
+
+The wrongly-caught pokemon was removed from the save by hand at the owner's
+request (undo copy at `out/state.json.prealakazam`): dropped from `dexCaught`
+and the box, and `capturedCount` decremented by exactly one. Note for whoever
+looks: `capturedCount` was 3 against 2 box entries before that edit, i.e. it was
+already one ahead of the box, and **that discrepancy was left alone** rather
+than tidied, because it was not what was reported.
+
+## Today's hearts no longer travel with a swapped pokemon (owner, 2026-07-31)
+
+He swapped to a pokemon caught minutes earlier and it arrived showing a heart
+and a half. Those halves were the **day's**, earned by the buddy that just left:
+`swapActiveBuddy` deliberately left `bondHalves` alone as "the trainer's day
+bookkeeping". Correct reasoning, wrong result — read off the panel it says "this
+one already likes you".
+
+`bondHalves` now resets to 0 on a swap. Two things did **not** change, and both
+matter:
+
+- **`bondSlots` still does not reset.** It is the mask of which HOURS have paid
+  out today. Resetting it with the halves would let a swap re-collect hours
+  already earned, so swapping back and forth would pay the day twice. Keeping it
+  means the incoming pokemon earns from whatever is left of the day.
+- **Nothing is "converted to exp" on the swap**, despite that being how the
+  owner described it, because there is nothing pending: `applyBondTick` grants
+  the exp for a half heart at the moment it credits it. The outgoing pokemon
+  already holds every point those hearts were worth.
+
+`test/roster.test.js` had a test asserting the old behaviour (`bondHalves` 4
+after a round trip). Its expectation was changed to 0 with a note, rather than
+the test being deleted — the round-trip property it was really guarding, that
+level/exp/bond/nature come back intact, is unchanged and still asserted.
+
 ## Two hardware numbers, measured 2026-07-31 (probes since removed)
 
 Both were guesses that decisions were resting on. The probe code lived in
