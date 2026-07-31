@@ -1,7 +1,44 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-07-31
-(morning, WORK PC)**.
+(end of the work day, WORK PC)**.
+
+## ▶ What the HOME PC has to do tonight
+
+```powershell
+cd "$HOME\claude-pokemon-buddy"
+git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
+cd host
+node scripts/save-sync-cli.mjs status
+node scripts/save-sync-cli.mjs pull     # once the device is actually home
+```
+
+Then **restart the host** — a great deal of tick-facing code changed today and
+a stale process will run none of it. No re-bake (artwork untouched since 07-29).
+**No reflash**: the device is carrying an image flashed from the work PC this
+afternoon, with both networks in it.
+
+Three things worth doing at home tonight, in this order:
+
+1. **Listen.** Sound has still never been heard on hardware — the six triggers
+   are listed further down and `node scripts/play-test.js` auditions the three
+   system sounds directly. This has been outstanding since 07-30.
+2. **Watch for `bond: credited N offline half-heart(s)` in the host log** after
+   the device attaches. That line is the real acceptance test for offline
+   亲密度, and the commute home is the first time the feature is in the
+   situation it was built for. Press KEY once on the way home, in an hour whose
+   slot has not already paid out.
+3. If the panel looks wrong in any way, check the host's **start time** before
+   checking the code. That has been the answer twice this week.
+
+> ⚠ **If the home PC ever builds firmware again, it must regenerate its
+> sdkconfig.** `partitions.csv` is new and `sdkconfig.defaults` now selects it,
+> but `sdkconfig` is per-machine and gitignored, so that machine still has the
+> 1MB single-app table. The app is 1,029,776 bytes and will not fit — the build
+> fails loudly rather than producing something wrong, which is the good case,
+> but the fix is not obvious from the error: delete `firmware/sdkconfig` and run
+> `idf.py reconfigure`. Diff the regenerated file against the old one; on this
+> machine exactly three partition lines differed and nothing else was lost.
 
 > **2026-07-31 morning, work PC — the work checklist below is consumed.** In
 > order: pulled the 14 commits from the fork (`7edcac1` → `d3855b5`), stopped the
@@ -213,7 +250,69 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 If `status` shows the remote *behind* what is on this machine, stop and read "the
 two-buddy trap" below before running anything.
 
-## Open, and the owner is waiting on it: wild availability is not being honoured
+## Session record: 2026-07-31 afternoon, work PC
+
+### 亲密度 is settled now, not paid as it is earned
+
+The owner reworked the rule twice in one afternoon and the end state is:
+
+- **Nothing is granted as a half heart is credited.** `applyBondTick` records
+  what is owed in `bondUnpaid` and grants no exp.
+- **Settlement happens when the day's window shuts** — 19:00 ordinarily, 21:00
+  on a Thursday, via `bondWindowClosed` rather than a hardcoded hour — **or when
+  the pokemon leaves the panel**, whichever comes first. `settleBondExp` pays
+  once and zeroes what it owed.
+- **Settling empties the hearts on the panel too.** They are a running total of
+  what has not been paid, not a record of the day.
+- A day that rolled over without ever reaching its own 19:00 (device off, host
+  off) is settled before the reset, or those halves would simply evaporate.
+
+`bondSlots` is untouched by any of this and it is what keeps the day honest: it
+still records which HOURS have been collected, so emptying the hearts cannot buy
+a second helping. There is a test pinning exactly that.
+
+**A short-lived "cash in on swap" step existed for about an hour and is gone.**
+It paid on top of the exp `applyBondTick` had already granted — a genuine second
+payment. It was implemented as asked, flagged as a second payment, and the owner
+removed it once the mechanics were clear. If a future note describes hearts as
+"unspent", it is describing the version that no longer exists.
+
+**`bondUnpaid` is registered in all three of `state.js`'s whitelists.** That file
+rebuilds the save from named fields; a field merely carried on the object is
+dropped between one save and the next load, which is how the capture fixture's
+`test` flag once vanished for five real catches.
+
+### Two bugs with one cause: the tick is 60 seconds wide
+
+Both were reported by the owner within an hour of each other, and both come from
+queueing work to a tick that may not run for a minute.
+
+- **Confirming a swap dropped him back on the panel still showing the old
+  buddy.** It looked like nothing had happened.
+- **A caught pokemon could be caught again.** The notice stayed up because the
+  save still held the offer, so the capture screen reopened on the same
+  encounter. It went into the collection twice, and `capturedCount` was
+  corrected by hand from 4 to 3.
+
+`wakeTick()` cuts the loop's sleep short when a swap or a capture result is
+queued. The tick is still the only thing that writes the pet — only *when* it
+next runs changed. For the capture there is a second, independent guard: the
+dispatcher remembers the `offeredAt` it has already played and refuses to
+reopen that encounter, so the fix does not depend on timing at all. Keyed on
+`offeredAt`, so the next offer of the same species plays normally. Backing out
+(`aborted`) deliberately does not close the offer.
+
+> **`wakeTick` killed the host on its first outing**, and the failure is worth
+> knowing: it was declared with `const` next to `stop()`, i.e. *after* the
+> dispatcher that takes it, so the temporal dead zone threw a ReferenceError the
+> moment `main()` ran. The device sat on its local clock face and the only
+> evidence was one line in `out/host-autostart.log`. It is now declared beside
+> `timer`/`resolveLoopSleep`, above every use.
+
+## Wild availability: half-fixed, and blocked on the evolution table
+
+The owner caught a species that **cannot be obtained in the wild in Gen 1** —
+verified against Serebii, trade-evolution only. He spotted it himself.
 
 The owner caught a species that **cannot be obtained in the wild in Gen 1** —
 verified against Serebii, it is a trade-evolution only. He spotted it himself.
@@ -224,17 +323,44 @@ should. So the defect is in the step that turns that data into encounter
 weights, not in the data. Anything with `areas: 0` (equivalently, an empty
 `methods`) must not be offerable at all.
 
-**Not fixed yet, and deliberately so:** the generator is one of the four spoiler
-files the owner has asked not to be read, and the fix raises a design question
-that is his rather than mine — **if wild-unobtainable species are excluded, how
-are they ever obtained?** In Gen 1 that set is the trade evolutions, and the
-answer is presumably "by evolving the one below it", which needs a box pokemon
-to be able to evolve; today only the active buddy does. Ask before changing.
+**The rule is in as of 2026-07-31 and it took three attempts, each one corrected
+by the data rather than by reasoning:**
 
-When it is fixed: re-run the simulation and check the dex is still completable.
-The handoff's own warning applies — the first table looked reasonable and left
-16 species unreachable, and only the simulation caught it. Report the summary
-numbers only; its output names species.
+1. `evolvesFrom != null` — wrong. Five Gen-1 species list a **Gen-2 baby form**
+   as their pre-evolution, so the chain leaves these 151 and nothing in the game
+   could ever evolve into them.
+2. "has an ancestor catchable on foot" — wrong, and it costs the three starter
+   lines: the starters are gifts with no walking encounter, so their evolutions
+   would have stayed in the wild pool.
+3. **In: a chain that stays entirely inside the 151, AND a branch in
+   `seed/evolution/*.json` that actually reaches the species.**
+
+The third clause is not tidiness. Without it the rule **stranded 27 of 36
+species permanently** — measured, not feared. `seed/evolution/` is the *playable*
+table (triggers, not the canonical graph) and today it covers a fraction of the
+Gen-1 lines. Gating on it also makes the rule self-maintaining: every line added
+to the evolution table takes its forms out of the wild pool on the next
+regenerate, with no edit to the generator.
+
+Net today: **9 excluded, 0 stranded**. A weight of 0 needs no engine change —
+`candidates()` already drops anything not greater than zero — and
+`test/encounter.test.js` now asserts that every zero-weight species is an
+evolution target, by counts only, so that file stays safe to read.
+
+**Still open, and it is the blocker for everything else here: the evolution
+table covers 14 targets out of 151.** Until the Gen-1 lines are filled in, most
+wild-unobtainable species stay in the wild pool, including the one the owner
+actually reported. The owner has since specified how he wants difficulty
+mirrored from the games and asked that none of it be discussed with him again —
+so the design lives in the spoiler files and the next session should read
+`gen-encounters.mjs` and get on with it. Report progress as counts and summary
+figures only.
+
+**One real cost, recorded so nobody rediscovers it as a mystery:**
+`sim-encounters.mjs` does not model evolution, so it can no longer answer "is
+the dex completable" — it now reports 0/40 with the encounter path topping out
+short of 151. That guard needs evolution modelling before it is meaningful
+again. Do not read its silence as a regression in the weights.
 
 The wrongly-caught pokemon was removed from the save by hand at the owner's
 request (undo copy at `out/state.json.prealakazam`): dropped from `dexCaught`
@@ -244,6 +370,10 @@ already one ahead of the box, and **that discrepancy was left alone** rather
 than tidied, because it was not what was reported.
 
 ## Today's hearts no longer travel with a swapped pokemon (owner, 2026-07-31)
+
+> Superseded in part the same afternoon — the settlement section above is
+> current. What survives from this note: `bondHalves` resets on a swap, and
+> `bondSlots` does not.
 
 He swapped to a pokemon caught minutes earlier and it arrived showing a heart
 and a half. Those halves were the **day's**, earned by the buddy that just left:
