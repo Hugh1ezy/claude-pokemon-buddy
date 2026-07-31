@@ -211,6 +211,16 @@ static std::atomic<bool> g_wifi_user_stopped{false};
 // a frozen/blank screen" rather than a special-cased startup state.
 static std::atomic<int64_t> g_last_frame_us{0};
 static constexpr int64_t LOCAL_CLOCK_TIMEOUT_US = 120LL * 1000 * 1000; // 2x the normal ~60s tick
+// esp_timer_get_time() at the last EXIT from local-clock mode. A BOOT double
+// inside this window is refused, so mashing BOOT cannot walk straight back into
+// power-save -- see the button handler for how that happens. Two seconds: long
+// enough to swallow the rest of a burst of presses, short enough that someone
+// deliberately toggling it off and on again does not notice. The guard is on
+// entry only; leaving must never be gated on a timer.
+static constexpr int64_t BOOT_REARM_GUARD_US = 2LL * 1000 * 1000;
+// Far enough in the past that the first BOOT double after boot is not swallowed
+// by a guard with no exit to measure from.
+static std::atomic<int64_t> g_local_clock_left_us{-BOOT_REARM_GUARD_US * 2};
 
 // "Is anybody driving this panel right now" -- asked in the only direction that
 // can be answered honestly, which is INBOUND. A live host pushes a frame about
@@ -230,6 +240,22 @@ static bool host_is_absent(void)
 }
 
 static SemaphoreHandle_t tx_mutex = nullptr;      // serializes USJ writes
+// Serializes EVERY write to the physical panel. There are exactly two writers --
+// rx_task blitting a host frame (handle_frame_payload) and local_clock_task
+// drawing the standalone clock -- and until 2026-08-01 nothing kept them apart
+// but a `g_mode` check at the top of the clock task's loop. That is check-then-
+// act, and the window is a whole clock redraw: ColorClear, the time, the ganzhi
+// row, then a full-panel RLCD_Display(). Press BOOT to leave power-save in that
+// window and the mode flips to NORMAL, the host is told to repaint, and rx_task
+// starts blitting into the same driver a half-finished clock draw is still using.
+//
+// Observed result, twice on 2026-08-01: RLCD_Display() never returns, so rx_task
+// stops ACKing forever. The panel stays frozen on the clock face, buttons still
+// reach the host (they are queued from the esp_timer task, which is untouched),
+// and the ONLY way out is a power cycle -- which is exactly how it presented:
+// "the panel is stuck on the default display", with a host that looked healthy
+// because it renders and pushes regardless of whether anything is accepted.
+static SemaphoreHandle_t panel_mutex = nullptr;
 static QueueHandle_t     btn_queue = nullptr;     // button events -> button_task
 static std::atomic<uint32_t> g_tx_drop_count{0};
 static bool have_last_acked_frame_seq = false;
@@ -452,6 +478,10 @@ static bool handle_frame_payload(const uint8_t *p, size_t len)
     }
     if (out != need) return false;                // size mismatch -> drop
 
+    // Everything above is decode and validation against `rectbuf` -- no panel
+    // access -- so the lock is taken only for the blit itself and a malformed
+    // frame is rejected without ever blocking the clock task.
+    xSemaphoreTake(panel_mutex, portMAX_DELAY);
     for (uint16_t row = 0; row < h; row++) {
         const uint8_t *r = rectbuf + (size_t)row * rectRowBytes;
         for (uint16_t col = 0; col < w; col++) {
@@ -460,6 +490,7 @@ static bool handle_frame_payload(const uint8_t *p, size_t len)
         }
     }
     RlcdPort.RLCD_Display();                       // blocks until SPI transfer done
+    xSemaphoreGive(panel_mutex);
     return true;
 }
 
@@ -666,6 +697,14 @@ static void exit_local_clock_mode(void)
         esp_wifi_start();   // re-triggers WIFI_EVENT_STA_START -> the normal connect flow
         diag("WAKE esp_wifi_start() returned");
     }
+    // Barrier, not a critical section: g_mode is already NORMAL above, so taking
+    // and immediately releasing the panel lock just waits out any clock redraw
+    // that was already in flight when the mode flipped. Only then is the host
+    // told to repaint. Without it the RESYNC races the tail of that redraw and
+    // the host's full-frame blit lands on top of a half-drawn clock.
+    xSemaphoreTake(panel_mutex, portMAX_DELAY);
+    xSemaphoreGive(panel_mutex);
+
     // local_clock_task drew directly to the panel while we were away, which the
     // host's diff tracking never saw. Tell it to treat this like a fresh
     // connection (previousBytes reset + full-frame repaint) instead of pushing
@@ -719,10 +758,28 @@ static void button_task(void *arg)
             // -- deliberately more forgiving than entry, since being stuck on
             // the clock face is the bad state to be in, and someone who has
             // forgotten which gesture it was will mash the button.
+            //
+            // ⚠ Forgiving on exit is not enough on its own, and 2026-08-01 is
+            // what proved it. Mashing BOOT does not produce N exits: the FIRST
+            // press exits, and the next two land inside multi_button's
+            // double-click window and emit KIND_DOUBLE -- which is the ENTER
+            // gesture. Out, in, out, in, for as long as the owner keeps pressing.
+            // The exit was made lenient precisely for someone who would mash, and
+            // then mashing was made the way back in.
+            //
+            // So an entry is refused for BOOT_REARM_GUARD_US after an exit. The
+            // guard is on entry only: getting out must never be gated on a timer.
             if (g_mode.load() == DeviceMode::LOCAL_CLOCK) {
-                if (key_id == KEY_ID_BOOT) exit_local_clock_mode();
+                if (key_id == KEY_ID_BOOT) {
+                    exit_local_clock_mode();
+                    g_local_clock_left_us.store(esp_timer_get_time());
+                }
             } else if (key_id == KEY_ID_BOOT && kind_id == KIND_DOUBLE) {
-                enter_local_clock_mode(true);
+                if (esp_timer_get_time() - g_local_clock_left_us.load() < BOOT_REARM_GUARD_US) {
+                    ESP_LOGI(TAG, "local-clock: entry ignored, still inside the re-arm guard");
+                } else {
+                    enter_local_clock_mode(true);
+                }
             }
         }
     }
@@ -1737,21 +1794,37 @@ static void draw_clock_screen(uint8_t hour, uint8_t minute, bool time_known, uin
     RlcdPort.RLCD_Display();
 }
 
-// Only draws while g_mode is LOCAL_CLOCK -- this is what makes it safe to
-// run continuously alongside normal T_FRAME handling without the two
-// fighting over the physical screen (the Phase B version of this task drew
-// unconditionally and corrupted the host's diff-tracking; see that commit).
+// Draws only while g_mode is LOCAL_CLOCK **and** only under panel_mutex. The
+// mode check came first (the Phase B version drew unconditionally and corrupted
+// the host's diff-tracking) and was treated as sufficient for months; it is not.
+// It says WHETHER to draw, the mutex says WHEN it is safe to -- see panel_mutex.
 // 2s redraw cadence is enough for a clock (doesn't need to feel real-time)
 // without redrawing so often it matters for the power savings this mode
 // exists for.
 static void local_clock_task(void *)
 {
     for (;;) {
+        // Cheap check first so a device in NORMAL mode never touches the lock at
+        // all -- the buddy panel is the common case and it should not queue
+        // behind a clock task that has nothing to draw.
         if (g_mode.load() == DeviceMode::LOCAL_CLOCK) {
             uint8_t hour = 0, minute = 0;
             uint16_t epoch_day = 0;
             bool known = compute_current_clock(hour, minute, epoch_day);
-            draw_clock_screen(hour, minute, known, epoch_day, read_battery_percent());
+            const uint8_t battery = read_battery_percent();
+
+            xSemaphoreTake(panel_mutex, portMAX_DELAY);
+            // Re-read the mode INSIDE the lock. This is the half that is easy to
+            // leave out and it fixes a second, quieter bug: waiting on the mutex
+            // can take as long as a whole host blit, and the press that ends
+            // power-save lands in exactly that window. Without this re-check the
+            // clock face gets painted back over the buddy panel the host has just
+            // restored, and stays there for the 2s until the next pass -- which
+            // reads as "BOOT did nothing".
+            if (g_mode.load() == DeviceMode::LOCAL_CLOCK) {
+                draw_clock_screen(hour, minute, known, epoch_day, battery);
+            }
+            xSemaphoreGive(panel_mutex);
         }
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
@@ -1829,10 +1902,14 @@ extern "C" void app_main(void)
     wifi_rxbuf = (uint8_t *) heap_caps_malloc(RX_MAX, MALLOC_CAP_SPIRAM);
     assert(rxbuf && rectbuf && wifi_rxbuf);
 
+    // panel_mutex before any task exists, so neither panel writer can start
+    // without it. The boot splash above deliberately runs unlocked: app_main is
+    // still the only thread at that point, and the mutex does not exist yet.
     tx_mutex      = xSemaphoreCreateMutex();
     wifi_tx_mutex = xSemaphoreCreateMutex();
+    panel_mutex   = xSemaphoreCreateMutex();
     btn_queue     = xQueueCreate(8, sizeof(uint16_t));
-    assert(tx_mutex && wifi_tx_mutex && btn_queue);
+    assert(tx_mutex && wifi_tx_mutex && panel_mutex && btn_queue);
 
     usb_serial_jtag_driver_config_t cfg = {
         .tx_buffer_size = 1024,
@@ -1888,8 +1965,8 @@ extern "C" void app_main(void)
 
     xTaskCreate(hello_task, "hello", 2048, nullptr, 3, nullptr);
 
-    // Safe to run continuously now: local_clock_task only draws while
-    // g_mode is LOCAL_CLOCK, so it and normal T_FRAME rendering never write
-    // to the screen at the same time (see the task's own comment).
+    // Safe to run continuously because every panel write -- this task's and
+    // rx_task's -- goes through panel_mutex. The `g_mode` check alone was NOT
+    // enough and wedged the device twice on 2026-08-01; see panel_mutex.
     xTaskCreate(local_clock_task, "local_clock", 3072, nullptr, 2, nullptr);
 }

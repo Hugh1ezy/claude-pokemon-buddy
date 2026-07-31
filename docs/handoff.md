@@ -42,6 +42,57 @@ Two things to check there:
 > the next flash is confirmed good. The build then came out at 0xfba20 =
 > 1,030,176 bytes, 75% of the 4MB app partition free.
 
+> **2026-08-01 late morning, home PC — the device wedging on the clock face is a
+> panel data race, and it needs a flash to be fixed.**
+>
+> This is the SECOND cause found today, and it is not the pokedex one below. That
+> one was real and is fixed; this one was underneath it.
+>
+> **Two tasks write the physical panel and nothing kept them apart.** `rx_task`
+> blits host frames (`handle_frame_payload`) and `local_clock_task` draws the
+> standalone clock. The only guard was a `g_mode` check at the top of the clock
+> task's loop — check-then-act, with a window as wide as a whole clock redraw
+> (ColorClear + time + ganzhi row + a full-panel `RLCD_Display()`). Press BOOT to
+> leave power-save inside that window and the mode flips, the host is told to
+> repaint, and `rx_task` starts blitting into the driver a half-finished clock
+> draw is still using. `RLCD_Display()` then never returns, `rx_task` stops ACKing
+> **forever**, and only a power cycle recovers it. The comment at the task
+> creation site asserted this was safe; it had been wrong for months.
+>
+> Fixed with a `panel_mutex` around every panel write, plus two things that are
+> easy to leave out and both matter:
+> - the clock task **re-reads `g_mode` inside the lock**, or it repaints the clock
+>   over the buddy panel the host has just restored and holds it for 2s;
+> - `exit_local_clock_mode` takes and releases the lock as a **barrier** before
+>   broadcasting RESYNC, so the host's repaint cannot race the tail of an
+>   in-flight clock redraw.
+>
+> The boot splash in `app_main` stays unlocked on purpose — single-threaded, and
+> the mutex does not exist yet.
+>
+> **How it presented, and why it took all morning:** "设备卡在断网显示", with a host
+> log that looked perfectly healthy. Buttons still reached the host (they are
+> queued from the esp_timer task, untouched by the wedge), so the device looked
+> alive. The decisive measurement was `node scripts/probe-downlink.js` with the
+> host stopped: `{"ok":false,"stale":true}` — retries exhausted, no ACK. **That
+> probe is the tool to reach for first next time**; everything before it was
+> inference. The host cannot answer this question on its own because it discards
+> `push()` results — `wrote out/frame.png` is printed whether or not the device
+> took the frame. That gap is still open and is worth closing.
+>
+> ⚠ **Not verified on hardware. The fix is firmware and the device has not been
+> flashed.** Until it is, the workaround is: press BOOT **once** and stop, and if
+> it wedges anyway, unplug and replug.
+>
+> **A wrong turn to not repeat.** Before finding this, a repaint-on-reconnect was
+> added to `host/src/index.js` on the theory that the panel was a tick behind. It
+> is not: `transport/index.js`'s `attachInner` already clears `previousBytes` and
+> calls `redrawLastFrame()` on reconnect. The duplicate hung the whole
+> main-orchestration suite — all 13 tests passing, process never exiting — and was
+> reverted. There is a NOTE at the site now. Also: do not round-trip a source file
+> through PowerShell `Get-Content`/`Set-Content`; it mangled `index.js`'s Chinese
+> comments and had to be restored from a copy.
+
 > **2026-08-01 morning, home PC — the panel dropping to the offline clock face
 > was the pokedex, and it was certain to happen, not unlucky.**
 >
