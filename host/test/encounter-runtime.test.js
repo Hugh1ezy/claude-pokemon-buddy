@@ -89,7 +89,10 @@ test("the real table loads, is cached, and carries a weight for every species", 
 
   assert.ok(table.species.length > 0);
   assert.ok(Number.isFinite(table.caughtWeight));
-  assert.ok(table.species.every((entry) => typeof entry.species === "string" && entry.weight > 0));
+  // Weight 0 is meaningful as of 2026-07-31: "not obtainable in the wild, come
+  // by it through evolution". candidates() already drops anything not > 0, so
+  // the invariant here is a number, not a positive one.
+  assert.ok(table.species.every((entry) => typeof entry.species === "string" && entry.weight >= 0));
   assert.equal(loadEncounterTable(), table, "expected the second load to be cached");
 });
 

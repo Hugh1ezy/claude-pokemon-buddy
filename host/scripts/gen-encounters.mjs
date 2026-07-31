@@ -47,7 +47,7 @@
 // temperature, humidity, wind, room temperature, battery, bond, level, streak,
 // care count, Claude usage, mood, weekday, and pokedex progress; every gate
 // below is built from those and nothing else.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const POKEDEX = JSON.parse(readFileSync(new URL("../seed/pokedex.json", import.meta.url), "utf8"));
@@ -108,9 +108,76 @@ const NEVER_ON_FOOT = 0.40;
 const AVAILABILITY_REFERENCE = 80;   // the median base form, i.e. "ordinary"
 const AVAILABILITY_CEILING = 1.6;
 
+// "Can this be reached by evolving something you could actually have caught?"
+//
+// Asking `evolvesFrom != null` is not enough and the difference is five species:
+// several Gen-1 pokemon list a Gen-2 baby form as their pre-evolution, which is
+// outside this dex entirely, so the chain would leave the table and the species
+// would be excluded with nothing able to evolve into it.
+//
+// Nor is "has an ancestor catchable on foot" right, and that costs the three
+// starter lines: bulbasaur is a gift with no walking encounter, so by that test
+// ivysaur and venusaur would stay in the wild pool even though evolving is
+// exactly how you are meant to get them.
+//
+// The line that actually holds: **is there a chain, entirely inside these 151,
+// that can deliver this species?** A base form is never excluded -- it has no
+// earlier stage to come from -- so any chain that stays in the dex terminates
+// at something obtainable, and the only real question is whether it stays.
+// ...and it has to be a path the game can actually walk, not just one the
+// canonical data implies. seed/evolution/*.json is the playable table -- the
+// triggers, not the graph -- and today it covers a fraction of the Gen-1 lines.
+// Excluding a species the table cannot deliver would strand it permanently:
+// measured 2026-07-31, the naive rule stranded 27 of 36.
+//
+// So exclusion is gated on the species being an actual branch target. That also
+// makes this self-maintaining: every line added to the evolution table takes its
+// forms out of the wild pool on the next regenerate, with no edit here.
+const EVOLUTION_TARGETS = (() => {
+  const dir = new URL("../seed/evolution/", import.meta.url);
+  const targets = new Set();
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith(".json")) continue;
+    const table = JSON.parse(readFileSync(new URL(file, dir), "utf8"));
+    for (const node of Object.values(table)) {
+      for (const branch of node.branches ?? []) targets.add(branch.to);
+    }
+  }
+  return targets;
+})();
+
+function hasWildAncestorInDex(wild) {
+  const seen = new Set();
+  let current = wild;
+  while (current?.evolvesFrom) {
+    if (seen.has(current.key)) return false;   // defensive: a cycle is not a path
+    seen.add(current.key);
+    current = WILD.get(current.evolvesFrom);
+    if (!current) return false;                // chain left the 151
+  }
+  return current != null && current !== wild;
+}
+
 function availability(species) {
   const wild = WILD.get(species.key);
   if (!wild) return 1;                       // absent from the dataset: unchanged
+
+  // Owner's rule, 2026-07-31: a species you cannot meet in the wild in Gen 1
+  // must not be offerable, and is obtained by putting the stage below it on the
+  // panel and evolving it. He caught one that is trade-evolution-only and
+  // spotted it himself; the canonical data was right all along and this
+  // function's floor was quietly overriding it.
+  //
+  // The `evolvesFrom` half is not optional. Nineteen of the sixty-one species
+  // with no wild walking encounter have no earlier stage at all -- the starters,
+  // the fossils, the one-off gifts, the legendaries -- and excluding those would
+  // make them permanently unreachable and the pokedex impossible to finish.
+  // They stay in the pool at the floor weight below.
+  //
+  // A weight of 0 needs no engine change: candidates() already drops anything
+  // that is not > 0.
+  if (wild.walkAreas === 0 && hasWildAncestorInDex(wild) && EVOLUTION_TARGETS.has(wild.key)) return 0;
+
   const raw = wild.walkAreas === 0
     // Square-rooted, not linear: the busiest species is ~330 against a median of
     // 80, and a raw ratio would let it eat the pool the way the old flat

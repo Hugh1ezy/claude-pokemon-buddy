@@ -13,7 +13,7 @@
     },
     {
       "species": "ivysaur",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "humidityAtLeast": 70,
         "notTheStarter": "bulbasaur",
@@ -22,7 +22,7 @@
     },
     {
       "species": "venusaur",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "humidityAtLeast": 70,
         "notTheStarter": "bulbasaur",
@@ -43,7 +43,7 @@
     },
     {
       "species": "charmeleon",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"
@@ -55,7 +55,7 @@
     },
     {
       "species": "charizard",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"
@@ -78,7 +78,7 @@
     },
     {
       "species": "wartortle",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -89,7 +89,7 @@
     },
     {
       "species": "blastoise",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -1008,7 +1008,7 @@
     },
     {
       "species": "vaporeon",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -1018,7 +1018,7 @@
     },
     {
       "species": "jolteon",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "usageAtLeast": 60,
         "dexAtLeast": 100
@@ -1026,7 +1026,7 @@
     },
     {
       "species": "flareon",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"

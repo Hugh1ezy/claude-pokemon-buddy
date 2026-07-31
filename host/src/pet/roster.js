@@ -7,7 +7,9 @@
 //
 // The test is "do I own something this evolves into", not "does this evolve",
 // which matters: a wild charmander you have never evolved is perfectly alive.
+import { expForHalfHeart } from "./bond.js";
 import { boxPet, normalizeDex } from "./dex.js";
+import { gainExp } from "./sim.js";
 import { SPECIES_DEX, evolutionDescendants, isDexSpecies } from "./species-meta.js";
 
 export function isFrozenSpecies(species, dex) {
@@ -74,10 +76,26 @@ export function swapActiveBuddy(pet, species) {
   // a week it did not live through or claim a day it did not earn. Leaving them
   // put means a boxed pokemon is simply paused, which is also what it looks
   // like from outside.
+  // Cashing today's hearts in, at the owner's ask (2026-07-31). Each half heart
+  // is worth half a percent of the level in progress, the same rate
+  // applyBondTick uses, so a full ten-half day hands the departing pokemon 5%
+  // of its bar on the way out.
+  //
+  // Stated plainly because it is a balance decision and not a bug fix: this is
+  // a SECOND payment. applyBondTick already granted the exp for each half at
+  // the moment it credited it, so the hearts were never unspent. The owner was
+  // told and asked for the step anyway. It is bounded -- a half can only be
+  // cashed once, since bondHalves resets here, so the most a day can hand over
+  // this way is the day's ten halves, and only to someone who swaps.
+  const cashed = Math.max(0, Number(pet.bondHalves ?? 0));
+  const paid = cashed > 0
+    ? gainExp(pet.level, pet.exp, expForHalfHeart(pet.level) * cashed)
+    : { level: pet.level, exp: pet.exp };
+
   const outgoing = {
     species: pet.species,
-    level: pet.level,
-    exp: pet.exp,
+    level: paid.level,
+    exp: paid.exp,
     bond: pet.bond,
     iv: pet.iv,
     nature: pet.nature,

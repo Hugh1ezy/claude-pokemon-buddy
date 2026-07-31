@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { isFrozenSpecies, rosterEntries, swapActiveBuddy } from "../src/pet/roster.js";
 import { evolutionDescendants } from "../src/pet/species-meta.js";
+import { expToNextLevel } from "../src/pet/sim.js";
 
 const pet = (over = {}) => ({
   species: "ivysaur", level: 18, exp: 20, bond: 21, bondHalves: 4, hatched: true,
@@ -98,7 +99,10 @@ test("swapping away and back preserves the buddy exactly", () => {
 
   assert.equal(round.species, "ivysaur");
   assert.equal(round.level, 18);
-  assert.equal(round.exp, 20);
+  // Not 20 any more: on the way out it cashed today's four halves into exp
+  // (owner's ask, 2026-07-31). The round trip still returns the SAME pokemon,
+  // which is what this test guards -- it just comes back slightly further along.
+  assert.equal(round.exp, 20 + (expToNextLevel(18) / 200) * 4);
   assert.equal(round.bond, 21);
   // NOT bondHalves. This asserted 4 until 2026-07-31, when the owner ruled that
   // today's hearts belong to whoever is on the panel earning them rather than
@@ -172,4 +176,48 @@ test("swapping does not hand the day's hearts back to the one that earned them",
   assert.equal(round.species, "ivysaur");
   assert.equal(round.bondHalves, 0, "the halves are spent, not stored on the pokemon");
   assert.equal(round.bond, 21, "lifetime bond still travels with the pokemon");
+});
+
+// Owner's ask, 2026-07-31. Knowingly a second payment -- applyBondTick already
+// granted the exp when it credited each half -- so the test pins the RATE and
+// the bound rather than pretending it is a correction.
+test("the departing pokemon cashes today's hearts into exp", () => {
+  const before = pet({
+    level: 10, exp: 0, bondHalves: 4,
+    dexCaught: ["ivysaur", "pidgey"],
+    box: [{ species: "pidgey", level: 7, bond: 3 }],
+  });
+  const after = swapActiveBuddy(before, "pidgey");
+  const stored = after.box.find((entry) => entry.species === "ivysaur");
+
+  // Half a percent of the level in progress per half heart, four of them.
+  assert.equal(stored.exp, (expToNextLevel(10) / 200) * 4);
+});
+
+test("a swap with no hearts earned today pays nothing", () => {
+  const before = pet({
+    level: 10, exp: 5, bondHalves: 0,
+    dexCaught: ["ivysaur", "pidgey"],
+    box: [{ species: "pidgey", level: 7, bond: 3 }],
+  });
+  const after = swapActiveBuddy(before, "pidgey");
+  const stored = after.box.find((entry) => entry.species === "ivysaur");
+
+  assert.equal(stored.exp, 5, "nothing accrued, nothing to cash");
+});
+
+// The bound that keeps this from being farmable: a half heart can only be
+// cashed once, because the swap that cashes it also zeroes the counter.
+test("swapping twice in a row cannot cash the same hearts again", () => {
+  const before = pet({
+    level: 10, exp: 0, bondHalves: 4,
+    dexCaught: ["ivysaur", "pidgey"],
+    box: [{ species: "pidgey", level: 7, bond: 3 }],
+  });
+  const once = swapActiveBuddy(before, "pidgey");
+  const back = swapActiveBuddy(once, "ivysaur");
+
+  assert.equal(back.exp, (expToNextLevel(10) / 200) * 4, "still just the one payment");
+  const storedPidgey = back.box.find((entry) => entry.species === "pidgey");
+  assert.equal(storedPidgey.exp ?? 0, 0, "pidgey earned nothing while on the panel");
 });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { ENCOUNTER_DEFAULTS, eligibleSpecies, rollEncounter, stepEncounter } from "../src/pet/encounter.js";
@@ -28,10 +28,36 @@ const fixture = {
 const always = () => 0;      // rng that always picks the first branch
 const never = () => 0.999;
 
-test("the shipped table covers all 151 with a positive weight", () => {
+// Everything the playable evolution table can deliver. Read from the same place
+// the generator reads it, so the two cannot drift into disagreeing about which
+// species a zero weight is safe for.
+const EVOLUTION_TARGETS = (() => {
+  const dir = new URL("../seed/evolution/", import.meta.url);
+  const targets = new Set();
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith(".json")) continue;
+    const table = JSON.parse(readFileSync(fileURLToPath(new URL(file, dir)), "utf8"));
+    for (const node of Object.values(table)) {
+      for (const branch of node.branches ?? []) targets.add(branch.to);
+    }
+  }
+  return targets;
+})();
+
+test("the shipped table covers all 151, and nothing is stranded", () => {
   assert.equal(TABLE.species.length, 151);
   assert.deepEqual(TABLE.species.map((s) => s.species), SPECIES_ORDER);
-  assert.ok(TABLE.species.every((s) => typeof s.weight === "number" && s.weight > 0));
+  assert.ok(TABLE.species.every((s) => typeof s.weight === "number" && s.weight >= 0));
+
+  // A zero weight means "the wild will never offer this; evolve into it
+  // instead", so every one of them has to actually BE reachable that way. This
+  // is the guard that matters: the naive version of the exclusion rule stranded
+  // 27 species permanently, and nothing at runtime would ever have said so.
+  //
+  // Counts only, no names -- this file is safe to read and stays that way.
+  const zero = TABLE.species.filter((s) => s.weight === 0).map((s) => s.species);
+  const stranded = zero.filter((species) => !EVOLUTION_TARGETS.has(species));
+  assert.deepEqual(stranded, [], `${stranded.length} species can be obtained no way at all`);
 });
 
 test("the shipped table uses only conditions the engine understands", () => {

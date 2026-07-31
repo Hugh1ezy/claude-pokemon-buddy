@@ -138,6 +138,12 @@ export function createButtonDispatcher({
   renderDex = renderDexPage,
   renderConfirm = renderDexConfirm,
   swapRequests = { push() {} },
+  // Cuts the tick's sleep short so a queued swap lands now rather than in up to
+  // a minute. The tick is still the only thing that writes the pet -- this only
+  // changes WHEN it next runs, not who owns the save. Owner, 2026-07-31:
+  // confirming a swap dropped him back on the panel still showing the old
+  // buddy, which reads as "nothing happened".
+  wakeTick = () => {},
   // The capture minigame. Results are queued rather than applied: the tick owns
   // the pet, and a second writer to the save is exactly the kind of thing that
   // loses a buddy. Same shape as the evolution intents.
@@ -302,6 +308,7 @@ export function createButtonDispatcher({
       if (chosen && !chosen.active) {
         swapRequests.push({ species: chosen.species });
         logger?.log?.(`pokedex: swapping to ${zhName(chosen.species)}`);
+        wakeTick();
       }
       if (next == null) {
         // Nothing repaints the panel here: resuming the animator does it within
@@ -817,6 +824,7 @@ export async function main({
         return { dex: pet, progress: dexProgress(pet ?? {}) };
       },
       swapRequests,
+      wakeTick,
       captureResults,
       logger,
     });
@@ -841,6 +849,14 @@ export async function main({
           nowProvider,
         })
       : null;
+
+    // Ends the loop's sleep early. Safe to call at any moment: with no timer
+    // pending a tick is already running, and the next one picks the queue up.
+    const wakeTick = () => {
+      if (!timer) return;
+      clearTimeout(timer);
+      resolveLoopSleep?.();   // clears both `timer` and itself, then resolves
+    };
 
     const stop = () => {
       stopped = true;

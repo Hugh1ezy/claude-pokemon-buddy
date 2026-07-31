@@ -89,11 +89,25 @@ cannot answer the question at all — then use `git show save/main:state.json`.
 
 - **Never state how many days a buddy level costs.** The level curve is
   deliberately opaque to the owner.
-- **Three files must not be read, quoted or summarised:**
+- **The spoiler files. Read them freely — just never let their contents reach the
+  owner.** This has been misread more than once, so plainly: the restriction is
+  on **output, not on access**. You may open, edit, regenerate and test
   `host/scripts/gen-encounters.mjs`, `host/seed/encounters.json`,
-  `host/scripts/sim-encounters.mjs`. They hold which species appears under which
-  conditions, and discovering that is the whole point of the feature. Work on the
-  engine through `src/pet/encounter.js`, which is deliberately species-free.
+  `host/scripts/sim-encounters.mjs` and `host/src/pet/capture-tuning.js` whenever
+  the work needs it, and you do not need to ask first.
+
+  What must never happen is a species-condition pair, a rarity, a difficulty or
+  a sighting list reaching **chat, commit messages, `docs/`, test names, or
+  log output the owner reads**. Discovering which pokemon shows up when is the
+  whole point of the feature, and he is the player.
+
+  So: report counts, not names ("excluded 4 species", not which four). Run
+  `sim-encounters.mjs` when a weight changes — its output names species, so quote
+  only the summary figures (completion rate, median days, encounters/day). Keep
+  `src/pet/encounter.js` and `src/pet/capture.js` species-free so *they* can be
+  discussed openly.
+
+  The owner has explained this several times. Do not make him do it again.
 
 More detail on everything above, plus per-machine setup that git does not carry,
 is in `docs/handoff.md`.

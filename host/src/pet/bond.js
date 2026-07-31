@@ -47,7 +47,7 @@ export function heartsFromHalves(halves) {
 // full five-heart day hands over 5% of that bar -- and, because the bar narrows as
 // levels get cheap and widens as they get dear, the reward always means the same
 // thing in progress terms rather than in raw points.
-function expForHalfHeart(level) {
+export function expForHalfHeart(level) {
   return expToNextLevel(level) / 200;
 }
 
