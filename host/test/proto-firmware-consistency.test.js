@@ -68,6 +68,7 @@ test("firmware capture-music ids agree with the host's music seed", () => {
     ["BGM_CAPTURE", MUSIC.CAPTURE_BGM],
     ["BGM_STOP", MUSIC.CAPTURE_BGM_STOP],
     ["CAUGHT", MUSIC.CAPTURE_CAUGHT],
+    ["EVOLUTION", MUSIC.EVOLUTION],
   ]) {
     assert.ok(offsets.has(cname), `music.inc must define SND_EXTRA_${cname}`);
     assert.equal(SND_EXTRA_BASE + offsets.get(cname), id, `SND_EXTRA_${cname}`);

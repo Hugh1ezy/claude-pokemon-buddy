@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runOneTick } from "../src/index.js";
+import { MUSIC } from "../src/pet/music-audio.js";
 import { SOUND } from "../src/transport/proto.js";
 
 const USAGE = {
@@ -39,7 +40,7 @@ function seedState(path, extra) {
   }));
 }
 
-test("evolution plays the EVOLVE sound", async () => {
+test("evolution plays its own track, not the hatching fanfare", async () => {
   const statePath = join("out", "test-sound-evolve-state.json");
   const framePath = join("out", "test-sound-evolve-frame.png");
   // thunder stone => auto-evolve to jolteon once KEY is pressed
@@ -52,7 +53,10 @@ test("evolution plays the EVOLVE sound", async () => {
   });
 
   assert.equal(pet.species, "jolteon", "thunder stone evolves eevee -> jolteon");
-  assert.ok(transport.sounds.includes(SOUND.EVOLVE), "should play EVOLVE on evolution");
+  assert.ok(transport.sounds.includes(MUSIC.EVOLUTION), "should play the evolution track");
+  // The point of the split: SOUND.EVOLVE is hatching's now, and an evolution that
+  // still reached for it would be the old shared-fanfare behaviour coming back.
+  assert.ok(!transport.sounds.includes(SOUND.EVOLVE), "and not the hatching fanfare");
 });
 
 test("no evolution => no EVOLVE sound", async () => {

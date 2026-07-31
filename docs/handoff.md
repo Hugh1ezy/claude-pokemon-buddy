@@ -48,28 +48,42 @@ Two things to check there:
 > 0.07), restarted it at 20:19. The device is on **COM3 on this machine, not
 > COM7** — that number is per-machine and the handoff had it wrong for home.
 >
-> Then the feature: **the capture screen now loops a BGM, and a catch has its own
-> jingle** instead of borrowing the evolution fanfare.
+> Then the feature: **the capture screen now loops a BGM, a catch has its own
+> jingle** instead of borrowing the evolution fanfare, **and evolution finally has
+> a dedicated track** rather than the four notes it shared with hatching.
 >
-> **These are original chiptune, not the Ruby tracks the owner asked for.** The
-> ask was 红宝石's music specifically; transcribing a Game Freak composition into
-> the firmware is copying a copyrighted work, so what shipped is written for this
-> project in the same idiom — GBA-era square wave, D minor, running eighths,
-> resolving to F major. It is a substitute and the owner should be told it is one,
-> not left to discover the tune is unfamiliar. Retuning by ear is cheap: the score
-> is note names in `host/seed/music.json`.
+> **These are original chiptune, not the Ruby tracks the owner asked for, and he
+> asked twice.** The ask was 红宝石's music specifically. Transcribing a Game Freak
+> composition into the firmware is copying a copyrighted work — and this fork is
+> public — so it was declined both times and what shipped is written for this
+> project in the same idiom. Say so plainly if it comes up again; do not quietly
+> ship a transcription. What the second round DID change is the writing: the first
+> pass was scalar and forgettable, and the owner said so. The rewrite has an actual
+> motif (one syncopated rhythm restated over three chord sets), a low B-section in
+> sixteenths instead of a third melodic phrase, and a C#5 leading tone in the last
+> bar so the seam back to bar 1 lands. Those two notes — **repeat a rhythm rather
+> than run a scale, and put a leading tone in the turnaround** — are written into
+> the seed's header comment, because they are what made the difference.
+>
+> Retuning by ear is cheap and is meant to be: the score is note names
+> (`"D5/8"`, `"F6:700"`) in `host/seed/music.json`, not Hz.
 >
 > How it is put together, because none of it is where you would guess:
 >
-> - **`host/seed/music.json` is the single source**, written in note names
->   (`"D5/8"`, `"F6:700"`) rather than Hz, because a tune is tweaked by ear.
->   `node scripts/gen-music.mjs` regenerates `firmware/main/music.inc`; a test
->   fails if the committed `.inc` has drifted from the seed.
+> - **`host/seed/music.json` is the single source.** `node scripts/gen-music.mjs`
+>   regenerates `firmware/main/music.inc`; a test fails if the committed `.inc`
+>   has drifted from the seed, and another fails if any bar of the loop is not
+>   1600ms.
 > - **The new ids sit ABOVE the 156 species cries** (`SND_EXTRA_BASE` =
 >   `SND_SPECIES_BASE + SND_SPECIES_COUNT` = 159), not next to BUI/EVOLVE/HOUR.
 >   Inserting them at the bottom would renumber every cry at once, because a cry
 >   id is `soundBase + index` — every pokemon would announce itself as the wrong
->   one until both sides were reflashed in lockstep.
+>   one until both sides were reflashed in lockstep. For the same reason **new
+>   tracks go on the END of the seed's `extra` list**: reordering it repoints
+>   every id against an already-flashed image.
+> - **`SND_EVOLVE` (id 1) is now honestly just the hatching sound.** Evolution
+>   moved to its own id; `onboarding.js` is the only caller left. The old shared
+>   fanfare was a consequence of the firmware having exactly one, not a decision.
 > - **The BGM is a phrase list, not one sound.** `audio_task` renders and plays it
 >   one BAR at a time and gives up the speaker the moment anything else is queued,
 >   so the catch jingle cuts in within ~100ms instead of after up to a bar and a
@@ -83,10 +97,12 @@ Two things to check there:
 >   (owner's call, 07-30), so nothing else would ever bound it.
 >
 > Verified: `npm test` **658 pass / 9 fail of 667** — the same 9 Windows-environment
-> failures documented below, none of them audio. `idf.py build` clean.
+> failures documented below, none of them audio. `idf.py build` clean, 0xfbc10 =
+> 1,031,184 bytes.
 > **Not verified: anything on the actual speaker.** The WAVs were auditioned on the
-> PC; the device was not reflashed this session, so it is still playing the
-> evolution fanfare on a catch and nothing on the capture screen.
+> PC; the device was **not reflashed this session**, so it is still playing the
+> old shared fanfare on a catch and on an evolution, and nothing on the capture
+> screen. Reflashing is the whole remaining step.
 
 > **2026-07-31 morning, work PC — the work checklist below is consumed.** In
 > order: pulled the 14 commits from the fork (`7edcac1` → `d3855b5`), stopped the
@@ -262,7 +278,8 @@ rendering WAVs and by reading the code. Eight places should now make noise:
 | **the capture screen opens** | **the capture BGM, looping until the screen closes** |
 | **a capture succeeds** | **the capture jingle** (was the evolution fanfare until 07-31) |
 | the pokedex cursor lands on a species you own | that species' cry |
-| an evolution animation | the evolution fanfare |
+| **an evolution animation** | **the evolution track** (its own since 07-31, ~2.5s) |
+| hatching, during onboarding | `SND_EVOLVE` — the old four-note fanfare, now only this |
 | top of the hour | the chime |
 | KEY short press **while the capture screen is up** | *nothing* — see below |
 
@@ -289,9 +306,10 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 2. **`bubble` text for the 138 generated species is placeholder** — the last two
    characters of the Chinese name. It is the only non-derived thing in
    `seed/species-cries.json` and wants replacing with real onomatopoeia over time.
-3. **Evolution plays the generic fanfare, not the new form's own cry.** The one
-   sound trigger still missing something. (The catch no longer borrows it — that
-   was fixed 07-31 when the capture music landed.)
+3. ~~**Evolution plays the generic fanfare, not the new form's own cry.**~~
+   **Half-resolved 07-31**: evolution has its own ~2.5s track now, and the catch
+   no longer borrows anything. Still open is the smaller wish underneath it —
+   playing the *new form's cry* at the reveal frame, on top of the track.
 4. ~~**SD card cannot be used yet.**~~ **Resolved 2026-07-31 — the card works.**
    The owner produced the board's pinout sheet; `sdcard: {clk: 38, cmd: 21, d0: 39}`
    went into `board_cfg.txt` and was verified on hardware. See the 07-31 section.

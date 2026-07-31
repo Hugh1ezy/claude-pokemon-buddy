@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { playEvolutionAnimation, renderEvolutionFrame } from "../src/render/evolution-anim.js";
-import { SOUND } from "../src/transport/proto.js";
+import { MUSIC } from "../src/pet/music-audio.js";
 
 function spyTransport() {
   const events = [];
@@ -22,7 +22,7 @@ function spyTransport() {
   };
 }
 
-test("evolution animation pushes frames sequentially, plays EVOLVE once", async () => {
+test("evolution animation pushes frames sequentially, plays its track once", async () => {
   const tr = spyTransport();
   await playEvolutionAnimation({
     transport: tr,
@@ -32,9 +32,9 @@ test("evolution animation pushes frames sequentially, plays EVOLVE once", async 
   });
 
   const pushes = tr.events.filter((e) => e.t === "push").length;
-  const sounds = tr.events.filter((e) => e.t === "sound" && e.id === SOUND.EVOLVE).length;
+  const sounds = tr.events.filter((e) => e.t === "sound" && e.id === MUSIC.EVOLUTION).length;
   assert.ok(pushes >= 12, "expect black×2 + alt×8 + black×2 + reveal");
-  assert.equal(sounds, 1, "EVOLVE played exactly once");
+  assert.equal(sounds, 1, "the evolution track played exactly once");
 });
 
 test("alternation frames differ for from vs to species", async () => {

@@ -36,4 +36,8 @@ export const MUSIC = {
   CAPTURE_BGM: idOf("capture_bgm"),
   CAPTURE_BGM_STOP: idOf("capture_bgm_stop"),
   CAPTURE_CAUGHT: idOf("capture_caught"),
+  // Its own track now, not SOUND.EVOLVE. That id is still what hatching plays,
+  // which is the reuse onboarding.js documents -- the two events shared a sound
+  // because there was only one, not because they wanted the same one.
+  EVOLUTION: idOf("evolution"),
 };

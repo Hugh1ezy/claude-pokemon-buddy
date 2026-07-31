@@ -49,10 +49,15 @@ test("the control id carries no audio", () => {
 
 test("generated inc declares the extra count, offsets and one array per bar", () => {
   const inc = generateInc(data);
-  assert.match(inc, /#define SND_EXTRA_COUNT 3/);
+  // The offsets are frozen deliberately -- they are the ABI against a flashed
+  // image. COUNT is derived, because it moves every time a track is added and a
+  // literal here only ever fails with "the number changed". New tracks go on the
+  // END for the same reason: reordering the seed silently repoints every id.
+  assert.match(inc, new RegExp(`#define SND_EXTRA_COUNT ${data.extra.length}\\b`));
   assert.match(inc, /#define SND_EXTRA_BGM_CAPTURE 0/);
   assert.match(inc, /#define SND_EXTRA_BGM_STOP 1/);
   assert.match(inc, /#define SND_EXTRA_CAUGHT 2/);
+  assert.match(inc, /#define SND_EXTRA_EVOLUTION 3/);
   assert.match(inc, /static constexpr int BGM_CAPTURE_PHRASE_COUNT = 8;/);
   assert.equal((inc.match(/static const Note BGM_CAPTURE_P\d+\[\]/g) ?? []).length, 8);
   // The .inc is #included into a translation unit; the seed's Chinese titles stay

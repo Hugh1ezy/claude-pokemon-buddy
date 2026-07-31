@@ -254,6 +254,9 @@ static constexpr uint8_t SND_EXTRA_BASE = SND_SPECIES_BASE + SND_SPECIES_COUNT;
 static constexpr uint8_t SND_BGM_CAPTURE = SND_EXTRA_BASE + SND_EXTRA_BGM_CAPTURE;
 static constexpr uint8_t SND_BGM_STOP    = SND_EXTRA_BASE + SND_EXTRA_BGM_STOP;
 static constexpr uint8_t SND_CAUGHT      = SND_EXTRA_BASE + SND_EXTRA_CAUGHT;
+// Distinct from SND_EVOLVE, which stays what it always was and is now honestly
+// just the hatching sound -- onboarding is the only thing still asking for it.
+static constexpr uint8_t SND_EVOLUTION   = SND_EXTRA_BASE + SND_EXTRA_EVOLUTION;
 // Derived, not written down. This was a literal 21 and the static_assert below
 // caught it the moment species_cries.inc grew to 156 cries -- which is the assert
 // doing its job, but the literal should never have been there to need catching.
@@ -744,7 +747,8 @@ static bool notes_for(uint8_t id, const Note **notes, int *count)
     case SND_BUI:    *notes = BUI_NOTES;    *count = 3; return true;
     case SND_EVOLVE: *notes = EVOLVE_NOTES; *count = 4; return true;
     case SND_HOUR:   *notes = HOUR_NOTES;   *count = 3; return true;
-    case SND_CAUGHT: *notes = CAUGHT_NOTES; *count = CAUGHT_NOTE_COUNT; return true;
+    case SND_CAUGHT:    *notes = CAUGHT_NOTES;    *count = CAUGHT_NOTE_COUNT;    return true;
+    case SND_EVOLUTION: *notes = EVOLUTION_NOTES; *count = EVOLUTION_NOTE_COUNT; return true;
     // SND_BGM_CAPTURE is not a note sequence -- it is a phrase list played on a
     // loop, handled in play_bgm(). SND_BGM_STOP carries no audio at all; queueing
     // it is the whole point, because that is what breaks the loop.

@@ -30,7 +30,9 @@ export async function runOnboarding(io, { render = renderOnboarding } = {}) {
   // 孵化动画 + 音; 揭晓交给诞生屏
   for (let f = 0; f < HATCH_FRAMES; f += 1) {
     await io.push(await render({ kind: "hatch", frame: f, species: chosen.species }));
-    if (f === FIRST_BLACK_FRAME) io.playSound(SOUND.EVOLVE); // 复用进化 fanfare 作孵化音
+    // SND_EVOLVE 现在实际上就是孵化音：进化在 2026-07-31 有了自己的曲子，
+    // 这里是唯一还在用它的地方，留着不动。
+    if (f === FIRST_BLACK_FRAME) io.playSound(SOUND.EVOLVE);
     await io.delay(HATCH_FRAME_MS[f] ?? 170);
   }
 

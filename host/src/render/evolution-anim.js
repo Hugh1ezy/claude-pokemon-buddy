@@ -1,7 +1,7 @@
 import { createCanvas } from "@napi-rs/canvas";
 
 import { zhName } from "../pet/species-meta.js";
-import { SOUND } from "../transport/proto.js";
+import { MUSIC } from "../pet/music-audio.js";
 import { imageDataToFrame } from "./frame.js";
 import { H, INK, PAPER, W } from "./palette.js";
 import { drawSprite, line, px } from "./sprite-pipeline.js";
@@ -31,7 +31,12 @@ export async function playEvolutionAnimation({ transport, fromSpecies, toSpecies
       toSpecies,
     });
     await transport.push(frame);
-    if (i === 0) transport.playSound?.(SOUND.EVOLVE);
+    // Its own track since 2026-07-31. This was SOUND.EVOLVE, the same four notes
+    // hatching plays -- shared because there was only one fanfare in the firmware,
+    // not because an egg cracking and a pokemon changing shape want the same
+    // sound. The new one is ~2.5s of accelerating climb, so it runs under the
+    // animation rather than announcing it and stopping.
+    if (i === 0) transport.playSound?.(MUSIC.EVOLUTION);
     await delay(step.gap);
   }
 }
