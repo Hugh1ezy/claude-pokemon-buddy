@@ -2,7 +2,7 @@
 // auditioned with no device, no speaker module and no reflash.
 //
 //   cd host && node scripts/cries-to-wav.mjs              # everything
-//   cd host && node scripts/cries-to-wav.mjs evolve       # just the catch fanfare
+//   cd host && node scripts/cries-to-wav.mjs capture      # the capture screen's music
 //   cd host && node scripts/cries-to-wav.mjs bulbasaur pikachu
 //
 // Writes out/cries/<id>-<name>.wav and prints a manifest.
@@ -15,6 +15,8 @@
 // that does not exist. Any change to synth_tone has to be mirrored here.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+import { SND_EXTRA_BASE } from "../src/pet/music-audio.js";
 
 const AUDIO_SR = 16000;
 const AUDIO_CH = 2;
@@ -83,6 +85,23 @@ if (isCli) {
     readFileSync(fileURLToPath(new URL("../seed/species-cries.json", import.meta.url)), "utf8"));
   const { loadReadings, pinyinOf } = await import("./species-pinyin.mjs");
   const readings = await loadReadings();
+
+  // The capture music, read from its own seed rather than transcribed here.
+  // The BGM is written out as TWO passes of the loop, because the thing you need
+  // to hear is whether the seam back to bar 1 lands -- one pass ends on the
+  // turnaround and tells you nothing about it. The control id has no audio and is
+  // skipped.
+  const { loadScore } = await import("./gen-music.mjs");
+  const music = loadScore().flatMap((t) => {
+    const id = SND_EXTRA_BASE + t.index;
+    if (t.kind === "loop") {
+      const once = t.phrases.flat();
+      return [{ id, name: t.key, notes: [...once, ...once] }];
+    }
+    if (t.kind === "oneshot") return [{ id, name: t.key, notes: t.notes }];
+    return [];
+  });
+
   const all = [
     ...SYSTEM_SOUNDS,
     ...data.species.map((s, i) => ({
@@ -91,6 +110,7 @@ if (isCli) {
       pinyin: s.zh ? pinyinOf(s.zh, readings) : null,
       notes: s.notes,
     })),
+    ...music,
   ];
 
   // Matches pinyin as well as the English key, because the files are named in

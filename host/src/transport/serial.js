@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { SerialPort as NodeSerialPort } from "serialport";
 
 import { encodeFrame, PROTO_VER, T } from "./proto.js";
-import { SND_SPECIES_BASE, SPECIES_SOUND_ORDER } from "../pet/cry-audio.js";
+import { SND_TABLE_SIZE } from "../pet/music-audio.js";
 import { appendBytes, ackSeq, parseButton, parseHello, parseOfflineBond, parseSensor, pumpFrames, volumeByte } from "./framing.js";
 
 const ESPRESSIF_VID = "303A";
@@ -11,8 +11,10 @@ const ESPRESSIF_VID = "303A";
 // How many sounds the host expects the firmware to carry, used only to warn when a
 // device is running an image older than the cry list. Derived rather than written
 // down: this was a literal 21 in proto.js while the table grew to 156, which
-// silently disabled the very warning it feeds.
-const SND_COUNT = SND_SPECIES_BASE + SPECIES_SOUND_ORDER.length;
+// silently disabled the very warning it feeds. Now covers the capture music too,
+// so an image flashed before it exists says so at HELLO instead of going quiet
+// on the capture screen for no stated reason.
+const SND_COUNT = SND_TABLE_SIZE;
 const PORT_GUARDED = Symbol("serialPortErrorsGuarded");
 const DEFAULT_BAUD_RATE = 115200;
 const DEFAULT_TIMEOUT_MS = 250;

@@ -1,44 +1,92 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-07-31
-(end of the work day, WORK PC)**.
+(evening, HOME PC)**.
 
-## ▶ What the HOME PC has to do tonight
+## ▶ What the WORK PC has to do next
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
 git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
 cd host
 node scripts/save-sync-cli.mjs status
-node scripts/save-sync-cli.mjs pull     # once the device is actually home
+node scripts/save-sync-cli.mjs pull     # only if the device travelled with you
 ```
 
-Then **restart the host** — a great deal of tick-facing code changed today and
-a stale process will run none of it. No re-bake (artwork untouched since 07-29).
-**No reflash**: the device is carrying an image flashed from the work PC this
-afternoon, with both networks in it.
+Then **restart the host** (the capture screen's sound wiring changed) and
+**reflash if the device is with you** — the capture music is firmware, so an
+unflashed device shows the new screen in silence. `idf.py -p <PORT> flash`.
+No re-bake (artwork untouched since 07-29).
 
-Three things worth doing at home tonight, in this order:
+Two things to check there:
 
-1. **Listen.** Sound has still never been heard on hardware — the six triggers
-   are listed further down and `node scripts/play-test.js` auditions the three
-   system sounds directly. This has been outstanding since 07-30.
-2. **Watch for `bond: credited N offline half-heart(s)` in the host log** after
-   the device attaches. That line is the real acceptance test for offline
-   亲密度, and the commute home is the first time the feature is in the
-   situation it was built for. Press KEY once on the way home, in an hour whose
-   slot has not already paid out.
-3. If the panel looks wrong in any way, check the host's **start time** before
-   checking the code. That has been the answer twice this week.
+1. **The sdkconfig hazard below is CONSUMED on the home PC and still live on the
+   work PC** if that machine ever had a pre-`partitions.csv` sdkconfig. Symptom
+   is a build that fails on app size, not anything about partitions.
+2. `pollUsage failed: no-token` repeats in the home PC's host stderr every tick.
+   Untouched tonight — it predates this session and only costs the usage rows.
 
-> ⚠ **If the home PC ever builds firmware again, it must regenerate its
-> sdkconfig.** `partitions.csv` is new and `sdkconfig.defaults` now selects it,
-> but `sdkconfig` is per-machine and gitignored, so that machine still has the
-> 1MB single-app table. The app is 1,029,776 bytes and will not fit — the build
-> fails loudly rather than producing something wrong, which is the good case,
-> but the fix is not obvious from the error: delete `firmware/sdkconfig` and run
-> `idf.py reconfigure`. Diff the regenerated file against the old one; on this
-> machine exactly three partition lines differed and nothing else was lost.
+> ⚠ **A machine that has not built firmware since `partitions.csv` landed must
+> regenerate its sdkconfig.** `sdkconfig.defaults` selects the new table but
+> `sdkconfig` is per-machine and gitignored, so the stale one still has the 1MB
+> single-app layout and the ~1MB app will not fit. The build fails loudly rather
+> than producing something wrong, but the fix is not obvious from the error:
+> delete `firmware/sdkconfig` and run `idf.py reconfigure`.
+>
+> **Done on the home PC 2026-07-31 evening**, and it went exactly as the work PC
+> predicted: the old file had `CONFIG_PARTITION_TABLE_SINGLE_APP=y`, the
+> regenerated one has `CONFIG_PARTITION_TABLE_CUSTOM=y`, and `Compare-Object`
+> reported **six** differing lines — the three partition settings, each as one
+> removal and one addition. Nothing else was lost. The old file was kept as
+> `firmware/sdkconfig.bak-20260731` (gitignored, home PC only); delete it once
+> the next flash is confirmed good. The build then came out at 0xfba20 =
+> 1,030,176 bytes, 75% of the 4MB app partition free.
+
+> **2026-07-31 evening, home PC — the home checklist above is consumed, and the
+> capture screen has music.** In order: pulled the 16 commits (`d3855b5` →
+> `97d3595`), stopped the host **before** pulling the save (Lv.5 凯西, exp 0 →
+> 0.07), restarted it at 20:19. The device is on **COM3 on this machine, not
+> COM7** — that number is per-machine and the handoff had it wrong for home.
+>
+> Then the feature: **the capture screen now loops a BGM, and a catch has its own
+> jingle** instead of borrowing the evolution fanfare.
+>
+> **These are original chiptune, not the Ruby tracks the owner asked for.** The
+> ask was 红宝石's music specifically; transcribing a Game Freak composition into
+> the firmware is copying a copyrighted work, so what shipped is written for this
+> project in the same idiom — GBA-era square wave, D minor, running eighths,
+> resolving to F major. It is a substitute and the owner should be told it is one,
+> not left to discover the tune is unfamiliar. Retuning by ear is cheap: the score
+> is note names in `host/seed/music.json`.
+>
+> How it is put together, because none of it is where you would guess:
+>
+> - **`host/seed/music.json` is the single source**, written in note names
+>   (`"D5/8"`, `"F6:700"`) rather than Hz, because a tune is tweaked by ear.
+>   `node scripts/gen-music.mjs` regenerates `firmware/main/music.inc`; a test
+>   fails if the committed `.inc` has drifted from the seed.
+> - **The new ids sit ABOVE the 156 species cries** (`SND_EXTRA_BASE` =
+>   `SND_SPECIES_BASE + SND_SPECIES_COUNT` = 159), not next to BUI/EVOLVE/HOUR.
+>   Inserting them at the bottom would renumber every cry at once, because a cry
+>   id is `soundBase + index` — every pokemon would announce itself as the wrong
+>   one until both sides were reflashed in lockstep.
+> - **The BGM is a phrase list, not one sound.** `audio_task` renders and plays it
+>   one BAR at a time and gives up the speaker the moment anything else is queued,
+>   so the catch jingle cuts in within ~100ms instead of after up to a bar and a
+>   half. That is also why the scratch buffer stayed small — one bar, not the
+>   whole 12.8s loop, which would have been ~400KB of PSRAM held forever.
+> - **The host stops the loop in a `finally`.** The device cannot tell that the
+>   screen closed; a missed stop is battle music playing over the clock face. A
+>   test drives a renderer that throws mid-encounter to hold that line.
+> - There is a 10-minute runaway guard in the firmware for the case where the
+>   host dies mid-capture. The capture screen has no time limit of its own
+>   (owner's call, 07-30), so nothing else would ever bound it.
+>
+> Verified: `npm test` **658 pass / 9 fail of 667** — the same 9 Windows-environment
+> failures documented below, none of them audio. `idf.py build` clean.
+> **Not verified: anything on the actual speaker.** The WAVs were auditioned on the
+> PC; the device was not reflashed this session, so it is still playing the
+> evolution fanfare on a catch and nothing on the capture screen.
 
 > **2026-07-31 morning, work PC — the work checklist below is consumed.** In
 > order: pulled the 14 commits from the fork (`7edcac1` → `d3855b5`), stopped the
@@ -203,24 +251,33 @@ and the buffer is now one ~37KB scratch instead of 2.36MB of pre-rendered audio.
 
 ### ▶ The first thing worth doing at work: actually listen
 
-**The speaker module is at work, and nothing has ever been heard.** Every sound
-change on 07-30 was verified by rendering WAVs on the home PC and by reading the
-code — never on real hardware. Six places should now cry:
+**Nothing had ever been heard until 2026-07-31 evening**, when the owner put
+external speakers on at home. Every sound change before that was verified by
+rendering WAVs and by reading the code. Eight places should now make noise:
 
 | when | what plays |
 |---|---|
 | KEY short press | the buddy's own cry (played by the firmware, not the host) |
 | a wild pokemon appears | that species' cry |
-| a capture succeeds | the evolution fanfare |
+| **the capture screen opens** | **the capture BGM, looping until the screen closes** |
+| **a capture succeeds** | **the capture jingle** (was the evolution fanfare until 07-31) |
 | the pokedex cursor lands on a species you own | that species' cry |
 | an evolution animation | the evolution fanfare |
 | top of the hour | the chime |
+| KEY short press **while the capture screen is up** | *nothing* — see below |
+
+That last row is deliberate. While the BGM holds the speaker the firmware
+suppresses the KEY cry (`g_bgm_active`), because on the capture screen KEY is the
+throw button: firing the buddy's cry on every throw would both talk over the music
+and kill it, since any queued sound ends the loop by design.
 
 `node scripts/play-test.js` auditions the three system sounds over serial without
 waiting for an event. `node scripts/cries-to-wav.mjs <pinyin>` renders any cry to a
 WAV on the PC for comparison — the synthesis there is a sample-for-sample port of
 `synth_tone`, so the two should sound identical. If they do not, that mismatch is
-the finding.
+the finding. `node scripts/cries-to-wav.mjs capture` renders the two music tracks;
+the BGM is written out as two passes of the loop so the seam back to bar 1 can be
+judged.
 
 Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 
@@ -233,7 +290,8 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
    characters of the Chinese name. It is the only non-derived thing in
    `seed/species-cries.json` and wants replacing with real onomatopoeia over time.
 3. **Evolution plays the generic fanfare, not the new form's own cry.** The one
-   sound trigger still missing something.
+   sound trigger still missing something. (The catch no longer borrows it — that
+   was fixed 07-31 when the capture music landed.)
 4. ~~**SD card cannot be used yet.**~~ **Resolved 2026-07-31 — the card works.**
    The owner produced the board's pinout sheet; `sdcard: {clk: 38, cmd: 21, d0: 39}`
    went into `board_cfg.txt` and was verified on hardware. See the 07-31 section.

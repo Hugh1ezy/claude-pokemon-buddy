@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { decodeFrame, encodeFrame, MAGIC, T } from "../src/transport/proto.js";
-import { SND_SPECIES_BASE, SPECIES_SOUND_ORDER } from "../src/pet/cry-audio.js";
+import { SND_TABLE_SIZE } from "../src/pet/music-audio.js";
 import { createSerialTransport, findEspPort, makeTransport } from "../src/transport/serial.js";
 
 test("findEspPort returns first serial path with Espressif VID 303A", async () => {
@@ -105,8 +105,11 @@ test("malformed BUTTON payloads are ignored instead of emitting null events (RL7
 
 // The expected count is derived, not written into the fixture. It was a literal 21
 // here, and when the cry table grew this test began asserting that a genuine
-// mismatch produces no warning -- i.e. it would have defended the bug.
-const EXPECTED_SND_COUNT = SND_SPECIES_BASE + SPECIES_SOUND_ORDER.length;
+// mismatch produces no warning -- i.e. it would have defended the bug. Same trap
+// on 2026-07-31 when the capture music added three ids above the species range:
+// spelled out as base + species it would have gone on passing while the real
+// expectation moved.
+const EXPECTED_SND_COUNT = SND_TABLE_SIZE;
 
 test("incoming HELLO stores firmware protocol info and stays queryable (RM8)", () => {
   const port = new FakePort();

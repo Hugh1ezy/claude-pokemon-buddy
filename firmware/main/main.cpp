@@ -3,8 +3,10 @@
 // Builds on B4's ES8311 audio with host-driven sounds: the host sends a PLAY
 // frame (type 0x03, payload[0] = sound id) so it can chime the buddy on its own
 // events, and sends CONFIG (type 0x04, payload[0] = sound id) to set the local
-// KEY-press cry. Three system sounds plus 18 species cries are synthesized on
-// boot; PLAY selects a sound immediately while KEY plays the active cry.
+// KEY-press cry. Three system sounds, the species cries and the capture-screen
+// music are synthesized on demand; PLAY selects a sound immediately while KEY
+// plays the active cry. One of those ids (SND_BGM_CAPTURE) is a LOOP rather than
+// a sound: it repeats until the host asks it to stop or anything else is queued.
 // The codec's I2C control bus is shared with the SHTC3 (same SDA13/SCL14)
 // via codec_board (see codec_init.c _i2c_init reuse).
 //
@@ -243,14 +245,23 @@ static constexpr uint8_t SND_HOUR   = 2;          // top-of-hour chime (host PLA
 // One note: sweep f0 -> f1 over `ms`. f0 == 0 means a silent gap.
 struct Note { float f0, f1; int ms; };
 #include "species_cries.inc"
+// The capture screen's music, ABOVE the species range rather than beside
+// BUI/EVOLVE/HOUR. Inserting ids at the bottom would push every species cry up by
+// three, and a cry id is `soundBase + index` on the host -- until the two sides
+// were reflashed in lockstep every cry would name the wrong pokemon out loud.
+static constexpr uint8_t SND_EXTRA_BASE = SND_SPECIES_BASE + SND_SPECIES_COUNT;
+#include "music.inc"
+static constexpr uint8_t SND_BGM_CAPTURE = SND_EXTRA_BASE + SND_EXTRA_BGM_CAPTURE;
+static constexpr uint8_t SND_BGM_STOP    = SND_EXTRA_BASE + SND_EXTRA_BGM_STOP;
+static constexpr uint8_t SND_CAUGHT      = SND_EXTRA_BASE + SND_EXTRA_CAUGHT;
 // Derived, not written down. This was a literal 21 and the static_assert below
 // caught it the moment species_cries.inc grew to 156 cries -- which is the assert
 // doing its job, but the literal should never have been there to need catching.
-static constexpr uint8_t SND_COUNT = SND_SPECIES_BASE + SND_SPECIES_COUNT;
+static constexpr uint8_t SND_COUNT = SND_EXTRA_BASE + SND_EXTRA_COUNT;
 static_assert(SND_SPECIES_BASE == 3, "species ids must start after BUI/EVOLVE/HOUR");
 // A sound id travels as ONE byte in the PLAY and CONFIG payloads, so the table can
 // never exceed 255 entries without a protocol change on both sides.
-static_assert(SND_SPECIES_BASE + SND_SPECIES_COUNT <= 255,
+static_assert(SND_EXTRA_BASE + SND_EXTRA_COUNT <= 255,
               "sound ids are a single protocol byte -- the table cannot exceed 255");
 static CodecPort    *g_codec = nullptr;
 // One scratch buffer, sized at boot to the longest sound and reused for every
@@ -260,6 +271,11 @@ static int16_t      *g_snd = nullptr;             // scratch PCM buffer (PSRAM)
 static size_t        g_snd_bytes = 0;             // its capacity, 0 = audio disabled
 static QueueHandle_t audio_queue = nullptr;       // sound id -> audio_task
 static std::atomic<uint8_t> g_active_cry{SND_BUI};  // KEY-press cry; set by host CONFIG
+// True from the moment SND_BGM_CAPTURE is queued until the loop gives up the
+// speaker. Read by on_key_single: while the capture screen is up KEY is the throw
+// button, and firing the buddy's cry on every throw would both talk over the music
+// and kill it (any queued sound breaks the loop, by design).
+static std::atomic<bool>    g_bgm_active{false};
 static std::atomic<uint8_t> g_volume{80};
 static void play_sound(uint8_t id);               // fwd decl (used by parse_frames)
 static void handle_time_sync(uint8_t hour, uint8_t minute, uint16_t epoch_day); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
@@ -728,6 +744,10 @@ static bool notes_for(uint8_t id, const Note **notes, int *count)
     case SND_BUI:    *notes = BUI_NOTES;    *count = 3; return true;
     case SND_EVOLVE: *notes = EVOLVE_NOTES; *count = 4; return true;
     case SND_HOUR:   *notes = HOUR_NOTES;   *count = 3; return true;
+    case SND_CAUGHT: *notes = CAUGHT_NOTES; *count = CAUGHT_NOTE_COUNT; return true;
+    // SND_BGM_CAPTURE is not a note sequence -- it is a phrase list played on a
+    // loop, handled in play_bgm(). SND_BGM_STOP carries no audio at all; queueing
+    // it is the whole point, because that is what breaks the loop.
     default: break;
     }
     if (id >= SND_SPECIES_BASE && id < SND_SPECIES_BASE + SND_SPECIES_COUNT) {
@@ -800,6 +820,16 @@ static void synth_init(void)
         if (frames > max_frames) max_frames = frames;
     }
 
+    // The BGM never passes through notes_for, so the loop above cannot see it.
+    // One PHRASE at a time is what gets rendered, not the whole 12.8s loop --
+    // that is why the tune is cut into bars in the seed. A single buffer for the
+    // whole thing would be 400KB of PSRAM held forever to save a few hundred
+    // microseconds of synthesis per bar.
+    for (int p = 0; p < BGM_CAPTURE_PHRASE_COUNT; p++) {
+        int frames = frames_of(BGM_CAPTURE_PHRASES[p].notes, BGM_CAPTURE_PHRASES[p].count);
+        if (frames > max_frames) max_frames = frames;
+    }
+
     g_snd_bytes = (size_t)max_frames * AUDIO_CH * sizeof(int16_t);
     g_snd = (int16_t *) heap_caps_malloc(g_snd_bytes, MALLOC_CAP_SPIRAM);
     if (g_snd == NULL) {
@@ -814,7 +844,52 @@ static void synth_init(void)
 
 static void play_sound(uint8_t id)
 {
-    if (audio_queue && id < SND_COUNT) xQueueSend(audio_queue, &id, 0);  // drop if busy
+    if (!audio_queue || id >= SND_COUNT) return;
+    // Set on the ENQUEUE, not when the loop starts playing: the host sends the
+    // BGM and the owner's first throw within the same few milliseconds, and a
+    // flag set by audio_task would still be false when that KEY press is handled.
+    if (id == SND_BGM_CAPTURE) g_bgm_active.store(true);
+    else if (id == SND_BGM_STOP) g_bgm_active.store(false);
+    xQueueSend(audio_queue, &id, 0);                     // drop if busy
+}
+
+// Push `bytes` of rendered PCM, in chunks, giving up the moment anything else is
+// waiting in the queue. This is what makes the BGM interruptible: a single
+// blocking write of a whole bar would hold the speaker for 1.6s, so the catch
+// fanfare would land up to a bar and a half after the ball stopped rocking.
+static constexpr int BGM_CHUNK_MS = 100;
+static bool write_interruptible(const int16_t *pcm, size_t bytes)
+{
+    const size_t chunk = (size_t)(AUDIO_SR * BGM_CHUNK_MS / 1000) * AUDIO_CH * sizeof(int16_t);
+    for (size_t off = 0; off < bytes; off += chunk) {
+        if (uxQueueMessagesWaiting(audio_queue) > 0) return false;
+        size_t n = (bytes - off < chunk) ? bytes - off : chunk;
+        g_codec->write((const uint8_t *)pcm + off, (int)n);
+    }
+    return true;
+}
+
+// Runaway guard. The host stops the BGM in a `finally`, so this should never
+// fire -- but a host that dies mid-capture would otherwise leave the device
+// playing battle music until someone unplugged it, and the capture screen
+// deliberately has no time limit of its own to bound this for us.
+static constexpr int64_t BGM_MAX_US = 10LL * 60 * 1000 * 1000;
+
+static void play_bgm(void)
+{
+    const int64_t deadline = esp_timer_get_time() + BGM_MAX_US;
+    for (;;) {
+        for (int p = 0; p < BGM_CAPTURE_PHRASE_COUNT; p++) {
+            size_t bytes = synth_tone(BGM_CAPTURE_PHRASES[p].notes,
+                                      BGM_CAPTURE_PHRASES[p].count, g_snd);
+            if (!write_interruptible(g_snd, bytes)) { g_bgm_active.store(false); return; }
+        }
+        if (esp_timer_get_time() > deadline) {
+            ESP_LOGW(TAG, "audio: capture BGM hit its %llds guard, stopping", BGM_MAX_US / 1000000);
+            g_bgm_active.store(false);
+            return;
+        }
+    }
 }
 
 static void audio_task(void *arg)
@@ -822,7 +897,13 @@ static void audio_task(void *arg)
     uint8_t id;
     for (;;) {
         if (xQueueReceive(audio_queue, &id, portMAX_DELAY) != pdTRUE) continue;
-        if (!g_codec || g_snd == nullptr) continue;
+        // Clears the flag on the way out: on a board with no codec the BGM is
+        // never going to play, and leaving g_bgm_active latched would mute the
+        // KEY cry for the rest of the boot.
+        if (!g_codec || g_snd == nullptr) { g_bgm_active.store(false); continue; }
+
+        if (id == SND_BGM_STOP) continue;                // control only; already flagged off
+        if (id == SND_BGM_CAPTURE) { play_bgm(); continue; }
 
         const Note *notes; int count;
         if (!notes_for(id, &notes, &count)) continue;    // unknown id -> silence
@@ -857,7 +938,14 @@ static void btn_emit(uint8_t key_id, uint8_t kind_id)
     xQueueSend(btn_queue, &ev, 0);                 // drop if full; events are advisory
 }
 
-static void on_key_single(Button *)  { btn_emit(KEY_ID_KEY, KIND_SHORT); play_sound(g_active_cry.load()); }
+// The button event always goes up to the host -- during capture that press IS the
+// throw. Only the cry is suppressed, and only while the capture music holds the
+// speaker: see g_bgm_active.
+static void on_key_single(Button *)
+{
+    btn_emit(KEY_ID_KEY, KIND_SHORT);
+    if (!g_bgm_active.load()) play_sound(g_active_cry.load());
+}
 static void on_key_double(Button *)  { btn_emit(KEY_ID_KEY,  KIND_DOUBLE); }
 static void on_key_long(Button *)    { btn_emit(KEY_ID_KEY,  KIND_LONG);   }
 static void on_boot_single(Button *) { btn_emit(KEY_ID_BOOT, KIND_SHORT);  }
@@ -1784,9 +1872,9 @@ extern "C" void app_main(void)
     xTaskCreate(audio_task, "audio", 4096, nullptr, 4, nullptr);
     // Counts derived, not written out: this line said "18 species" for as long as
     // there were 18, and would have gone on saying it.
-    ESP_LOGI(TAG, "B5: codec up; %d system + %d species sounds, synthesized on demand "
-                  "(KEY=active cry, PLAY=evolve/hour)",
-             SND_SPECIES_BASE, SND_SPECIES_COUNT);
+    ESP_LOGI(TAG, "B5: codec up; %d system + %d species + %d capture sounds, synthesized "
+                  "on demand (KEY=active cry, PLAY=evolve/hour/capture)",
+             SND_SPECIES_BASE, SND_SPECIES_COUNT, SND_EXTRA_COUNT);
     // After CodecPort, which is what tells codec_board which board's pin table
     // to parse -- get_sdcard_config reads that same parsed section.
     sdcard_probe();

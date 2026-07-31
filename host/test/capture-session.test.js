@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { runCaptureSession, FRAME_MS } from "../src/pet/capture-session.js";
 import { sliderCentre } from "../src/pet/capture.js";
-import { SOUND } from "../src/transport/proto.js";
+import { MUSIC } from "../src/pet/music-audio.js";
 
 const PHASE = {
   AIM: "aim", THROW: "throw", HIT: "hit", WOBBLE: "wobble",
@@ -175,12 +175,44 @@ test("a catch plays the fanfare exactly once, and an abort plays nothing", async
   // Once, not once per frame: PHASE.CAUGHT loops at 20fps for its whole
   // duration, so a call placed inside that loop would fire ~2 times here and
   // dozens of times with the real phase lengths.
-  assert.deepEqual(heard, [SOUND.EVOLVE]);
+  assert.deepEqual(heard,
+    [MUSIC.CAPTURE_BGM, MUSIC.CAPTURE_CAUGHT, MUSIC.CAPTURE_BGM_STOP]);
 
   const bailed = harness({ target: start, aimOffsets: [FRAME_MS], abortAfter: 1 });
   const quiet = [];
   const out = await runCaptureSession({ ...bailed.io, playSound: (id) => quiet.push(id) });
 
   assert.equal(out.outcome, "aborted");
-  assert.deepEqual(quiet, [], "backing out of the screen is not a catch");
+  assert.deepEqual(quiet, [MUSIC.CAPTURE_BGM, MUSIC.CAPTURE_BGM_STOP],
+    "backing out of the screen is not a catch -- but the music still has to stop");
+});
+
+// The device loops the BGM on its own and cannot tell that the screen closed, so
+// every way out of the session has to send the stop. A missed one is not a subtle
+// bug: it is battle music playing over the clock face until the next reboot.
+test("the capture BGM starts once and is stopped on every exit", async () => {
+  const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
+
+  // Escaped: aim the capture throw into the miss zone (target parked at the far
+  // end from where the slider is when the press lands).
+  const fled = harness({ target: 1, aimOffsets: [FRAME_MS, FRAME_MS, FRAME_MS] });
+  const escapedHeard = [];
+  const escaped = await runCaptureSession({ ...fled.io, playSound: (id) => escapedHeard.push(id) });
+  assert.ok(["escaped", "caught"].includes(escaped.outcome));
+  assert.equal(escapedHeard[0], MUSIC.CAPTURE_BGM, "the loop starts before the first frame");
+  assert.equal(escapedHeard.at(-1), MUSIC.CAPTURE_BGM_STOP, "and is the last thing sent");
+
+  // A renderer that throws is the case a plain "stop it at each return" would
+  // miss, which is why the stop is in a `finally` rather than at the exits.
+  const broken = harness({ target: start, aimOffsets: [FRAME_MS] });
+  const afterThrow = [];
+  await assert.rejects(
+    () => runCaptureSession({
+      ...broken.io,
+      render: async () => { throw new Error("panel died mid-encounter"); },
+      playSound: (id) => afterThrow.push(id),
+    }),
+    /panel died mid-encounter/,
+  );
+  assert.deepEqual(afterThrow, [MUSIC.CAPTURE_BGM, MUSIC.CAPTURE_BGM_STOP]);
 });

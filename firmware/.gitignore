@@ -1,6 +1,9 @@
 /build/
 /sdkconfig
 /sdkconfig.old
+# Kept by hand when regenerating after a partitions.csv change, so the old and
+# new files can be diffed. Per-machine like sdkconfig itself -- never commit one.
+/sdkconfig.bak-*
 /managed_components/
 dependencies.lock
 .cache/
