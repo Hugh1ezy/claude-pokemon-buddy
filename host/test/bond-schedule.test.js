@@ -123,7 +123,7 @@ test("a full five-heart day hands over 5% of the level", () => {
 
   assert.equal(closed.level, level, "5% of a bar must not be enough to level on its own");
   assert.ok(Math.abs(closed.exp - bar * 0.05) < 1e-9, `expected 5% of ${bar}, got ${closed.exp}`);
-  assert.equal(closed.bondHalves, 10, "the hearts stay on the panel after settling");
+  assert.equal(closed.bondHalves, 0, "settling empties the hearts");
   assert.equal(closed.bondUnpaid, 0);
 });
 
@@ -151,4 +151,18 @@ test("lifetime bond keeps its old pace so friendship evolutions still take ~2 we
 test("applyBondTick refuses to guess the clock or the calendar day", () => {
   assert.throws(() => applyBondTick(pet(), { today: YMD.mon }), /now is required/);
   assert.throws(() => applyBondTick(pet(), { now: MON(9, 30) }), /today is required/);
+});
+
+// Emptying the hearts must not reopen the day. bondSlots is what stops that:
+// the hours it records stay recorded, so a settled slot cannot pay twice.
+test("hearts emptied by settling cannot be earned again the same hour", () => {
+  const earned = applyBondTick(pet({ level: 5 }), { now: MON(9, 30), today: YMD.mon, clicked: true });
+  assert.equal(earned.bondHalves, 1);
+
+  const settled = settleBondExp(earned);
+  assert.equal(settled.bondHalves, 0);
+
+  const again = applyBondTick(settled, { now: MON(9, 45), today: YMD.mon, clicked: true });
+  assert.equal(again.bondHalves, 0, "the hour was already collected");
+  assert.equal(again.bondUnpaid, 0);
 });

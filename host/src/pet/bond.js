@@ -44,12 +44,18 @@ export function bondWindowClosed(date) {
 // is settled when the day's window shuts, or when the pokemon leaves the panel,
 // whichever comes first -- and it is paid exactly once either way, which is why
 // `bondUnpaid` is zeroed here rather than being derived from bondHalves.
+// Settling also empties the hearts on the panel (owner, 2026-07-31). They are a
+// running total of what has not been paid out yet, not a record of the day, so
+// once the day is settled there is nothing for them to show. `bondSlots` is the
+// one that keeps the day honest -- it still says which hours have been
+// collected, so emptying the hearts cannot buy a second helping.
 export function settleBondExp(pet) {
   const unpaid = Math.max(0, Number(pet.bondUnpaid ?? 0));
-  if (unpaid <= 0) return pet.bondUnpaid === 0 ? pet : { ...pet, bondUnpaid: 0 };
+  const cleared = { ...pet, bondHalves: 0, bondUnpaid: 0 };
+  if (unpaid <= 0) return cleared;
 
   const grown = gainExp(pet.level, pet.exp, expForHalfHeart(pet.level) * unpaid);
-  return { ...pet, level: grown.level, exp: grown.exp, bondUnpaid: 0 };
+  return { ...cleared, level: grown.level, exp: grown.exp };
 }
 
 // Index of the hour slot `date` falls in, or null when the window is closed.
