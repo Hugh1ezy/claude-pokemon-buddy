@@ -83,6 +83,7 @@ export async function createTransport({
     getHello,
     injectButton,
     getKind,
+    isAttached,
     close,
   };
 
@@ -266,6 +267,15 @@ export async function createTransport({
 
   function getKind() {
     return inner ? innerKind : "mock";
+  }
+
+  // Is a REAL device on the other end? Callers used to ask this as
+  // `Boolean(getKind())`, and "mock" is a truthy string, so the answer was
+  // always yes -- which silently disabled every save-sync guard that depends
+  // on it (see docs/handoff.md, 2026-08-03). Ask the field that actually
+  // means it.
+  function isAttached() {
+    return inner != null;
   }
 
   function close() {

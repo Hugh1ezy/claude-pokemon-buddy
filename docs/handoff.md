@@ -1,22 +1,114 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-08-01
-(morning, HOME PC)**.
+Rolling note between the home PC and the work PC. Last updated **2026-08-03
+(morning, WORK PC)**.
 
-## ▶ What the WORK PC has to do next
+## ▶ Read this first: the save-sync guards were never running
+
+**2026-08-03, work PC.** A weekend of play was overwritten and recovered. The
+short version, because it changes how much you can trust anything this file says
+about save sync working:
+
+`transport.getKind()` returns the **string `"mock"`** when nothing is attached,
+and every save-sync guard asked "is the device here?" as
+`Boolean(transport.getKind())`. That is `true` for `"mock"`. So, since the day
+the guard landed:
+
+- the pull-on-arrival fired **once**, on the first tick after a host start, and
+  never again — a device arriving at an already-running host never triggered it;
+- the push-on-departure branch was **dead code**, unreachable in both directions;
+- "publish only from the machine holding the device", called *the whole safety
+  story* in `save-sync.js`'s own header, was an **unconditional yes**. A host
+  idling in mock mode published exactly as if it held the device.
+
+What that cost: this machine's host had been up since **07-31 14:27** and never
+stopped when the device went home. The home PC published its weekend at
+**08-02 22:26** (`34fe9bd`: Lv.11, 图鉴 14, 捕捉 13, box 12) and was then shut
+down. At **08-03 11:09:58** the three-day-old host here force-pushed its stale
+save (`c8c1d68`: Lv.5, 图鉴 5, 捕捉 4, box 3) over it. The owner noticed because
+图鉴 and 捕捉 read wrong; the **level did not** — the stale lineage had settled
+to Lv.11 that morning by coincidence, the same number the real save carried.
+
+**`--force-with-lease` did not help and structurally cannot.** `push()` fetches
+the tip and pins the lease to what it fetched milliseconds earlier, so it only
+ever catches a genuine race. It was satisfied throughout. The header comment
+claiming it protects against the other machine having pushed has been corrected.
+
+### Recovery, and where the originals are
+
+`34fe9bd` survived only in this machine's `refs/remotes/save/main` **reflog** —
+the save branch is one parentless commit deep, so the overwritten commit is
+unreachable on the remote the moment it is replaced. `git reflog show
+refs/remotes/save/main` is the recovery path, and it is worth knowing before you
+need it.
+
+Byte-exact copies kept outside the repo at `~/cpb-save-recovery-2026-08-03/`
+(`state-34fe9bd-exact.json` is the one that matters). The save displaced by the
+restore is at `host/out/state.json.prerestore-2026-08-03`. Extract blobs with
+`git cat-file blob` **through node**, not a PowerShell pipeline — `Out-File`
+added a BOM and a trailing newline and the copy was no longer byte-exact.
+
+### What changed, and what is still only argued
+
+Four fixes, `npm test` 675 tests / 664 pass / **11 fail, byte-identical to the
+pre-change baseline on this machine** (measured by stashing and re-running, not
+assumed). The 11 are the standing Windows failures: launchd/plist ×6, the two
+`.inc` no-drift tests that need python, the statusline fan-out pair, and the
+RM12 quiet-boundary orchestration race.
+
+1. **`transport.isAttached()`** — `inner != null`, the question the callers meant
+   to ask. `getKind()` keeps its meaning; nothing else moved.
+2. **`deviceIsAttached()` in `index.js`**, one definition for all four call
+   sites, with a `getKind()`-based fallback for injected test transports.
+3. **`pull()` merges the collection instead of replacing it.** 图鉴 / 捕捉 / box
+   are monotone, and the machine *without* the device cannot catch anything, so
+   the union is **exact rather than a heuristic** — that is the whole argument
+   for doing it automatically. Level/exp/bond still come wholesale from whoever
+   held the device. Returns `keptLocal`, and the log says how many entries it
+   kept.
+4. **`push()` refuses when the remote holds 图鉴/捕捉 this machine lacks** —
+   `push-would-lose`, with an `--allow-loss` escape hatch for the one legitimate
+   case (a removal you made by hand). This is the check the lease was never
+   going to be.
+
+Plus: a catch now forces a publish instead of waiting out the five-minute
+debounce, detected by watching `capturedCount` across the tick rather than by
+tapping the capture path; and `save-sync-cli.mjs status` prints 图鉴/捕捉/box
+next to the level, because on 08-03 the two saves shared a level and that line
+said nothing else.
+
+> **The gap, stated plainly: nothing tests the orchestration-level property.**
+> The new tests cover `isAttached()` on the transport and the guard inside
+> `save-sync.js`. What is *not* covered is "a host in mock mode does not
+> publish", which is the actual bug — `makeSaveSync` is built from config inside
+> `runHost` and there is no seam to inject a fake. Adding one is the honest next
+> step for anyone who touches this.
+
+> **The manual-edit wrinkle.** A monotone merge resurrects a species you removed
+> from the save by hand if any copy that still has it gets merged in later. The
+> 07-31 removal is the precedent. Publish immediately after any manual edit so no
+> such copy survives; `--allow-loss` exists for exactly that push.
+
+## ▶ What the HOME PC has to do next
+
+The device is at **work** as of 08-03 and the save on the remote is current.
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
 git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
 cd host
-node scripts/save-sync-cli.mjs status
-node scripts/save-sync-cli.mjs pull     # only if the device travelled with you
+node scripts/save-sync-cli.mjs status    # figures now include 图鉴/捕捉/box
 ```
 
-Then **restart the host** (the capture screen's sound wiring changed) and
-**reflash if the device is with you** — the capture music is firmware, so an
-unflashed device shows the new screen in silence. `idf.py -p <PORT> flash`.
-No re-bake (artwork untouched since 07-29).
+Then **restart the host** — the save-sync fixes above are all in the tick path,
+and a host left running is precisely what caused the incident. Do **not** pull
+the save unless the device actually travelled home.
+
+**Still open from 08-01 and now overdue: the device has not been reflashed.**
+It is at work, the panel-lock fix and the capture music are firmware, and it is
+running the 07-30 evening image. Check `grep -cE '^\s*\{\s*".*",\s*".*"\s*\}'
+firmware/main/wifi_creds.h` prints 2 before flashing from anywhere, and take the
+running-image dump first (see the 07-31 section).
 
 Two things to check there:
 

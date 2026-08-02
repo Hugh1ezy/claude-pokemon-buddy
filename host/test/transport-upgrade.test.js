@@ -32,6 +32,35 @@ test("T1: mock transport upgrades in place and subsequent push uses serial", asy
   }
 });
 
+// getKind() answers "which transport", and its answer with nothing attached is
+// the string "mock" -- truthy. Every save-sync guard asked the question as
+// Boolean(getKind()), so all of them read yes forever, and on 2026-08-03 a host
+// that had been in mock mode for three days published over the machine that
+// actually had the device. isAttached() is the question they meant to ask.
+test("T1b: isAttached is false in mock mode and true only once a device is really there", async () => {
+  const serial = makeSerial();
+  const probe = makeUpgradeFactory(serial.transport);
+  let transport;
+  try {
+    transport = await createTransport({
+      serialTransportFactory: probe.factory,
+      mockFactory: () => makeMock().transport,
+      reconnectDelayMs: 5,
+      framePath: null,
+      logger,
+    });
+
+    assert.equal(transport.getKind(), "mock");
+    assert.equal(transport.isAttached(), false, "mock is not a device");
+    assert.ok(Boolean(transport.getKind()), "and this is exactly why Boolean(getKind()) was wrong");
+
+    await waitFor(() => transport.getKind() === "serial");
+    assert.equal(transport.isAttached(), true);
+  } finally {
+    transport?.close();
+  }
+});
+
 test("T2: upgrade redraws the cached frame as a full-screen dirty rect", async () => {
   const serial = makeSerial();
   const probe = makeUpgradeFactory(serial.transport);

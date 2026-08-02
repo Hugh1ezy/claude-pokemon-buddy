@@ -848,6 +848,20 @@ export async function main({
     let lastLoadUsageFailureReason = null;
     let lastPollUsageFailureReason = null;
     let deviceWasAttached = false;
+    // Every save-sync guard below turns on this one question, so it gets one
+    // definition. It was `Boolean(transport.getKind?.())` until 2026-08-03, and
+    // getKind() returns the string "mock" when nothing is attached -- so the
+    // answer was an unconditional `true`, the pull-on-arrival fired once at
+    // startup and never again, the push-on-departure branch was dead code, and
+    // a host idling in mock mode published over the machine that actually had
+    // the device. That is how a weekend of catches was overwritten. The
+    // getKind() fallback is for injected test transports that predate
+    // isAttached(); it makes the same distinction, just by name.
+    const deviceIsAttached = () => {
+      if (transport.isAttached) return transport.isAttached();
+      const kind = transport.getKind?.();
+      return Boolean(kind) && kind !== "mock";
+    };
     const actions = createActionQueue();
     const evolutionIntents = createEvolutionIntentQueue();
     // Same queue shape, carrying capture verdicts from the button path to the
@@ -984,7 +998,7 @@ export async function main({
         // so this machine picks up the buddy that was actually being raised
         // wherever the device just came from. (loadState re-reads from disk
         // every tick, so replacing the file is all this takes.)
-        const deviceAttached = Boolean(transport.getKind?.());
+        const deviceAttached = deviceIsAttached();
         if (deviceAttached && !deviceWasAttached) await saveSync.pull();
         // The device just left -- it is on its way to the other machine, and
         // this is the handoff. Publish now instead of leaving the last stretch
@@ -992,6 +1006,14 @@ export async function main({
         // silently dropped when the machine at the other end pulls.
         if (!deviceAttached && deviceWasAttached) await saveSync.maybePush({ force: true });
         deviceWasAttached = deviceAttached;
+        // A catch is the one event worth publishing immediately rather than
+        // within the next five minutes: it is rare, it is the thing the owner
+        // would most notice losing, and the five-minute window is long enough
+        // to span putting the device in a bag. Detected by watching the counter
+        // rather than by tapping the capture path, so every route that records
+        // a catch is covered by construction.
+        const capturedBefore = runtime.pet?.capturedCount ?? null;
+        let capturedThisTick = false;
         animator.pause();
         try {
           const snapshot = await loadUsageSnapshot({ ...config, run: usageRun });
@@ -1059,6 +1081,9 @@ export async function main({
             throw error;
           }
           runtime = { usage, weather, room, pet };
+          capturedThisTick = capturedBefore != null
+            && Number.isFinite(pet?.capturedCount)
+            && pet.capturedCount > capturedBefore;
           const hour = now.getHours();
           if (hour !== lastHour) {
             lastHour = hour;
@@ -1079,7 +1104,7 @@ export async function main({
         }
         // Publish only from the machine holding the device: see save-sync.js's
         // header for why that guard is the whole safety story.
-        if (deviceAttached) await saveSync.maybePush();
+        if (deviceAttached) await saveSync.maybePush({ force: capturedThisTick });
       });
     }
 
@@ -1110,7 +1135,7 @@ export async function main({
       // Checking "attached right now" rather than "attached at some point"
       // matters: a host that idled all day in mock mode after the device left
       // must not publish that drift on its way out.
-      const attachedAtExit = Boolean(transport.getKind?.());
+      const attachedAtExit = deviceIsAttached();
       process.off("SIGINT", stop);
       process.off("SIGTERM", stop);
       if (!stopped) stop();

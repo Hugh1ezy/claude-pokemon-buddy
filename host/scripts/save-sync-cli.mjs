@@ -5,7 +5,12 @@
 //
 //   node scripts/save-sync-cli.mjs status
 //   node scripts/save-sync-cli.mjs pull
-//   node scripts/save-sync-cli.mjs push
+//   node scripts/save-sync-cli.mjs push [--allow-loss]
+//
+// `push` refuses when the remote holds 图鉴/捕捉 this machine does not, since
+// that is a save from the other machine's turn and publishing over it is how a
+// weekend went missing on 2026-08-03. --allow-loss is for the one legitimate
+// case: you removed something from the save by hand and mean it.
 //
 // Run it from host/. Reads config.json's saveSync block for remote/branch.
 import { existsSync, readFileSync } from "node:fs";
@@ -52,8 +57,11 @@ if (command !== "pull" && command !== "push") {
   process.exit(2);
 }
 
+const allowLoss = process.argv.includes("--allow-loss");
 const before = describeSave(statePath);
-const result = command === "pull" ? await sync.pull() : await sync.maybePush({ force: true });
+const result = command === "pull"
+  ? await sync.pull()
+  : await sync.maybePush({ force: true, allowLoss });
 console.log(`${command}: ${result.status}${result.detail ? ` -- ${result.detail}` : ""}`);
 if (command === "pull") {
   console.log(`before : ${before}`);
@@ -81,9 +89,16 @@ function describeSave(path) {
 // evolution, so it printed "妙蛙种子 (ivysaur)" -- a name and species that do
 // not match, in the one command whose job is to rule the two-buddy trap in or
 // out. The raw key stays alongside it because this is a diagnostic.
+// 图鉴/捕捉 are printed alongside the level because they are what actually
+// distinguishes two saves at a glance. On 2026-08-03 the stale copy happened to
+// share a level with the real one and differed only in the collection, and this
+// line said they were both "Lv.11" and nothing more. Counts, never species.
 function summarise(save) {
   const who = save.species ? `${displayName(ownerName, save.species)} (${save.species})` : "?";
-  return `${who} Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`;
+  const dex = Array.isArray(save.dexCaught) ? save.dexCaught.length : 0;
+  const box = Array.isArray(save.box) ? save.box.length : 0;
+  return `${who} Lv.${save.level} exp=${save.exp} bond=${save.bond} streak=${save.streak}`
+    + ` 图鉴=${dex} 捕捉=${save.capturedCount ?? 0} box=${box}`;
 }
 
 function describeRemote(peeked) {

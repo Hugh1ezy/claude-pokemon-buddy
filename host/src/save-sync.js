@@ -11,15 +11,21 @@
 // 2. Every push is a PARENTLESS commit that replaces the branch tip, so the
 //    branch stays exactly one commit deep no matter how many years of saves
 //    go through it.
-// 3. Pushes use --force-with-lease pinned to the tip we last saw. If the other
-//    machine pushed in the meantime, the push is REJECTED rather than winning
-//    -- losing a save to a silent overwrite is the one outcome worth failing
-//    loudly over.
+// 3. Pushes use --force-with-lease. Note what this does and does not buy:
+//    the lease is pinned to the tip fetched milliseconds earlier in the same
+//    push(), so it catches a genuine RACE and nothing else. It said yes all
+//    through 2026-08-03, while a three-day-old save was force-pushed over a
+//    weekend of play. The check that would have caught that is
+//    wouldLoseCollection(), below, and it is separate on purpose.
 //
 // The caller is responsible for the fourth property, and it is the important
 // one: only push from the machine that currently has the device attached (see
 // index.js). A host running in mock mode is simulating a buddy nobody is
-// looking at; letting it publish would overwrite the real one.
+// looking at; letting it publish would overwrite the real one. That guard was
+// written as `Boolean(transport.getKind())` and getKind() returns "mock" when
+// nothing is attached, so it was an unconditional yes from the day it landed.
+// If you are reading this because the guard looks redundant with something
+// else: it is not, and it is the one that failed.
 import { execFile } from "node:child_process";
 import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
@@ -115,32 +121,99 @@ export function createSaveSync({
     const localText = existsSync(statePath) ? readFileSync(statePath, "utf8") : null;
     if (localText === remoteText) return { status: "already-current" };
 
+    // The incoming save wins on everything the device's holder was actually
+    // playing -- level, exp, bond, streak -- but not on the collection. See
+    // mergeCollection: those three fields only ever grow, so taking the union
+    // costs nothing and closes the window where a pull silently drops a catch
+    // this machine made and never managed to publish.
+    const merged = mergeCollection(remoteText, localText);
+    const finalText = merged.text;
+
     // One-step undo, kept separate from state.json.bak so a pull can never
     // consume the backup loadState() falls back to.
     if (localText != null) copyFileSync(statePath, `${statePath}.presync`);
 
     const tmp = `${statePath}.pull.tmp`;
-    writeFileSync(tmp, remoteText, "utf8");
+    writeFileSync(tmp, finalText, "utf8");
     renameSync(tmp, statePath);
     logger?.warn?.(`save-sync: pulled save from ${remote}/${branch}`);
-    return { status: "pulled" };
+    if (merged.kept > 0) {
+      logger?.warn?.(`save-sync: kept ${merged.kept} local dex/box entr${merged.kept === 1 ? "y" : "ies"} the remote did not have`);
+    }
+    return { status: "pulled", keptLocal: merged.kept };
+  }
+
+  // 图鉴 / 捕捉 / box are MONOTONE: an entry is never removed by play, and the
+  // count never goes down. And only one machine can be holding the device, so
+  // the other one cannot have caught anything -- its copy of these three can be
+  // stale but never divergent. That makes union-and-max exact here rather than
+  // a guess, which is why it is safe to do automatically while level/exp/bond
+  // (which do go down, and do belong to one lineage) are taken wholesale from
+  // whoever had the device.
+  //
+  // The one thing this cannot see is a DELIBERATE removal -- a species edited
+  // out of the save by hand comes back the next time a copy that still has it
+  // is merged in. Publish immediately after any manual edit so no such copy
+  // survives. (2026-07-31 is the precedent: one species removed by hand.)
+  function mergeCollection(remoteText, localText) {
+    const remote = parseSave(remoteText);
+    const local = localText == null ? null : parseSave(localText);
+    if (!remote || !local) return { text: remoteText, kept: 0 };
+
+    const merged = { ...remote };
+    let kept = 0;
+
+    const remoteDex = Array.isArray(remote.dexCaught) ? remote.dexCaught : [];
+    const localDex = Array.isArray(local.dexCaught) ? local.dexCaught : [];
+    const extraDex = localDex.filter((id) => !remoteDex.includes(id));
+    if (extraDex.length) {
+      merged.dexCaught = [...remoteDex, ...extraDex];
+      kept += extraDex.length;
+    }
+
+    const remoteBox = Array.isArray(remote.box) ? remote.box : [];
+    const localBox = Array.isArray(local.box) ? local.box : [];
+    const inRemote = new Set(remoteBox.map((entry) => entry?.species));
+    const extraBox = localBox.filter((entry) => entry?.species && !inRemote.has(entry.species));
+    if (extraBox.length) {
+      merged.box = [...remoteBox, ...extraBox];
+      kept += extraBox.length;
+    }
+
+    // Deliberately max() and not a sum: this counts duplicates, the two sides
+    // share an ancestor, and there is no merge base to subtract. It is also
+    // deliberately not forced to agree with box.length -- the owner has left
+    // the two out of step on purpose before.
+    const counts = [remote.capturedCount, local.capturedCount].filter((n) => Number.isFinite(n));
+    if (counts.length) merged.capturedCount = Math.max(...counts);
+
+    if (kept === 0 && merged.capturedCount === remote.capturedCount) {
+      return { text: remoteText, kept: 0 };
+    }
+    // Compact and newline-free, matching saveState() in state.js -- a pull that
+    // reformatted the file would make the very next push look like a change.
+    return { text: JSON.stringify(merged), kept };
   }
 
   // Publishes the local save. `force` skips the interval debounce (used on
   // shutdown, where "in 5 minutes" means never).
-  async function maybePush({ force = false } = {}) {
+  async function maybePush({ force = false, allowLoss = false } = {}) {
     const stamp = now();
     if (!force && lastPushAt != null && stamp - lastPushAt < pushIntervalMs) {
       return { status: "debounced" };
     }
-    const result = await push();
+    const result = await push({ allowLoss });
     // Only a completed attempt restarts the clock; a rejected push should be
     // retried on the next tick, not sat on for another interval.
     if (result.status === "pushed" || result.status === "already-current") lastPushAt = stamp;
     return result;
   }
 
-  async function push() {
+  // `allowLoss` is the deliberate-edit escape hatch: after removing something
+  // from the save by hand, the local copy IS legitimately behind the remote on
+  // the monotone fields, and that is the one time publishing anyway is right.
+  // Nothing in the tick loop passes it -- only a human at the CLI.
+  async function push({ allowLoss = false } = {}) {
     if (!existsSync(statePath)) return { status: "no-local-save" };
     const localText = readFileSync(statePath, "utf8");
     if (!parseSave(localText)) {
@@ -166,6 +239,22 @@ export function createSaveSync({
         if (tipTree.code === 0 && trim(tipTree.stdout) === treeSha) {
           return { status: "already-current" };
         }
+
+        // The lease below is NOT this check. It is pinned to the tip fetched
+        // two lines up, so it only ever catches a push racing us inside these
+        // few milliseconds -- it cannot tell that the tip we are about to
+        // replace is a save from LAST NIGHT holding catches we do not have.
+        // On 2026-08-03 that is exactly what happened: a host that had been up
+        // for three days force-pushed a stale save over a weekend of play, and
+        // the lease was satisfied the whole time. Ask the question the lease
+        // does not.
+        if (!allowLoss) {
+          const loss = await wouldLoseCollection(localText);
+          if (loss) {
+            logger?.warn?.(`save-sync: refusing to publish -- ${loss}`);
+            return fail("push-would-lose", loss);
+          }
+        }
       }
     }
 
@@ -187,6 +276,32 @@ export function createSaveSync({
     }
     writeMarker(commitSha);
     return { status: "pushed" };
+  }
+
+  // Returns a human-readable reason string if publishing `localText` would drop
+  // 图鉴 or 捕捉 the remote already holds, or null if it is safe. Counts only --
+  // this string reaches the log the owner reads, so it must never name a
+  // species (CLAUDE.md, the spoiler rule).
+  async function wouldLoseCollection(localText) {
+    const shown = await git(["show", `${remoteRef}:${BLOB_NAME}`]);
+    if (shown.code !== 0) return null;      // unreadable remote is not evidence of loss
+    const remote = parseSave(shown.stdout);
+    const local = parseSave(localText);
+    if (!remote || !local) return null;
+
+    const remoteDex = Array.isArray(remote.dexCaught) ? remote.dexCaught : [];
+    const localDex = Array.isArray(local.dexCaught) ? local.dexCaught : [];
+    const missing = remoteDex.filter((id) => !localDex.includes(id)).length;
+
+    const remoteCount = Number.isFinite(remote.capturedCount) ? remote.capturedCount : 0;
+    const localCount = Number.isFinite(local.capturedCount) ? local.capturedCount : 0;
+    const shortfall = remoteCount - localCount;
+
+    if (missing === 0 && shortfall <= 0) return null;
+    const parts = [];
+    if (missing > 0) parts.push(`${missing} dex entr${missing === 1 ? "y" : "ies"}`);
+    if (shortfall > 0) parts.push(`${shortfall} capture${shortfall === 1 ? "" : "s"}`);
+    return `the remote save has ${parts.join(" and ")} this one does not; pull first, or push --allow-loss if the removal was deliberate`;
   }
 
   function readMarker() {

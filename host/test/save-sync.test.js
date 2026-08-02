@@ -242,6 +242,84 @@ test("no git command may touch the working tree, HEAD, or the index", async (t) 
   }
 });
 
+// ── 2026-08-03: the weekend that was overwritten ────────────────────────────
+// A host that had been up for three days, with the device elsewhere the whole
+// time, force-pushed its stale save over the other machine's. Nine catches and
+// nine dex entries went with it. The lease said yes because the lease only ever
+// answers "did anyone push in the last few milliseconds". These pin the two
+// checks that would have said no. Counts only, never species -- CLAUDE.md.
+
+const COLLECTED = {
+  schemaVersion: 1, hatched: true, species: "abra", level: 11, streak: 8,
+  dexCaught: ["s1", "s2", "s3", "s4"], capturedCount: 4,
+  box: [{ species: "s2", level: 5 }, { species: "s3", level: 6 }],
+};
+const STALE = {
+  schemaVersion: 1, hatched: true, species: "abra", level: 11, streak: 9,
+  dexCaught: ["s1", "s2"], capturedCount: 2,
+  box: [{ species: "s2", level: 5 }],
+};
+
+test("push refuses to publish over a remote holding catches this machine does not have", async (t) => {
+  const { statePath } = tempSave(t, STALE);
+  const git = fakeGit({ blob: JSON.stringify(COLLECTED), tip: "aaa111", tipTree: "old-tree" });
+
+  const result = await createSaveSync({ statePath, runGit: git.run, logger: null }).push();
+
+  assert.equal(result.status, "push-would-lose");
+  assert.ok(!git.calls.some((call) => call[0] === "push"), "nothing may reach the remote");
+  // The reason reaches a log the owner reads, so it carries counts and no names.
+  assert.match(result.detail, /2 dex entries and 2 captures/);
+  assert.ok(!/s1|s2|s3|s4|abra/.test(result.detail), "the refusal must not name a species");
+});
+
+test("allowLoss is the escape hatch for a removal that was deliberate", async (t) => {
+  const { statePath } = tempSave(t, STALE);
+  const git = fakeGit({ blob: JSON.stringify(COLLECTED), tip: "aaa111", tipTree: "old-tree" });
+
+  const result = await createSaveSync({ statePath, runGit: git.run, logger: null }).push({ allowLoss: true });
+
+  assert.equal(result.status, "pushed");
+});
+
+test("a save that is merely different, not behind, still publishes", async (t) => {
+  const { statePath } = tempSave(t, { ...COLLECTED, bond: 3 });
+  const git = fakeGit({ blob: JSON.stringify(COLLECTED), tip: "aaa111", tipTree: "old-tree" });
+
+  assert.equal((await createSaveSync({ statePath, runGit: git.run, logger: null }).push()).status, "pushed");
+});
+
+test("pull takes the remote's lineage but keeps 图鉴/捕捉 only this machine has", async (t) => {
+  // The device's holder owns level/exp/bond. The collection is monotone and the
+  // non-holder cannot have caught anything, so the union is exact, not a guess.
+  const local = { ...STALE, level: 4, dexCaught: ["s1", "s2", "s9"], capturedCount: 3, box: [{ species: "s9", level: 2 }] };
+  const { statePath } = tempSave(t, local);
+  const git = fakeGit({ blob: JSON.stringify(COLLECTED), tip: "aaa111" });
+
+  const result = await createSaveSync({ statePath, runGit: git.run, logger: null }).pull();
+
+  assert.equal(result.status, "pulled");
+  assert.equal(result.keptLocal, 2, "one dex entry and one box entry were local-only");
+  const after = JSON.parse(readFileSync(statePath, "utf8"));
+  assert.equal(after.level, 11, "level comes wholesale from whoever had the device");
+  assert.equal(after.streak, 8);
+  assert.deepEqual(after.dexCaught, ["s1", "s2", "s3", "s4", "s9"]);
+  assert.deepEqual(after.box.map((entry) => entry.species), ["s2", "s3", "s9"]);
+  assert.equal(after.capturedCount, 4, "max of the two, never a sum -- they share an ancestor");
+  // The undo copy is still the untouched local save, not the merge.
+  assert.deepEqual(JSON.parse(readFileSync(`${statePath}.presync`, "utf8")), local);
+});
+
+test("a pull with nothing local-only installs the remote save byte for byte", async (t) => {
+  const { statePath } = tempSave(t, STALE);
+  const git = fakeGit({ blob: JSON.stringify(COLLECTED), tip: "aaa111" });
+
+  const result = await createSaveSync({ statePath, runGit: git.run, logger: null }).pull();
+
+  assert.equal(result.keptLocal, 0);
+  assert.equal(readFileSync(statePath, "utf8"), JSON.stringify(COLLECTED));
+});
+
 function tempSave(t, save) {
   const dir = mkdtempSync(join(tmpdir(), "cpb-save-sync-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
