@@ -615,9 +615,18 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 
 ### Still open, in rough priority order
 
-1. **The 138 generated cries have never been heard.** They are derived from real
-   height/weight/type, not tuned by ear. Expect some to be wrong and plan to fix
-   them by hand — the owner should say which ids sound wrong.
+1. ~~**The 138 generated cries have never been heard.**~~ **Owner's verdict
+   2026-08-03, on the image flashed that afternoon: the sounds are fine and he
+   does not want anything changed.** So the "expect some to be wrong and plan to
+   fix them by ear" worry is answered for now, and the reworked capture BGM,
+   capture jingle and evolution track are all accepted on hardware.
+
+   What that does **not** mean: he has not auditioned 138 species one at a time,
+   because most of them have not been encountered yet. A cry that turns out wrong
+   will surface the first time its species appears, not before. Treat this as
+   "nothing has sounded wrong so far", not as sign-off on every entry — and do
+   not go tuning cries nobody has complained about (07-29's sprite lesson: a fix
+   widened past the report is how a fix becomes a regression).
 2. **`bubble` text for the 138 generated species is placeholder** — the last two
    characters of the Chinese name. It is the only non-derived thing in
    `seed/species-cries.json` and wants replacing with real onomatopoeia over time.
@@ -628,13 +637,12 @@ Audio names are pinyin now (`node scripts/species-pinyin.mjs` prints the list).
 4. ~~**SD card cannot be used yet.**~~ **Resolved 2026-07-31 — the card works.**
    The owner produced the board's pinout sheet; `sdcard: {clk: 38, cmd: 21, d0: 39}`
    went into `board_cfg.txt` and was verified on hardware. See the 07-31 section.
-5. **The app partition is 98% full** (0xfa990 of 0x100000 — 22,128 bytes left)
-   after the SD probe. But the constraint is self-inflicted: the flash is
-   **16MB, measured** (`esptool flash_id`), and the partition table is still
-   IDF's `singleapp` default — `nvs` 24K, `phy_init` 4K, `factory` **1M**, and
-   then **15MB of nothing**. Growing `factory` extends into empty space; nothing
-   sits after it. This should be done before the next firmware feature, not
-   after it stops fitting.
+5. ~~**The app partition is 98% full**~~ **Resolved — `partitions.csv` gives
+   `factory` 4M, and the 2026-08-03 build measured 0xfbd60 = 1,031,520 bytes,
+   i.e. 75% of the partition free.** The diagnosis in the old note was right:
+   the ceiling was IDF's `singleapp` default, not the hardware. The flash is
+   16MB and ~12MB after `factory` is still unallocated, so there is room to do
+   this again if a firmware feature ever needs it.
 6. **`pollUsage failed: no-token`** on the home PC every tick — no usage token
    configured there, so the WEEK bar and the 5h/wk figures stay blank at home.
 
@@ -1348,7 +1356,7 @@ transport, or the animator. The device is running exactly what it ran before.
 | P3 encounter engine | **done** — `pet/encounter.js` + a generated condition table |
 | P4 notification row + capture screen | **done (2026-07-30)** — rows 3-4 draw the offer and the dex counts, and the capture screen plays. Not yet played on hardware by the owner |
 | P5 pokedex screen + swapping the active buddy | **done (2026-07-30)** — all 151 on three pages, a cursor over what you own, a confirm screen, and the swap. Not yet driven on hardware by the owner |
-| P6 cries | **synthesized cries done for all 151 (2026-07-30)**, plus the six trigger points, all flashed. Never heard: the speaker module is at work. *Recorded* cries are still blocked — the microSD card is now physically in the device, but no board in `board_cfg.txt` declares SD pins, so the slot cannot be mounted yet |
+| P6 cries | **synthesized cries done for all 151 (2026-07-30)**, plus the trigger points, all flashed. **Heard on hardware and accepted by the owner 2026-08-03** — see "Still open" #1 for what that does and does not cover. *Recorded* cries are no longer blocked either: the SD pins were measured 07-31 and the card mounts, so that path is open whenever anyone wants it |
 
 ### P4, where it actually stands
 
