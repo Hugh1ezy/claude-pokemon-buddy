@@ -89,6 +89,73 @@ said nothing else.
 > 07-31 removal is the precedent. Publish immediately after any manual edit so no
 > such copy survives; `--allow-loss` exists for exactly that push.
 
+## ▶ A PWR power-off loses the clock, and that breaks offline 亲密度 on the commute
+
+**Measured 2026-08-03, work PC**, prompted by the owner starting to power the
+device down at night rather than leaving it running. Host stopped, device off for
+2m11s, then on with nothing listening but a serial reader:
+
+```
+13:01:41  (port went away -- device powered down)
+13:03:52  (port open -- device is powered)
+13:03:53  #CPB 622 rtc: no valid time
+13:03:53  #CPB 919 offline-bond: restored day=20668 hours=0x000000
+13:03:56  #CPB 4062 GOT_IP 192.168.1.138
+```
+
+The clock face read `--:--` (the deliberate no-time-yet placeholder), confirming
+it independently of the serial race.
+
+**So the PCF85063's backup rail does not survive PWR-off.** PWR is wired to the
+power path, not the MCU, and it cuts the rail the chip sits on. "Backed by the
+18650" is true of the *board doc* and was only ever verified across a **reset**.
+The claim further down this file that a device keeping its battery keeps real
+time is now marked wrong in place.
+
+### Why this costs more than a blank clock
+
+`compute_current_clock()` returns false with no valid time, and
+`offline_bond_note_press()` then **drops the press outright** —
+`offline-bond: press dropped, no time` — because it refuses to guess an hour. So
+from a cold power-on until the first host contact, offline 亲密度 cannot be
+recorded at all. That window is exactly the commute, which is the situation the
+feature was built for.
+
+The routine that avoids it, with no code change: **power the device on while a
+running host can still reach it.** One sync seeds the chip (`rtc_maintain`) and
+the clock is then good for the rest of that boot. Powering on after leaving the
+house is what loses the morning.
+
+Nothing was changed in response to this. The alternatives all cost something the
+owner has to choose between — recording a press with an unknown hour and letting
+the host attribute it breaks the "absent, not guessed" rule that the encounter
+context and the RTC read both follow, and would risk paying a slot that was not
+earned.
+
+### Two things the same run confirmed, previously only argued
+
+- **A cold boot correctly discards the BSSID pin.** `connect idx=0 scan`, not
+  `pinned` — the pin and the DHCP lease are RAM-only statics by design and the
+  cold path goes back to a full scan. `ASSOCIATED` at 760ms, `GOT_IP` at 4062ms,
+  i.e. **~3.3s of DHCP**, matching the 3.1s in `main.cpp`'s own comment. There is
+  no stale-lease hazard on this path; the earlier worry was unfounded.
+- **NVS survives a real power-off**, not just a reflash: `offline-bond: restored`
+  came back with day 20668. (The mask is empty because the day had already rolled
+  over and been cleared, which is the designed behaviour, not a loss.)
+
+> **Also worth knowing, and it is a designed limit rather than a bug:** an
+> offline KEY press that never meets a host before midnight is worth nothing.
+> The firmware drops the mask on day rollover (`main.cpp`, `offline_bond_publish`)
+> and the host drops any other day (`pet/bond.js`, `applyOfflineBond`), both
+> because `bondSlots` is per-day and resets — there is no honest way to credit
+> yesterday without either wiping today or paying a slot twice. This never
+> mattered while the home host ran all night. It matters now.
+
+The reader used for this is `host/out/rtc-coldboot-listen.mjs` (untracked, like
+the other probes). Unlike `sd-probe-read.mjs` it does not expect esptool to have
+just reset the chip: it tolerates the port vanishing and re-opens every 50ms, so
+the operator can take their time between the off and the on.
+
 ## ▶ What the HOME PC has to do next
 
 The device is at **work** as of 08-03 and the save on the remote is current.
@@ -899,6 +966,14 @@ and is about the *driver*. The **board carries a PCF85063** on the same I2C bus
 (SDA 13 / SCL 14, INT on GPIO 15), backed by the 18650. So a device that keeps
 its battery keeps real time with no host and no network — which removes the
 reason to reach for SNTP in any offline work. Nobody has written the driver yet.
+
+> ⚠ **The second sentence is wrong and was measured wrong on 2026-08-03.** "Backed
+> by the 18650" is what the board doc says; it does not survive a **PWR
+> power-off**, which cuts the rail the chip sits on. Keeping the battery in the
+> device is not the same as keeping the device powered. See the 08-03 section at
+> the top — a real 2-minute power-off came back with `rtc: no valid time` and a
+> `--:--` clock face. This claim was written from a *reset* surviving and was
+> never tested against a power cycle.
 
 ## Session record: 2026-07-30 late evening, home PC
 
