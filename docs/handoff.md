@@ -1,13 +1,49 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-08-03
-(end of the work day, WORK PC)**.
+(evening, HOME PC — arrival sync done)**.
 
-## ▶ What the HOME PC has to do tonight
+## ▶ 2026-08-03 evening, home PC — the arrival sync ran, in full
+
+Everything the section below used to ask for is done. State as of **19:59**:
+
+- `git pull hugh main` took the 8 commits of the work day. **`HEAD == hugh/main
+  == 918cc9a`**, working tree clean, `main` already tracked `hugh/main` here.
+- **The save needed nothing.** Both copies read `Lv.5 exp=0.07 bond=0.4
+  streak=8 图鉴=16 捕捉=14 box=13` before and after — the work PC's departure
+  push had already landed. `already the same save, nothing to do`.
+- **Host restarted onto the new code** (pid 5416, 19:59:43) via
+  `start-buddy.vbs`. No `npm install` was needed: the only dependency added
+  today is a **devDependency** used by `bake-cries.mjs`, not by the tick.
+- **The device is attached over serial.** COM3 is present and the new process
+  connected on its *initial* probe — so there is deliberately no `ESP serial
+  device detected; upgrading mock transport` line for it. That line means the
+  host started on mock and upgraded later; its absence together with no `ESP
+  serial port not found` is the healthy signature. The pre-restart process had
+  both, because it started before the device came home.
+
+Two consequences worth carrying to work tomorrow:
+
+1. **The device is home and attached, so this machine owns the save tonight** —
+   the work PC's direction in the morning is `pull`.
+2. **Nothing is waiting to evolve.** Measured against the new table with the
+   real save: 14 members between panel and box, **0** of them past a level line,
+   and `readyToEvolve=false`. So if the evolution work looks silent tomorrow,
+   that is not evidence it is broken — nothing is eligible yet.
+
+Still true and still unverified: **browsing the pokedex may make one constant
+sound**, because the firmware plays the buddy's cry on every KEY short no matter
+what screen the host is holding. Fixing it is a protocol change plus a reflash.
+Listening for it is a hardware check only the owner can do.
+
+`pollUsage failed: no-token` still repeats every tick on this machine. It
+predates all of this and only costs the usage rows.
+
+## ▶ What the HOME PC had to do tonight — ✅ done 2026-08-03 19:59
 
 The device left work at **18:1x on 08-03**. The save was published and both
-copies matched at that moment; the host here was then **stopped**, so nothing on
-this machine is ticking overnight.
+copies matched at that moment; the host there was then **stopped**, so nothing
+on the work machine ticked overnight.
 
 ```powershell
 cd "$HOME\claude-pokemon-buddy"
@@ -18,12 +54,13 @@ node scripts/save-sync-cli.mjs pull       # once the device is actually home
 ```
 
 Then **restart the host** — a great deal of tick-facing code changed today.
-**No reflash**: the device is carrying an image flashed from this machine at
+**No reflash**: the device is carrying an image flashed from the work machine at
 13:17 today. **No re-bake** of sprites.
 
 **Run `node scripts/bake-cries.mjs` once on that machine** if you want the real
 cries there — `host/seed/cries/` is gitignored Nintendo audio, same rule as the
-sprites, so git does not carry it. Nothing on the device uses it yet.
+sprites, so git does not carry it. Nothing on the device uses it yet. **Not run
+on the home PC tonight** — the owner has not asked for cries here.
 
 Three things worth doing at home tonight:
 
@@ -34,6 +71,7 @@ Three things worth doing at home tonight:
    so browsing may still make one constant sound.
 2. **Watch for an evolution.** 63 species could not evolve at all until today.
    If anything in the box is sitting past its level, it will offer now.
+   — *checked: nothing is eligible, see above.*
 3. If the panel looks wrong in any way, check the host's **start time** before
    checking the code. That has been the answer three times this week.
 
