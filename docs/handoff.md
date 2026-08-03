@@ -1,7 +1,42 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-08-03
-(evening, HOME PC — arrival sync, then the pokedex-cry fix and a reflash)**.
+23:3x (HOME PC, shut down for the night — arrival sync, the pokedex-cry fix, a
+reflash)**.
+
+## ▶ What the WORK PC has to do in the morning
+
+The home PC was **shut down for the night at 23:3x on 08-03**. The host there was
+stopped first and the save published (`push: already-current`), so nothing on the
+home machine is ticking and nothing is owed. `HEAD == hugh/main`, tree clean.
+
+```powershell
+cd "$HOME\claude-pokemon-buddy"
+git rev-parse --abbrev-ref HEAD@{upstream}   # want hugh/main -- per-machine, git does not carry it
+git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
+cd host
+node scripts/save-sync-cli.mjs status
+node scripts/save-sync-cli.mjs pull          # once the device is actually at work
+```
+
+Then restart the host. **No reflash** — the device is carrying an image flashed
+from the *home* PC at 22:1x on 08-03, and that machine's `wifi_creds.h` has both
+networks, so it will join the work wifi on its own. **No re-bake** of sprites.
+
+**The first thing worth doing there is listening.** The pokedex-cry fix (T_SCREEN,
+section below) is on the device but was **never heard** — it was flashed after
+22:00, when quiet hours already had the volume at 0. Browse the pokedex: every
+cursor move and page turn should be silent, and only the zoom should speak. If
+there is still a cry on every press, the flag is not arriving and the place to
+look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
+`main.cpp` — not the host's PLAY path, which the tests already cover.
+
+> Noted in passing, not acted on: the home host ran for **80 minutes** tonight
+> and the save did not move by one field — `exp`, `bond` and `streak` all
+> identical before and after. That machine has no usage token (`pollUsage failed:
+> no-token`, its own item below), so there is nothing there for the tick to
+> credit. Whether the buddy is *supposed* to grow on a machine that cannot see
+> any usage is a question for the owner, not a bug anyone has decided on.
 
 ## ▶ 2026-08-03 evening, home PC — the arrival sync ran, in full
 
