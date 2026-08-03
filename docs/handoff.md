@@ -1,7 +1,147 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-08-03
-(morning, WORK PC)**.
+(end of the work day, WORK PC)**.
+
+## ▶ What the HOME PC has to do tonight
+
+The device left work at **18:1x on 08-03**. The save was published and both
+copies matched at that moment; the host here was then **stopped**, so nothing on
+this machine is ticking overnight.
+
+```powershell
+cd "$HOME\claude-pokemon-buddy"
+git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
+cd host
+node scripts/save-sync-cli.mjs status     # now prints 图鉴/捕捉/box too
+node scripts/save-sync-cli.mjs pull       # once the device is actually home
+```
+
+Then **restart the host** — a great deal of tick-facing code changed today.
+**No reflash**: the device is carrying an image flashed from this machine at
+13:17 today. **No re-bake** of sprites.
+
+**Run `node scripts/bake-cries.mjs` once on that machine** if you want the real
+cries there — `host/seed/cries/` is gitignored Nintendo audio, same rule as the
+sprites, so git does not carry it. Nothing on the device uses it yet.
+
+Three things worth doing at home tonight:
+
+1. **Check what browsing the pokedex sounds like now.** The host no longer cries
+   on cursor moves — only on the zoom. There is a prediction attached to that
+   (below) which has NOT been checked on hardware: the firmware plays the
+   buddy's own cry locally on every KEY short regardless of what screen is up,
+   so browsing may still make one constant sound.
+2. **Watch for an evolution.** 63 species could not evolve at all until today.
+   If anything in the box is sitting past its level, it will offer now.
+3. If the panel looks wrong in any way, check the host's **start time** before
+   checking the code. That has been the answer three times this week.
+
+## ▶ 2026-08-03 afternoon, work PC — evolution, and where the cry goes
+
+### 63 of the 70 species that can evolve simply never did
+
+The owner reported it from the player's end: his buddy reached the level its
+species evolves at and nothing happened. `evolution.js` returns no branches for a
+species with no entry, and `seed/evolution/` held **four hand-authored lines**.
+Not a broken rule — missing data. **His four files' six level conditions were
+canonical, every one.**
+
+`scripts/gen-evolution.mjs` now generates the table from PokeAPI. It accepts only
+triggers Generation 1 actually had — a level-up with a `min_level`, and the five
+Gen-1 stones — and drops everything else, because **PokeAPI reports each link the
+way the LATEST generation implements it**. Taken literally it serves an ice-stone
+link, a galarica-cuff link and a happiness link for species inside the 151, which
+would have quietly imported three later-generation systems into a Gen-1 game.
+
+Measured through the real loader afterwards: **70 of 70** species that can evolve
+now have branches, 72 targets inside the 151, and the four hand-authored files
+are untouched.
+
+**`evolution.js` merges per species now instead of `Object.assign`.** Two files
+may legitimately describe the same species, and whole-node replacement made the
+winner depend on readdir order — a branch silently not existing, which is exactly
+the failure this directory had already produced once by being incomplete.
+
+### The wild pool moved, on the owner's instruction
+
+He asked for the encounter weights to be regenerated in the same pass. Measured:
+**115 species can still be met in the wild, 36 are evolution-only, 0 are stranded,
+and all 151 remain obtainable by some route.** An earlier estimate in this
+session put the exclusion as high as 72; that was the theoretical ceiling and the
+real number is 36.
+
+> `sim-encounters.mjs` still does not model evolution, so it cannot confirm the
+> dex is completable in a reasonable time. The count above proves every species is
+> *reachable*, not that the whole set is *achievable*. That guard is still owed.
+
+### Evolving into a species you already own
+
+The owner defined this himself when he asked what would happen:
+
+- **捕捉 does not move** — an evolution is not a capture.
+- **图鉴 +1** if the new form was not already lit.
+- **The higher-level one survives**; a tie keeps the one that just evolved, since
+  it is the one on the panel whose nature the owner has been looking at.
+- **No boxed copy of that species is left behind.** Panel-and-box for one species
+  is the state that must not exist: `rosterEntries` renders one and strands the
+  other, which from outside looks like a pokemon that lost its levels.
+
+Eight tests in `test/evolve-into-owned.test.js`. It fired for real the same
+afternoon: 图鉴 14 → 15, 捕捉 unchanged at 13.
+
+### The pokedex cry moved from the cursor to the zoom
+
+Owner, after living with it the other way round. Browsing is one press per
+species, so a cry per press queues them up behind a blocking codec write and the
+sound stops corresponding to the row under the cursor. The zoom is the deliberate
+"show me this one" and gets the sound to itself. Fires on the *transition* into
+the confirm view, so a repaint is silent; cancel, page-turn and confirm are all
+silent.
+
+> **Predicted, NOT verified on hardware:** browsing may still make one constant
+> sound. `on_key_single` in `main.cpp` plays `g_active_cry` on every KEY short and
+> the device has no idea a host screen is up — only the capture BGM suppresses it
+> (`g_bgm_active`). Silencing it needs the same treatment: a "host holds the
+> screen" flag, which is a protocol change and a reflash. Not done.
+
+### Real Game Boy cries are baked, and nothing on the device uses them yet
+
+`scripts/bake-cries.mjs` fetches the **legacy** cries from PokeAPI — despite the
+extension, `latest/*.ogg` is an MP3 of the modern remaster; `legacy/*.ogg` is real
+Ogg Vorbis of the Game Boy original — and writes 16 kHz mono s16le to
+`seed/cries/`. **138 baked, 181..2238 ms, 3.48 MB total.** The 18 hand-authored
+cries are deliberately excluded: the owner asked for those to stay.
+
+`seed/cries/` is **gitignored**, same rule and same reason as `seed/sprites/`.
+Verified: git sees the script and not the 3.48 MB.
+
+`--wav` also writes `seed/cries/audition.html`, a local page with a player per
+cry and a checkbox that produces a list of ids. It plays Nintendo audio, so it is
+`file://` only — never publish it.
+
+**The device half is not started.** It needs a file-transfer frame, firmware that
+writes to the SD card, and a play path that streams from the card and falls back
+to the synthesized cry when a file is absent. That fallback is the safety belt:
+it makes the rollout incremental. **Neither PC has a card reader** (checked on
+both), so streaming over the wire is the only route, not a preference.
+
+### The test suite intermittently does not exit, and it is not new
+
+`npm test` sometimes hangs after every test has finished — a leaked handle, not a
+stuck test. **Reproduced on a clean tree with all of the day's changes stashed**,
+so it predates them. `--test-force-exit` makes it deterministic (the whole suite
+in a few seconds).
+
+Numbers for comparison, all with `--test-force-exit --test-concurrency=4`:
+clean-tree control **12 failures**, end of day **13**, and the extra one is RM12,
+which flipped pass/fail across three identical runs. The standing Windows set is
+launchd/plist ×6, the two `.inc` no-drift tests that want python, and the
+statusline fan-out pair.
+
+> Time was lost here: several bisects were run against this file before noticing
+> the behaviour was intermittent, which is why they contradicted each other.
+> Establish whether a symptom is stable **before** bisecting it.
 
 ## ▶ Read this first: the save-sync guards were never running
 
