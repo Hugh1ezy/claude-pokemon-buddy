@@ -1,42 +1,79 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-08-03
-23:3x (HOME PC, shut down for the night — arrival sync, the pokedex-cry fix, a
-reflash)**.
+Rolling note between the home PC and the work PC. Last updated **2026-08-04
+10:5x (WORK PC, arrival sync done)**.
 
-## ▶ What the WORK PC has to do in the morning
+## ▶ What the WORK PC did on arrival — ✅ 2026-08-04 10:53
 
-The home PC was **shut down for the night at 23:3x on 08-03**. The host there was
-stopped first and the save published (`push: already-current`), so nothing on the
-home machine is ticking and nothing is owed. `HEAD == hugh/main`, tree clean.
+The checklist below is consumed. In order, and every line of it measured:
 
-```powershell
-cd "$HOME\claude-pokemon-buddy"
-git rev-parse --abbrev-ref HEAD@{upstream}   # want hugh/main -- per-machine, git does not carry it
-git fetch hugh; git log --oneline HEAD..hugh/main; git pull hugh main
-cd host
-node scripts/save-sync-cli.mjs status
-node scripts/save-sync-cli.mjs pull          # once the device is actually at work
-```
+- `git pull hugh main` took the 3 commits of the home evening. **`HEAD ==
+  hugh/main == b6d8be5`**, working tree clean, `main` already tracked `hugh/main`
+  on this machine.
+- **The device is here and attached: COM7.** The other two ports this machine
+  shows (COM3, COM4) are Bluetooth serial, not the buddy — `Get-CimInstance
+  Win32_PnPEntity` names them, which is a faster answer than opening ports.
+- **Save pulled** — the home PC held the device overnight, so `pull` was the
+  direction. `exp 0 → 0.07`, everything else already equal; `status` after it
+  reads `already the same save`.
+- **Host started 10:53:23 (pid 22536)** by `start-buddy.vbs`, onto the new code.
+  It attached to the device on its *initial* probe — no `ESP serial port not
+  found`, no `upgrading mock transport`, and `device left local-clock mode
+  (RESYNC)` in the log — which is the healthy signature, not a missing line.
+- **Quiet hours are over and the volume is back up.** `config.json` sets neither
+  `volume` nor `quietHours`, so `config.js`'s defaults apply: quiet 22:00–08:00,
+  volume 70. At 10:53 `effectiveVolume()` is 70, so the listening test below is
+  no longer confounded by the mute.
 
-Then restart the host. **No reflash** — the device is carrying an image flashed
-from the *home* PC at 22:1x on 08-03, and that machine's `wifi_creds.h` has both
-networks, so it will join the work wifi on its own. **No re-bake** of sprites.
-
-**The first thing worth doing there is listening.** The pokedex-cry fix (T_SCREEN,
-section below) is on the device but was **never heard** — it was flashed after
-22:00, when quiet hours already had the volume at 0. Browse the pokedex: every
-cursor move and page turn should be silent, and only the zoom should speak. If
+Still owed here, and it needs ears rather than a machine: **browse the pokedex.**
+Every cursor move and page turn should be silent, only the zoom should speak. If
 there is still a cry on every press, the flag is not arriving and the place to
 look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
-`main.cpp` — not the host's PLAY path, which the tests already cover.
+`main.cpp` — not the host's PLAY path, which the tests already cover. Note that
+`setHostScreen()` is fire-and-forget and **logs nothing**, so the host log cannot
+answer this question either way; the device's serial output could, but the host
+holds COM7 while it runs.
 
-> Noted in passing, not acted on: the home host ran for **80 minutes** tonight
-> and the save did not move by one field — `exp`, `bond` and `streak` all
-> identical before and after. That machine has no usage token (`pollUsage failed:
-> no-token`, its own item below), so there is nothing there for the tick to
-> credit. Whether the buddy is *supposed* to grow on a machine that cannot see
-> any usage is a question for the owner, not a bug anyone has decided on.
+### Correction: `no-token` is not why a save sits still
+
+Last night's note here blamed the home host's flat 80 minutes on that machine
+having no usage token. **That was wrong, and the reasoning was wrong in a way
+worth keeping.**
+
+- `pollUsage failed: no-token` prints on **this** machine too, throughout
+  yesterday's log and again on this morning's start. It is not a property of the
+  home PC.
+- It costs only the official rate-limit rows. `pollUsage` feeds `loadRateLimits()`
+  (the 5h/week percentages); the tokens that drive growth come from
+  `loadUsageSnapshot()` → ccusage, a **different path**. Measured here at 10:5x
+  while `no-token` was printing every tick: `todayTokens = 1,398,716`,
+  `todayPeriod = 2026-08-04`. Growth is fine on a machine with no token.
+- The actual reason the home save did not move: read out of the home PC's own
+  published save (`git show 7d3828d:state.json`, the reflog entry for last
+  night's tip), **`todayCreditedExp` was already equal to `PARAMS.dailyExpCap`
+  and `todayCreditedBond` to `PARAMS.bondPerActiveDay`**. `applyDailyGrowth`
+  grants `max(0, credit - alreadyCredited)`, so both were 0 for the rest of that
+  day no matter what was spent. The day's allowance had been credited hours
+  earlier. `bond` was flat for a second, independent and equally designed reason:
+  the 亲密度 window shuts at 19:00 and the host started at 22:14.
+
+So there is **no open design question** about whether the buddy should grow at
+home. It grew; the day was simply already paid. Retracted.
+
+> Method note, since this is the second time a save has been explained wrongly
+> from the outside: the answer was in `todayCreditedExp`, a field the save
+> carries, and it took one `git show` against the reflog to read it. Read the
+> bookkeeping fields before theorising about the tick.
+
+### The panel jumped Lv.5 → Lv.11 on the first tick, and it is not the 08-03 incident
+
+Today's credit landed in one go on the newly swapped-in buddy. Checked before
+writing this, because a level moving by itself is exactly what the 08-03
+overwrite looked like: the save reflog shows the 08-03 18:0x step from `Lv.16
+kadabra 慢性子` to `Lv.5 growlithe 话痨` came with `box 12 → 13` and `捕捉 13 →
+14`, i.e. it is a **swap to a pokemon caught minutes earlier**, with 凯西 still in
+the box — not a lineage replacing another. Species and nature have been stable
+since. Nothing to do.
 
 ## ▶ 2026-08-03 evening, home PC — the arrival sync ran, in full
 
