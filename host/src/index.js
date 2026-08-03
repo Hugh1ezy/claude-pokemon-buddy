@@ -304,17 +304,25 @@ export function createButtonDispatcher({
     });
     if (next === was && action == null) return;
 
-    // The selected species cries when the cursor lands on it, including the press
-    // that opens the screen. Sent as PLAY rather than via setActiveCry, which
-    // would rewrite what the KEY button plays and outlive the screen.
+    // A species cries when you ZOOM IN on it, not when the cursor passes over
+    // it. Owner's call, 2026-08-03, after living with the other way round:
+    // browsing is a press per species, so a cry per press turns walking the page
+    // into a stack of half-played cries that never catches up with the cursor.
+    // Opening the zoom is a deliberate "show me this one", and it is the one
+    // press that has a sound to itself.
+    //
+    // Fires on the TRANSITION into the confirm view, not on being in it, so
+    // re-rendering the same screen is silent. Sent as PLAY rather than via
+    // setActiveCry, which would rewrite what the KEY button plays and outlive
+    // the screen.
     //
     // Only owned species are in `roster`, so an undiscovered silhouette is
     // silent -- which is the point: hearing one before finding it would give it
     // away, and the black rows are not selectable anyway.
-    const wasSpecies = was ? onPage(roster, was.page)[was.cursor]?.species ?? null : null;
-    const nowSpecies = next ? onPage(roster, next.page)[next.cursor]?.species ?? null : null;
-    if (nowSpecies && nowSpecies !== wasSpecies) {
-      const selectedCry = cryAudioId(nowSpecies);
+    const zoomed = Boolean(next?.confirming) && !was?.confirming;
+    const zoomSpecies = zoomed ? onPage(roster, next.page)[next.cursor]?.species ?? null : null;
+    if (zoomSpecies) {
+      const selectedCry = cryAudioId(zoomSpecies);
       if (selectedCry != null) transport.playSound?.(selectedCry);
     }
 

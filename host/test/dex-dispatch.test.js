@@ -13,11 +13,13 @@ function harness({ pet = { species: "bulbasaur", dexCaught: ["bulbasaur", "pidge
   const animator = { depth: 0, pause() { this.depth += 1; }, resume() { this.depth -= 1; } };
   const rendered = [];
   const swaps = [];
+  const sounds = [];
 
   const dispatcher = createButtonDispatcher({
     transport: {
       onButton: (fn) => { onButton = fn; return () => { onButton = null; }; },
       push: async (frame) => { pushed.push(frame); },
+      playSound: (id) => { sounds.push(id); },
     },
     getPet: () => pet,
     getModel: () => ({ buddy: {} }),
@@ -34,7 +36,7 @@ function harness({ pet = { species: "bulbasaur", dexCaught: ["bulbasaur", "pidge
   // The dispatcher's work happens on the action queue, so tests have to let it
   // drain before asserting.
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-  return { press: (key, kind) => { onButton({ key, kind }); return settle(); }, pushed, rendered, swaps, animator, dispatcher };
+  return { press: (key, kind) => { onButton({ key, kind }); return settle(); }, pushed, rendered, swaps, sounds, animator, dispatcher };
 }
 
 test("KEY double draws the first page and parks the animator", async () => {
@@ -219,4 +221,48 @@ test("with no dexSource the screen does not exist and KEY behaves as before", as
   onButton({ key: "KEY", kind: "short" });
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(pushed, ["signature"]);
+});
+
+// ── Where the cry goes (owner, 2026-08-03) ───────────────────────────────────
+// It used to fire on every cursor move. Browsing is one press per species, so
+// that was a cry per press: they queue, each blocks the speaker for its whole
+// length, and the sound you hear stops corresponding to the row you are looking
+// at. The zoom is the deliberate "show me this one" and it gets the sound.
+
+test("browsing the pokedex is silent -- opening it, moving the cursor, turning the page", async () => {
+  const h = harness();
+  await h.press("KEY", "double");   // open
+  await h.press("KEY", "short");    // move
+  await h.press("KEY", "short");    // move
+  await h.press("KEY", "long");     // page
+
+  assert.deepEqual(h.sounds, [], "not one PLAY may be sent while merely browsing");
+});
+
+test("zooming in on an owned species plays its cry, once per zoom", async () => {
+  const h = harness();
+  await h.press("KEY", "double");   // open, cursor on the first entry
+  assert.deepEqual(h.sounds, []);
+
+  await h.press("KEY", "double");   // zoom
+  assert.equal(h.sounds.length, 1, "the zoom is the press that has a sound");
+
+  // Cancelling and re-zooming the same species plays it again -- it is a fresh
+  // "show me this one" -- but nothing in between makes a sound.
+  await h.press("KEY", "short");    // cancel back to the grid
+  assert.equal(h.sounds.length, 1, "cancelling is silent");
+  await h.press("KEY", "double");   // zoom again
+  assert.equal(h.sounds.length, 2);
+});
+
+test("confirming the swap out of the zoom does not add a second cry", async () => {
+  const h = harness();
+  await h.press("KEY", "double");   // open
+  await h.press("KEY", "short");    // move off the active buddy so there is a swap to make
+  await h.press("KEY", "double");   // zoom
+  const afterZoom = h.sounds.length;
+
+  await h.press("KEY", "double");   // confirm
+  assert.equal(h.sounds.length, afterZoom, "the confirm is the swap, not another look");
+  assert.equal(h.swaps.length, 1, "and it really did request the swap");
 });
