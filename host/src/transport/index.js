@@ -30,6 +30,7 @@ export async function createTransport({
   let lastFrame = null;
   let lastActiveCry = null;
   let lastVolume = null;
+  let lastHostScreen = null;
   let detachInner = () => {};
   let probeTimer = null;
   let closed = false;
@@ -73,6 +74,7 @@ export async function createTransport({
     pushFrame,
     playSound,
     setActiveCry,
+    setHostScreen,
     sendVolume,
     sendTime,
     onButton,
@@ -169,6 +171,10 @@ export async function createTransport({
   function replay() {
     if (lastActiveCry != null) inner?.setActiveCry?.(lastActiveCry);
     if (lastVolume != null) inner?.sendVolume?.(lastVolume);
+    // State, so it replays like the other two. A device that rebooted comes back
+    // with the flag clear while the pokedex is still up on the host, and without
+    // this the cry would be back on every KEY for the rest of that screen.
+    if (lastHostScreen != null) inner?.setHostScreen?.(lastHostScreen);
   }
 
   function redrawLastFrame() {
@@ -224,6 +230,15 @@ export async function createTransport({
   function sendVolume(volume) {
     lastVolume = volumeByte(volume);
     return inner?.sendVolume?.(lastVolume);
+  }
+
+  // "The host owns the panel right now." The device uses it to keep quiet on a
+  // KEY short it would otherwise answer with the buddy's cry -- see g_host_screen
+  // in main.cpp. Kept as state rather than sent fire-and-forget because it has a
+  // matching off, and a missed off is a permanently silent button.
+  function setHostScreen(on) {
+    lastHostScreen = Boolean(on);
+    return inner?.setHostScreen?.(lastHostScreen);
   }
 
   // No replay-on-reconnect needed (unlike cry/volume, which are state) --

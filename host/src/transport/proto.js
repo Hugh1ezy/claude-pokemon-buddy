@@ -11,6 +11,9 @@ export const T = {
   PLAY: 0x03,
   CONFIG: 0x04,
   TIME: 0x05,
+  // payload[0] = 1 while a HOST screen (the pokedex) owns the panel, 0 when the
+  // buddy has it back. The device suppresses its local KEY cry while it is 1.
+  SCREEN: 0x06,
   VOLUME: 0x25,
   HELLO: 0x81,
   BUTTON: 0x82,

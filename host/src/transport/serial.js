@@ -348,6 +348,9 @@ export function makeTransport({
     setActiveCry(soundId) {
       writeFireAndForget(T.CONFIG, Uint8Array.from([soundId & 0xff]));
     },
+    setHostScreen(on) {
+      writeFireAndForget(T.SCREEN, Uint8Array.from([on ? 1 : 0]));
+    },
     sendVolume(volume) {
       writeFireAndForget(T.VOLUME, Uint8Array.from([volumeByte(volume)]));
     },

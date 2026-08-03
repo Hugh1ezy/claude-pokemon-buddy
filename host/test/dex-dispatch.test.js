@@ -14,12 +14,14 @@ function harness({ pet = { species: "bulbasaur", dexCaught: ["bulbasaur", "pidge
   const rendered = [];
   const swaps = [];
   const sounds = [];
+  const screen = [];
 
   const dispatcher = createButtonDispatcher({
     transport: {
       onButton: (fn) => { onButton = fn; return () => { onButton = null; }; },
       push: async (frame) => { pushed.push(frame); },
       playSound: (id) => { sounds.push(id); },
+      setHostScreen: (on) => { screen.push(on); },
     },
     getPet: () => pet,
     getModel: () => ({ buddy: {} }),
@@ -36,7 +38,7 @@ function harness({ pet = { species: "bulbasaur", dexCaught: ["bulbasaur", "pidge
   // The dispatcher's work happens on the action queue, so tests have to let it
   // drain before asserting.
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-  return { press: (key, kind) => { onButton({ key, kind }); return settle(); }, pushed, rendered, swaps, sounds, animator, dispatcher };
+  return { press: (key, kind) => { onButton({ key, kind }); return settle(); }, pushed, rendered, swaps, sounds, screen, animator, dispatcher };
 }
 
 test("KEY double draws the first page and parks the animator", async () => {
@@ -265,4 +267,91 @@ test("confirming the swap out of the zoom does not add a second cry", async () =
   await h.press("KEY", "double");   // confirm
   assert.equal(h.sounds.length, afterZoom, "the confirm is the swap, not another look");
   assert.equal(h.swaps.length, 1, "and it really did request the swap");
+});
+
+// ── The OTHER half of the silence (owner, 2026-08-03 evening, on hardware) ───
+// The tests above only prove the HOST sends no cry. The device was still making
+// one on its own: on_key_single plays g_active_cry on every KEY short and the
+// firmware cannot see whose screen is on the panel. So browsing was silent from
+// here and one constant cry in the room. T_SCREEN is how the host says "I have
+// the panel"; these pin that it is sent, and far more importantly that it is
+// always taken back.
+
+test("opening the pokedex takes the device's KEY cry, closing gives it back", async () => {
+  const h = harness();
+  await h.press("KEY", "double");
+  assert.deepEqual(h.screen, [true], "the device must be told before the first browsing press");
+
+  await h.press("BOOT", "short");
+  assert.deepEqual(h.screen, [true, false], "and told again the moment the buddy has the panel back");
+});
+
+test("browsing does not re-send the flag, and the zoom does not drop it", async () => {
+  const h = harness();
+  await h.press("KEY", "double");   // open
+  await h.press("KEY", "short");    // move
+  await h.press("KEY", "short");    // move
+  await h.press("KEY", "double");   // zoom
+  await h.press("KEY", "short");    // cancel
+  await h.press("KEY", "long");     // page
+
+  assert.deepEqual(h.screen, [true], "it is a state with two edges, not a per-press message");
+});
+
+// Every way the screen can end has to give the cry back. A missed off is not a
+// cosmetic bug: KEY stays silent for the rest of the session, on the buddy panel,
+// where the cry is the only thing the button does.
+test("the idle self-close gives the KEY cry back", async () => {
+  const h = harness();
+  await h.press("KEY", "double");
+
+  let closed = false;
+  for (let i = 0; i < 10 && !closed; i += 1) closed = h.dispatcher.ageDex();
+
+  assert.equal(closed, true);
+  assert.deepEqual(h.screen, [true, false], "walking away must not cost the button its sound");
+});
+
+test("a screen that fails to render gives the KEY cry back", async () => {
+  let onButton = null;
+  const screen = [];
+  const dispatcher = createButtonDispatcher({
+    transport: {
+      onButton: (fn) => { onButton = fn; return () => {}; },
+      push: async () => {},
+      setHostScreen: (on) => { screen.push(on); },
+    },
+    getPet: () => ({}),
+    getModel: () => ({ buddy: {} }),
+    actions: createActionQueue(),
+    animator: { pause() {}, resume() {} },
+    dexSource: () => ({ dex: {}, progress: { dexCaught: 0, dexTotal: 151 } }),
+    renderDex: async () => { throw new Error("no sprites"); },
+    logger: null,
+  });
+
+  onButton({ key: "KEY", kind: "double" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(dispatcher.isDexOpen(), false);
+  assert.deepEqual(screen, [true, false], "the unwind has to undo the flag as well as the animator");
+});
+
+// The mock transport has no setHostScreen at all, and neither does an older one.
+test("a transport without setHostScreen still runs the pokedex", async () => {
+  let onButton = null;
+  const dispatcher = createButtonDispatcher({
+    transport: { onButton: (fn) => { onButton = fn; return () => {}; }, push: async () => {} },
+    getPet: () => ({ species: "bulbasaur", dexCaught: ["bulbasaur"], capturedCount: 1, box: [] }),
+    getModel: () => ({ buddy: {} }),
+    actions: createActionQueue(),
+    animator: { pause() {}, resume() {} },
+    dexSource: () => ({ dex: { dexCaught: ["bulbasaur"] }, progress: { dexCaught: 1, dexTotal: 151 } }),
+    renderDex: async () => "page",
+    logger: null,
+  });
+
+  onButton({ key: "KEY", kind: "double" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(dispatcher.isDexOpen(), true, "the optional call must not throw the screen away");
 });

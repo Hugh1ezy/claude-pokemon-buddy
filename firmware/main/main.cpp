@@ -108,6 +108,7 @@ static constexpr uint8_t T_FRAME  = 0x01;
 static constexpr uint8_t T_PLAY   = 0x03;   // host -> device: play sound, payload[0]=id
 static constexpr uint8_t T_CONFIG = 0x04;   // host -> device: set active KEY cry
 static constexpr uint8_t T_TIME   = 0x05;   // host -> device: [hour u8][minute u8][epoch_day u16 LE], local-clock time+date sync
+static constexpr uint8_t T_SCREEN = 0x06;   // host -> device: payload[0] != 0 while the HOST owns the screen (see g_host_screen)
 static constexpr uint8_t T_VOLUME = 0x25;   // host -> device: set codec volume 0..100
 static constexpr uint8_t T_HELLO  = 0x81;
 static constexpr uint8_t T_BUTTON = 0x82;
@@ -305,6 +306,18 @@ static std::atomic<uint8_t> g_active_cry{SND_BUI};  // KEY-press cry; set by hos
 // button, and firing the buddy's cry on every throw would both talk over the music
 // and kill it (any queued sound breaks the loop, by design).
 static std::atomic<bool>    g_bgm_active{false};
+// True while the HOST is holding the screen with something of its own -- today
+// that means the pokedex. The device cannot see what is on its own panel: KEY
+// short is "greet the buddy" as far as the firmware is concerned, so browsing a
+// screen that is one KEY short per row played the buddy's cry under every press.
+// The owner heard it on hardware on 2026-08-03 and asked for it gone. The button
+// EVENT still goes up either way -- the host is the one doing something with the
+// press; only the local sound is suppressed, exactly like g_bgm_active.
+//
+// Cleared on entry to local-clock mode: that is the path taken when the host
+// goes quiet, and a flag left latched by a host that died with the pokedex open
+// would mute KEY until the next host connects.
+static std::atomic<bool>    g_host_screen{false};
 static std::atomic<uint8_t> g_volume{80};
 static void play_sound(uint8_t id);               // fwd decl (used by parse_frames)
 static void handle_time_sync(uint8_t hour, uint8_t minute, uint16_t epoch_day); // fwd decl (used by parse_frames), defined with the rest of local-clock mode below
@@ -545,6 +558,8 @@ static void parse_frames(uint8_t *buf, size_t &len_in_buf, Link link)
                 play_sound(f[5]);                  // payload[0] = sound id; fire-and-forget (no ACK)
             } else if (f[1] == T_CONFIG && len >= 1) {
                 if (f[5] < SND_COUNT) g_active_cry.store(f[5]); // 非法 id 拒绝, 不改值
+            } else if (f[1] == T_SCREEN && len == 1) {
+                g_host_screen.store(f[5] != 0);    // host owns the panel; suppress the local KEY cry
             } else if (f[1] == T_TIME && len == 4) {
                 uint16_t epoch_day = (uint16_t)(f[7] | (f[8] << 8));
                 handle_time_sync(f[5], f[6], epoch_day); // payload = [hour][minute][epoch_day LE]; malformed values ignored inside
@@ -678,6 +693,11 @@ static void enter_local_clock_mode(bool user_initiated)
 {
     if (g_mode.load() == DeviceMode::LOCAL_CLOCK) return;
     g_mode.store(DeviceMode::LOCAL_CLOCK);
+    // Whatever the host was holding, it is not holding it now -- the clock face
+    // owns the panel. Leaving this set would carry a host-side screen state into
+    // a mode that host cannot reach, and KEY would stay silent for as long as it
+    // took the owner to notice.
+    g_host_screen.store(false);
     if (user_initiated) {
         g_wifi_user_stopped.store(true);
         esp_wifi_stop();
@@ -1000,12 +1020,13 @@ static void btn_emit(uint8_t key_id, uint8_t kind_id)
 }
 
 // The button event always goes up to the host -- during capture that press IS the
-// throw. Only the cry is suppressed, and only while the capture music holds the
-// speaker: see g_bgm_active.
+// throw, and on the pokedex it turns the page. Only the cry is suppressed, and
+// only while something else owns the speaker or the screen: see g_bgm_active
+// (capture music) and g_host_screen (a host screen is up).
 static void on_key_single(Button *)
 {
     btn_emit(KEY_ID_KEY, KIND_SHORT);
-    if (!g_bgm_active.load()) play_sound(g_active_cry.load());
+    if (!g_bgm_active.load() && !g_host_screen.load()) play_sound(g_active_cry.load());
 }
 static void on_key_double(Button *)  { btn_emit(KEY_ID_KEY,  KIND_DOUBLE); }
 static void on_key_long(Button *)    { btn_emit(KEY_ID_KEY,  KIND_LONG);   }

@@ -439,6 +439,22 @@ test("setActiveCry writes a CONFIG frame with the sound id", () => {
   assert.deepEqual([...frame.payload], [7]);
 });
 
+test("setHostScreen writes a SCREEN frame carrying one flag byte", () => {
+  const port = new FakePort();
+  const transport = makeTransport({ port });
+
+  transport.setHostScreen(true);
+  let frame = decodeFrame(port.writes.at(-1));
+  assert.equal(frame.type, T.SCREEN);
+  assert.equal(frame.seq, 0);
+  assert.deepEqual([...frame.payload], [1]);
+
+  transport.setHostScreen(false);
+  frame = decodeFrame(port.writes.at(-1));
+  assert.equal(frame.type, T.SCREEN);
+  assert.deepEqual([...frame.payload], [0], "the firmware reads payload[0] != 0, so the off must really be 0");
+});
+
 test("sendVolume writes a VOLUME frame with the configured volume (RM12)", () => {
   const port = new FakePort();
   const transport = makeTransport({ port });

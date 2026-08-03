@@ -1,7 +1,7 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
 Rolling note between the home PC and the work PC. Last updated **2026-08-03
-(evening, HOME PC — arrival sync done)**.
+(evening, HOME PC — arrival sync, then the pokedex-cry fix and a reflash)**.
 
 ## ▶ 2026-08-03 evening, home PC — the arrival sync ran, in full
 
@@ -31,10 +31,51 @@ Two consequences worth carrying to work tomorrow:
    and `readyToEvolve=false`. So if the evolution work looks silent tomorrow,
    that is not evidence it is broken — nothing is eligible yet.
 
-Still true and still unverified: **browsing the pokedex may make one constant
-sound**, because the firmware plays the buddy's cry on every KEY short no matter
-what screen the host is holding. Fixing it is a protocol change plus a reflash.
-Listening for it is a hardware check only the owner can do.
+## ▶ The pokedex is properly silent now — T_SCREEN, and a reflash to go with it
+
+The prediction was right. The owner heard it on hardware the same evening and
+asked for it gone: browsing made the buddy's cry on **every** KEY short, because
+`on_key_single` plays `g_active_cry` and the firmware cannot see whose screen is
+on the panel. The host half landed earlier today; this is the device half.
+
+**New frame type: `T_SCREEN = 0x06`, one payload byte.** 1 while a host screen
+owns the panel, 0 when the buddy has it back. `on_key_single` now checks
+`g_host_screen` beside `g_bgm_active` — same shape, same reason, the two cases
+where something else owns the sound. **The button EVENT still goes up either
+way**; only the local cry is suppressed. The zoom's cry is unaffected: that one
+is a host `T_PLAY`, and it was always the press that was meant to speak.
+
+Three things that are easy to get wrong and are covered:
+
+- **The flag has a matching off, and a missed off is a permanently silent
+  button** — KEY on the buddy panel does nothing *but* cry. `syncScreenHold()`
+  is called after every assignment to `dexView`, which is three paths, not one:
+  the button dispatch, the idle self-close, and the render-failure unwind.
+  Tested per path.
+- **It is replayed on reconnect**, like the cry and the volume. A device that
+  reboots comes back with the flag clear while the pokedex is still up on the
+  host, and the host has no reason to touch it again until the screen closes.
+- The **firmware clears it on entry to local-clock mode**, which is the path
+  taken when the host goes quiet. A host that dies with the pokedex open would
+  otherwise mute KEY until the next one connects.
+
+Host: `684 pass / 10 fail of 694` — the same 10 documented Windows-environment
+failures (launchd plist, SIGINT, the usage bridge), none of them in this path.
+
+### Flash record: 2026-08-03 22:1x, HOME PC, COM3
+
+`idf.py build` clean, `0xfbdb0`, 75% of the app partition free. Flashed over
+COM3, **both hashes verified**, hard reset, host restarted onto it (pid 21164)
+and reconnected to the device on its initial probe. `wifi_creds.h` was checked
+first and has **2** entries, so this image knows the work network too — the
+standing home-flash trap does not apply.
+
+> **NOT verified by ear, and it could not have been:** the flash finished at
+> **22:1x** and quiet hours start at **22:00**, at which point
+> `effectiveVolume()` sends the device a flat **0**. Everything is silent right
+> now for reasons that have nothing to do with this change, so tonight cannot
+> tell the fix from the mute. **Check it after 08:00** — browse the pokedex and
+> expect nothing until you zoom.
 
 `pollUsage failed: no-token` still repeats every tick on this machine. It
 predates all of this and only costs the usage rows.
@@ -142,6 +183,10 @@ silent.
 > the device has no idea a host screen is up — only the capture BGM suppresses it
 > (`g_bgm_active`). Silencing it needs the same treatment: a "host holds the
 > screen" flag, which is a protocol change and a reflash. Not done.
+>
+> **Confirmed and fixed the same evening.** The owner heard it, and the flag is
+> exactly what it took: `T_SCREEN` + `g_host_screen`, flashed from the home PC at
+> 22:1x. See the T_SCREEN section at the top of this file.
 
 ### Real Game Boy cries are baked, and nothing on the device uses them yet
 

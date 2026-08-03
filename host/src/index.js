@@ -156,6 +156,7 @@ export function createButtonDispatcher({
   const tickQueue = [];
   let signatureInFlight = false;
   let dexView = null;
+  let screenHeld = false;
   let captureActive = false;
   // `offeredAt` of an encounter this session has already played out. Session
   // state, not save state: it only has to cover the gap between the capture
@@ -224,6 +225,25 @@ export function createButtonDispatcher({
       finally { animator.resume(); }
     }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
   });
+
+  // Tell the device whether the pokedex is up, so it can stop answering KEY with
+  // the buddy's cry. Browsing is one KEY short per row and the firmware has no
+  // idea whose screen is on the panel, so every step of the cursor fired a cry
+  // underneath a screen that is supposed to speak only when you zoom in. Owner
+  // heard it on hardware, 2026-08-03 evening.
+  //
+  // Called after EVERY assignment to dexView, including the idle self-close and
+  // the render-failure unwind: the flag has a matching off, and a missed off
+  // leaves the button silent long after the screen is gone. Sent only on a
+  // transition, since the press that opens (KEY double) and the one that closes
+  // (KEY long) do not cry in the firmware anyway -- there is no race to win, only
+  // a state to keep honest.
+  function syncScreenHold() {
+    const held = dexView != null;
+    if (held === screenHeld) return;
+    screenHeld = held;
+    transport.setHostScreen?.(held);
+  }
 
   // Dex page a species sits on. SPECIES_DEX is 1-based; the grid is not.
   function dexPageOf(species) {
@@ -327,6 +347,7 @@ export function createButtonDispatcher({
     }
 
     dexView = next;
+    syncScreenHold();
 
     // Read before the queue runs: `action` is decided against the roster the
     // press was made against, and a tick could land in between.
@@ -350,7 +371,7 @@ export function createButtonDispatcher({
     }).catch((error) => {
       logger?.warn?.(`pokedex screen failed: ${errorReason(error)}`);
       // Do not leave the animator parked on a screen that failed to draw.
-      if (dexView != null) { dexView = null; animator.resume(); }
+      if (dexView != null) { dexView = null; syncScreenHold(); animator.resume(); }
     });
   }
 
@@ -413,6 +434,7 @@ export function createButtonDispatcher({
       const next = ageDexView(dexView);
       if (next != null) { dexView = next; return false; }
       dexView = null;
+      syncScreenHold();
       animator.resume();
       logger?.log?.("pokedex closed itself after no input");
       return true;

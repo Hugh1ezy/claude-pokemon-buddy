@@ -11,6 +11,7 @@ function fakeSerialFactory() {
     pushFrame: async () => ({ ok: true }),
     playSound() {},
     setActiveCry(id) { writes.push(["cry", id]); },
+    setHostScreen(on) { writes.push(["screen", on]); },
     sendVolume(volume) { writes.push(["volume", volume]); },
     onReconnect(cb) { reconnectCb = cb; return () => {}; },
     onButton() { return () => {}; },
@@ -40,6 +41,28 @@ test("setActiveCry is replayed after reconnect", async () => {
   serial._writes.length = 0;
   serial._fireReconnect();
   assert.deepEqual(serial._writes.at(-1), ["cry", 9]); // 重放
+});
+
+test("setHostScreen reaches the device as a boolean", async () => {
+  const fake = fakeSerialFactory();
+  const t = await createTransport({ serialTransportFactory: fake });
+  t.setHostScreen(1);
+  const serial = await fake();
+  assert.deepEqual(serial._writes.at(-1), ["screen", true], "coerced here, so the wire byte is never a stray truthy value");
+});
+
+// A device that rebooted comes back with its flag clear while the pokedex is
+// still up on the host -- and the host has no reason to touch the flag again
+// until the screen closes. Without the replay the cry returns on every KEY for
+// the rest of that screen.
+test("setHostScreen is replayed after reconnect", async () => {
+  const fake = fakeSerialFactory();
+  const serial = await fake();
+  const t = await createTransport({ serialTransportFactory: () => Promise.resolve(serial) });
+  t.setHostScreen(true);
+  serial._writes.length = 0;
+  serial._fireReconnect();
+  assert.deepEqual(serial._writes.at(-1), ["screen", true]);
 });
 
 test("sendVolume sends a VOLUME downlink through the serial wrapper (RM12)", async () => {
