@@ -17,3 +17,7 @@ start-buddy.vbs
 firmware/main/wifi_creds.h
 host/seed/sprites/
 host/seed/oak.png
+# Real Game Boy cries, baked by scripts/bake-cries.mjs. Nintendo audio, same
+# rule and same reason as the sprites above: this fork is public. A fresh
+# checkout runs the baker once, exactly as it runs bake-assets.mjs.
+host/seed/cries/
