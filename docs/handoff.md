@@ -89,6 +89,62 @@ said nothing else.
 > 07-31 removal is the precedent. Publish immediately after any manual edit so no
 > such copy survives; `--allow-loss` exists for exactly that push.
 
+## ▶ Flash record: 2026-08-03 13:17, work PC
+
+The device was three days behind the tree — still on the image the work PC
+flashed 07-31 afternoon, so without the 08-01 panel-lock fix and the capture
+music. Flashed from here, every step verified rather than assumed:
+
+| Check | Result |
+|---|---|
+| `wifi_creds.h` entries | **2** |
+| sdkconfig partition table | already `CONFIG_PARTITION_TABLE_CUSTOM=y` — **the sdkconfig hazard is not live on this machine** |
+| app size | 0xfbd60 = 1,031,520 B against the 4M `factory`, **75% free** |
+| both SSIDs in the built binary | **present**, no placeholder strings |
+| write_flash | three regions, all **hash verified** |
+| post-flash boot | `rtc: seeded`, `sdcard: mounted`, `offline-bond: restored`, `GOT_IP` |
+| host after restart | holds COM7 (opening it from PowerShell is denied), frames flowing |
+
+Rollback image, taken first because this machine did not produce what was
+running:
+
+    ~/cpb-fw-backup-2026-08-03/running-image-0x0.bin   (2,097,152 B, write_flash 0x0)
+    sha256 6829d2c99449b30b6a4384e10b7fbdac7ab860b521fbe0d2ea252c5c27a442e3
+
+**It is 0x200000, not the 0x110000 the 07-31 note used.** The partition table
+changed to a 4M `factory` on 07-31, so 1MB no longer covers the app region and a
+dump that size would silently be a partial image. Size the dump to the partition
+table in front of you, not to the last note.
+
+### The SSID check is now a script instead of a squint
+
+`grep -c` on `wifi_creds.h` answers "how many networks did I configure", which is
+not the question — the 07-27 incident was a *build* that never saw the file.
+CMake evaluates the `EXISTS` check at configure time, so it flashes placeholders
+and reports success. The check that actually answers it reads the SSIDs out of
+`wifi_creds.h` and looks for each one in `build/pokemon_buddy_fw.bin`, printing
+**index and verdict only** so neither SSID reaches a terminal or a log:
+
+```powershell
+cd host
+node scripts/check-flashed-ssids.mjs ..\firmware\main\wifi_creds.h ..\firmware\build\pokemon_buddy_fw.bin
+```
+
+It also fails if any `YOUR_*` placeholder is still in the image, and exits
+non-zero either way so it can gate a flash. **Run it between `build` and
+`write_flash`, every time.**
+
+### Booting the credential list, seen for real
+
+    connect idx=0 scan   -> DISCONNECTED reason=2
+    connect idx=1 scan   -> DISCONNECTED reason=201   (NO_AP_FOUND: the home net is not here)
+    connect idx=0 scan   -> ASSOCIATED -> GOT_IP 192.168.1.138
+
+12.8s from boot to an IP, most of it the two failed passes. `pinned=0` throughout,
+which is correct for a cold boot. Nothing to fix — recorded because "it tried the
+other network and failed" is exactly what a *missing* credential also looks like
+in the log, and here it is what success looks like.
+
 ## ▶ A PWR power-off loses the clock, and that breaks offline 亲密度 on the commute
 
 **Measured 2026-08-03, work PC**, prompted by the owner starting to power the
@@ -171,11 +227,9 @@ Then **restart the host** — the save-sync fixes above are all in the tick path
 and a host left running is precisely what caused the incident. Do **not** pull
 the save unless the device actually travelled home.
 
-**Still open from 08-01 and now overdue: the device has not been reflashed.**
-It is at work, the panel-lock fix and the capture music are firmware, and it is
-running the 07-30 evening image. Check `grep -cE '^\s*\{\s*".*",\s*".*"\s*\}'
-firmware/main/wifi_creds.h` prints 2 before flashing from anywhere, and take the
-running-image dump first (see the 07-31 section).
+~~**Still open from 08-01: the device has not been reflashed.**~~ **Done
+2026-08-03 13:17 from the work PC** — see the flash record below. The device is
+now carrying the panel-lock fix and the capture music.
 
 Two things to check there:
 

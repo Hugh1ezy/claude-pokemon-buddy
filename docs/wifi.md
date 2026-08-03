@@ -80,12 +80,19 @@ the cause.
 > ⚠️ **Creating `wifi_creds.h` for the first time needs `idf.py reconfigure`
 > before `idf.py flash`.** CMake evaluates the `EXISTS` check at configure
 > time, so a first build without it flashes the placeholder credentials and
-> reports success. Verify before believing the flash:
+> reports success. Verify the built image before believing the flash — this
+> reads the SSIDs out of the header, looks for each one in the binary, and
+> prints index and verdict only, so nothing secret reaches your terminal:
 >
 > ```powershell
-> $t = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes("firmware/build/pokemon_buddy_fw.bin"))
-> $t.Contains("YOUR_SSID")   # must be True, for every network you listed
+> cd host
+> node scripts/check-flashed-ssids.mjs ..\firmware\main\wifi_creds.h ..\firmware\build\pokemon_buddy_fw.bin
 > ```
+>
+> It exits non-zero if any configured network is missing or any `YOUR_*`
+> placeholder is still in the image. Run it between `build` and `write_flash`,
+> every time — not just the first. A build is equally capable of dropping a
+> network you added later.
 
 **3. Set the pairing token** in `host/config.json` (gitignored — this file
 never gets committed, so the real token only needs to exist here and in the
