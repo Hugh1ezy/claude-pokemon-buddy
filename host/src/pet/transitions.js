@@ -1,5 +1,6 @@
 import { rollPersonality } from "./personality.js";
 import { resolveEvolution } from "./evolution.js";
+import { normalizeDex, recordSeen } from "./dex.js";
 
 export function ensurePet(state, today, personalityRng = Math.random) {
   // No hatched flag = fresh start (or pre-hatched dirty save) -> newborn from bond 0.
@@ -122,9 +123,57 @@ export function evolutionContext({ pet, weather, room, now }) {
   };
 }
 
+// Evolving is not catching, and the owner spelled out the difference on
+// 2026-08-03 when he asked what happens if his buddy evolves into something he
+// already owns:
+//
+//   * **捕捉 does not move.** Nothing was caught. `capturedCount` counts
+//     captures, and an evolution is the same pokemon changing shape.
+//   * **图鉴 +1 if the new form was not already lit**, which is what `recordSeen`
+//     does and the only thing it does.
+//   * **If that species is already in the box, the HIGHER LEVEL one survives.**
+//     Not the newer, not the boxed one: the higher. Two records for one species
+//     is the state that must not exist -- `rosterEntries` would show one and
+//     silently strand the other, which is how a pokemon appears to have lost
+//     levels.
+//
+// The fields carried across are the same short list `swapActiveBuddy` uses --
+// identity, growth, personality -- and for the same reason: everything else is
+// the trainer's day bookkeeping and belongs to the day, not to the pokemon.
 export function evolvePet(pet, species) {
   const { pendingCandidates, stone, ...rest } = pet;
-  return { ...rest, species, readyToEvolve: false };
+  const evolved = { ...rest, species, readyToEvolve: false };
+
+  const dex = normalizeDex(pet);
+  const stored = dex.box.find((entry) => entry.species === species) ?? null;
+  const seen = recordSeen(dex, species);          // 图鉴 +1 if new; never touches capturedCount
+
+  // Strictly greater, so a tie keeps the one that just evolved. It is the one
+  // on the panel and the one whose IVs and nature the owner has been looking
+  // at; swapping it out for an identical-level twin would be a change he could
+  // see (nature is on the panel) for no reason he could.
+  const keepStored = stored != null && (stored.level ?? 0) > (evolved.level ?? 0);
+  const winner = keepStored
+    ? {
+        ...evolved,
+        level: stored.level ?? evolved.level,
+        exp: stored.exp ?? 0,
+        bond: stored.bond ?? evolved.bond,
+        iv: stored.iv ?? null,
+        nature: stored.nature ?? null,
+        characteristic: stored.characteristic ?? null,
+        caughtAt: stored.caughtAt ?? evolved.caughtAt ?? null,
+      }
+    : evolved;
+
+  return {
+    ...winner,
+    dexCaught: seen.dexCaught,
+    capturedCount: seen.capturedCount,
+    // The active buddy lives on the panel, not in the box. Leaving the boxed
+    // copy behind is what would duplicate the species.
+    box: seen.box.filter((entry) => entry.species !== species),
+  };
 }
 
 export function drainEvolutionIntents(evolutionIntents) {

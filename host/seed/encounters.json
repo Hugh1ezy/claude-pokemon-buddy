@@ -108,7 +108,7 @@
     },
     {
       "species": "butterfree",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "weedle",
@@ -120,7 +120,7 @@
     },
     {
       "species": "beedrill",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "pidgey",
@@ -132,7 +132,7 @@
     },
     {
       "species": "pidgeot",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "rattata",
@@ -206,7 +206,7 @@
     },
     {
       "species": "nidoqueen",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "nidoran-m",
@@ -218,7 +218,7 @@
     },
     {
       "species": "nidoking",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "clefairy",
@@ -253,7 +253,7 @@
     },
     {
       "species": "ninetales",
-      "weight": 11.2,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"
@@ -304,7 +304,7 @@
     },
     {
       "species": "vileplume",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "night": true,
         "humidityAtLeast": 70,
@@ -364,7 +364,7 @@
     },
     {
       "species": "persian",
-      "weight": 11.2,
+      "weight": 0,
       "needs": {
         "night": true,
         "dexAtLeast": 40
@@ -408,7 +408,7 @@
     },
     {
       "species": "arcanine",
-      "weight": 11.2,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"
@@ -427,7 +427,7 @@
     },
     {
       "species": "poliwhirl",
-      "weight": 22,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -437,7 +437,7 @@
     },
     {
       "species": "poliwrath",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -455,7 +455,7 @@
     },
     {
       "species": "alakazam",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "machop",
@@ -470,7 +470,7 @@
     },
     {
       "species": "machamp",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "dexAtLeast": 80
       }
@@ -492,7 +492,7 @@
     },
     {
       "species": "victreebel",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "humidityAtLeast": 70,
         "dexAtLeast": 70
@@ -510,7 +510,7 @@
     },
     {
       "species": "tentacruel",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -532,7 +532,7 @@
     },
     {
       "species": "golem",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "dexAtLeast": 75
       }
@@ -549,7 +549,7 @@
     },
     {
       "species": "rapidash",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"
@@ -641,7 +641,7 @@
     },
     {
       "species": "cloyster",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -667,7 +667,7 @@
     },
     {
       "species": "gengar",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "night": true,
         "hourFrom": 21,
@@ -742,7 +742,7 @@
     },
     {
       "species": "exeggutor",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "sun"
@@ -872,7 +872,7 @@
     },
     {
       "species": "seaking",
-      "weight": 5.6
+      "weight": 0
     },
     {
       "species": "staryu",
@@ -886,7 +886,7 @@
     },
     {
       "species": "starmie",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -968,7 +968,7 @@
     },
     {
       "species": "gyarados",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -1056,7 +1056,7 @@
     },
     {
       "species": "omastar",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -1076,7 +1076,7 @@
     },
     {
       "species": "kabutops",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -1152,7 +1152,7 @@
     },
     {
       "species": "dragonair",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"
@@ -1163,7 +1163,7 @@
     },
     {
       "species": "dragonite",
-      "weight": 5.6,
+      "weight": 0,
       "needs": {
         "weather": [
           "rain"

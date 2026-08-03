@@ -1,0 +1,987 @@
+{
+  "abra": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "kadabra",
+        "needs": {
+          "level": 16
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "arbok": {
+    "stage": 1,
+    "branches": []
+  },
+  "arcanine": {
+    "stage": 1,
+    "branches": []
+  },
+  "beedrill": {
+    "stage": 2,
+    "branches": []
+  },
+  "bellsprout": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "weepinbell",
+        "needs": {
+          "level": 21
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "butterfree": {
+    "stage": 2,
+    "branches": []
+  },
+  "caterpie": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "metapod",
+        "needs": {
+          "level": 7
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "clefable": {
+    "stage": 2,
+    "branches": []
+  },
+  "clefairy": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "clefable",
+        "needs": {
+          "stone": "moon"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "cloyster": {
+    "stage": 1,
+    "branches": []
+  },
+  "cubone": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "marowak",
+        "needs": {
+          "level": 28
+        },
+        "priority": 1
+      },
+      {
+        "to": "marowak",
+        "needs": {
+          "level": 28
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "dewgong": {
+    "stage": 1,
+    "branches": []
+  },
+  "diglett": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "dugtrio",
+        "needs": {
+          "level": 26
+        },
+        "priority": 1
+      },
+      {
+        "to": "dugtrio",
+        "needs": {
+          "level": 26
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "dodrio": {
+    "stage": 1,
+    "branches": []
+  },
+  "doduo": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "dodrio",
+        "needs": {
+          "level": 31
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "dragonair": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "dragonite",
+        "needs": {
+          "level": 55
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "dragonite": {
+    "stage": 2,
+    "branches": []
+  },
+  "dratini": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "dragonair",
+        "needs": {
+          "level": 30
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "drowzee": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "hypno",
+        "needs": {
+          "level": 26
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "dugtrio": {
+    "stage": 1,
+    "branches": []
+  },
+  "ekans": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "arbok",
+        "needs": {
+          "level": 22
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "electrode": {
+    "stage": 1,
+    "branches": []
+  },
+  "exeggcute": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "exeggutor",
+        "needs": {
+          "stone": "leaf"
+        },
+        "priority": 9
+      },
+      {
+        "to": "exeggutor",
+        "needs": {
+          "stone": "leaf"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "exeggutor": {
+    "stage": 1,
+    "branches": []
+  },
+  "fearow": {
+    "stage": 1,
+    "branches": []
+  },
+  "gastly": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "haunter",
+        "needs": {
+          "level": 25
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "geodude": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "graveler",
+        "needs": {
+          "level": 25
+        },
+        "priority": 1
+      },
+      {
+        "to": "graveler",
+        "needs": {
+          "level": 25
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "gloom": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "vileplume",
+        "needs": {
+          "stone": "leaf"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "golbat": {
+    "stage": 1,
+    "branches": []
+  },
+  "goldeen": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "seaking",
+        "needs": {
+          "level": 33
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "golduck": {
+    "stage": 1,
+    "branches": []
+  },
+  "graveler": {
+    "stage": 1,
+    "branches": []
+  },
+  "grimer": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "muk",
+        "needs": {
+          "level": 38
+        },
+        "priority": 1
+      },
+      {
+        "to": "muk",
+        "needs": {
+          "level": 38
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "growlithe": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "arcanine",
+        "needs": {
+          "stone": "fire"
+        },
+        "priority": 9
+      },
+      {
+        "to": "arcanine",
+        "needs": {
+          "stone": "fire"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "gyarados": {
+    "stage": 1,
+    "branches": []
+  },
+  "haunter": {
+    "stage": 1,
+    "branches": []
+  },
+  "horsea": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "seadra",
+        "needs": {
+          "level": 32
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "hypno": {
+    "stage": 1,
+    "branches": []
+  },
+  "jigglypuff": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "wigglytuff",
+        "needs": {
+          "stone": "moon"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "kabuto": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "kabutops",
+        "needs": {
+          "level": 40
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "kabutops": {
+    "stage": 1,
+    "branches": []
+  },
+  "kadabra": {
+    "stage": 1,
+    "branches": []
+  },
+  "kakuna": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "beedrill",
+        "needs": {
+          "level": 10
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "kingler": {
+    "stage": 1,
+    "branches": []
+  },
+  "koffing": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "weezing",
+        "needs": {
+          "level": 35
+        },
+        "priority": 1
+      },
+      {
+        "to": "weezing",
+        "needs": {
+          "level": 35
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "krabby": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "kingler",
+        "needs": {
+          "level": 28
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "machoke": {
+    "stage": 1,
+    "branches": []
+  },
+  "machop": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "machoke",
+        "needs": {
+          "level": 28
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "magikarp": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "gyarados",
+        "needs": {
+          "level": 20
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "magnemite": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "magneton",
+        "needs": {
+          "level": 30
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "magneton": {
+    "stage": 1,
+    "branches": []
+  },
+  "mankey": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "primeape",
+        "needs": {
+          "level": 28
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "marowak": {
+    "stage": 1,
+    "branches": []
+  },
+  "meowth": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "persian",
+        "needs": {
+          "level": 28
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "metapod": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "butterfree",
+        "needs": {
+          "level": 10
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "muk": {
+    "stage": 1,
+    "branches": []
+  },
+  "nidoking": {
+    "stage": 2,
+    "branches": []
+  },
+  "nidoqueen": {
+    "stage": 2,
+    "branches": []
+  },
+  "nidoran-f": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "nidorina",
+        "needs": {
+          "level": 16
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "nidoran-m": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "nidorino",
+        "needs": {
+          "level": 16
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "nidorina": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "nidoqueen",
+        "needs": {
+          "stone": "moon"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "nidorino": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "nidoking",
+        "needs": {
+          "stone": "moon"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "ninetales": {
+    "stage": 1,
+    "branches": []
+  },
+  "oddish": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "gloom",
+        "needs": {
+          "level": 21
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "omanyte": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "omastar",
+        "needs": {
+          "level": 40
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "omastar": {
+    "stage": 1,
+    "branches": []
+  },
+  "paras": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "parasect",
+        "needs": {
+          "level": 24
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "parasect": {
+    "stage": 1,
+    "branches": []
+  },
+  "persian": {
+    "stage": 1,
+    "branches": []
+  },
+  "pidgeot": {
+    "stage": 2,
+    "branches": []
+  },
+  "pidgeotto": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "pidgeot",
+        "needs": {
+          "level": 36
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "pidgey": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "pidgeotto",
+        "needs": {
+          "level": 18
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "pikachu": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "raichu",
+        "needs": {
+          "stone": "thunder"
+        },
+        "priority": 9
+      },
+      {
+        "to": "raichu",
+        "needs": {
+          "stone": "thunder"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "poliwag": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "poliwhirl",
+        "needs": {
+          "level": 25
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "poliwhirl": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "poliwrath",
+        "needs": {
+          "stone": "water"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "poliwrath": {
+    "stage": 2,
+    "branches": []
+  },
+  "ponyta": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "rapidash",
+        "needs": {
+          "level": 40
+        },
+        "priority": 1
+      },
+      {
+        "to": "rapidash",
+        "needs": {
+          "level": 40
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "primeape": {
+    "stage": 1,
+    "branches": []
+  },
+  "psyduck": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "golduck",
+        "needs": {
+          "level": 33
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "raichu": {
+    "stage": 2,
+    "branches": []
+  },
+  "rapidash": {
+    "stage": 1,
+    "branches": []
+  },
+  "raticate": {
+    "stage": 1,
+    "branches": []
+  },
+  "rattata": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "raticate",
+        "needs": {
+          "level": 20
+        },
+        "priority": 1
+      },
+      {
+        "to": "raticate",
+        "needs": {
+          "level": 20
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "rhydon": {
+    "stage": 1,
+    "branches": []
+  },
+  "rhyhorn": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "rhydon",
+        "needs": {
+          "level": 42
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "sandshrew": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "sandslash",
+        "needs": {
+          "level": 22
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "sandslash": {
+    "stage": 1,
+    "branches": []
+  },
+  "seadra": {
+    "stage": 1,
+    "branches": []
+  },
+  "seaking": {
+    "stage": 1,
+    "branches": []
+  },
+  "seel": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "dewgong",
+        "needs": {
+          "level": 34
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "shellder": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "cloyster",
+        "needs": {
+          "stone": "water"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "slowbro": {
+    "stage": 1,
+    "branches": []
+  },
+  "slowpoke": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "slowbro",
+        "needs": {
+          "level": 37
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "spearow": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "fearow",
+        "needs": {
+          "level": 20
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "starmie": {
+    "stage": 1,
+    "branches": []
+  },
+  "staryu": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "starmie",
+        "needs": {
+          "stone": "water"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "tentacool": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "tentacruel",
+        "needs": {
+          "level": 30
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "tentacruel": {
+    "stage": 1,
+    "branches": []
+  },
+  "venomoth": {
+    "stage": 1,
+    "branches": []
+  },
+  "venonat": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "venomoth",
+        "needs": {
+          "level": 31
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "victreebel": {
+    "stage": 2,
+    "branches": []
+  },
+  "vileplume": {
+    "stage": 2,
+    "branches": []
+  },
+  "voltorb": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "electrode",
+        "needs": {
+          "level": 30
+        },
+        "priority": 1
+      },
+      {
+        "to": "electrode",
+        "needs": {
+          "stone": "leaf"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "vulpix": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "ninetales",
+        "needs": {
+          "stone": "fire"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "weedle": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "kakuna",
+        "needs": {
+          "level": 7
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "weepinbell": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "victreebel",
+        "needs": {
+          "stone": "leaf"
+        },
+        "priority": 9
+      }
+    ]
+  },
+  "weezing": {
+    "stage": 1,
+    "branches": []
+  },
+  "wigglytuff": {
+    "stage": 2,
+    "branches": []
+  },
+  "zubat": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "golbat",
+        "needs": {
+          "level": 22
+        },
+        "priority": 1
+      }
+    ]
+  }
+}

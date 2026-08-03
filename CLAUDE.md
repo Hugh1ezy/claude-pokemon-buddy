@@ -93,8 +93,17 @@ cannot answer the question at all — then use `git show save/main:state.json`.
   owner.** This has been misread more than once, so plainly: the restriction is
   on **output, not on access**. You may open, edit, regenerate and test
   `host/scripts/gen-encounters.mjs`, `host/seed/encounters.json`,
-  `host/scripts/sim-encounters.mjs` and `host/src/pet/capture-tuning.js` whenever
-  the work needs it, and you do not need to ask first.
+  `host/scripts/sim-encounters.mjs`, `host/src/pet/capture-tuning.js`,
+  `host/scripts/gen-evolution-special.mjs` and `host/seed/evolution/_special.json`
+  whenever the work needs it, and you do not need to ask first.
+
+  The last two joined the list on **2026-08-03**. Generation 1 has five trade
+  evolutions and this device has nothing to trade with, so each needed a
+  substitute condition — and the owner asked for that specifically to be designed
+  without him: 「这是你自己要设计的保密项，不能给我看，是惊喜」. He finds out by
+  playing. Note the asymmetry with the rest of `seed/evolution/`: the canonical
+  levels and stones in `_generated.json` are public Gen-1 knowledge and are **not**
+  restricted — he quoted one from memory when he reported the bug.
 
   What must never happen is a species-condition pair, a rarity, a difficulty or
   a sighting list reaching **chat, commit messages, `docs/`, test names, or

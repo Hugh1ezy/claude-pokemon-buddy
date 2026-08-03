@@ -1,0 +1,96 @@
+{
+  "kadabra": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "alakazam",
+        "needs": {
+          "level": 20,
+          "bond": 40,
+          "care": true
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "alakazam": {
+    "stage": 2,
+    "branches": []
+  },
+  "machoke": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "machamp",
+        "needs": {
+          "level": 36,
+          "bond": 48,
+          "care": true
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "machamp": {
+    "stage": 2,
+    "branches": []
+  },
+  "graveler": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "golem",
+        "needs": {
+          "level": 36,
+          "bond": 40
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "golem": {
+    "stage": 2,
+    "branches": []
+  },
+  "haunter": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "gengar",
+        "needs": {
+          "level": 32,
+          "bond": 40,
+          "night": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "gengar",
+        "needs": {
+          "level": 32,
+          "bond": 64,
+          "daytime": true
+        },
+        "priority": 2
+      }
+    ]
+  },
+  "gengar": {
+    "stage": 2,
+    "branches": []
+  },
+  "poliwhirl": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "poliwrath",
+        "needs": {
+          "level": 36,
+          "bond": 48,
+          "care": true
+        },
+        "priority": 2
+      }
+    ]
+  }
+}
