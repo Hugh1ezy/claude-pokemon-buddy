@@ -10,6 +10,11 @@ import { createWifiTransport, fileAddressCache } from "./wifi.js";
 
 let loggedMockFallback = false;
 
+// ~3 pushes/second from the animator, so this is a line about once a minute
+// while the panel is not being fed. Frequent enough that a long outage leaves a
+// trail with timestamps in it, rare enough that it does not bury the log.
+const PUSH_DROP_REMINDER = 200;
+
 export async function createTransport({
   framePath = "out/frame.png",
   serialTransportFactory = createSerialTransport,
@@ -35,6 +40,8 @@ export async function createTransport({
   let probeTimer = null;
   let closed = false;
   let chain = Promise.resolve();
+  // Consecutive pushes the device did not take. See notePushResult.
+  let pushDropStreak = 0;
   const probeDelayMs = serialOptions.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS;
   const wifiEnabled = Boolean(wifi?.enabled && wifi?.token);
   const wifiOptions = wifiEnabled
@@ -200,11 +207,49 @@ export async function createTransport({
       return { ok: true, skipped: true };
     }
     const result = await inner.pushFrame(encodeDirtyPayload(rect));
+    notePushResult(result);
     if (result?.ok) {
       previousBytes = Uint8Array.from(bitmap.bytes);
       lastFrame = frame;
     }
     return result;
+  }
+
+  // Every push in the process comes through doPush -- the tick, the animator's
+  // three frames a second, the capture screen, the pokedex -- so this is the one
+  // place that can say whether the panel is actually being fed.
+  //
+  // It exists because the host threw these results away, and twice that cost a
+  // session. On 2026-08-01 the log read `wrote out/frame.png` every minute for a
+  // whole night while the device sat on its clock face receiving nothing. On
+  // 2026-08-04 the device stopped ACKing for minutes and the only way to find out
+  // was to stop the host and run probe-downlink.js by hand. A push that is not
+  // taken is exactly the state where the panel keeps showing something plausible,
+  // so it has to announce itself.
+  //
+  // Edges only, plus a reminder every REMINDER frames -- the animator would
+  // otherwise write three identical lines a second for as long as it lasted.
+  // `skipped` (nothing changed, nothing sent) is deliberately neither: it says
+  // nothing about whether the device would have taken a frame.
+  function notePushResult(result) {
+    if (result?.skipped) return;
+    if (result?.ok) {
+      if (pushDropStreak > 0) {
+        logger?.log?.(`panel: device is taking frames again (${pushDropStreak} dropped)`);
+        pushDropStreak = 0;
+      }
+      return;
+    }
+    pushDropStreak += 1;
+    if (pushDropStreak === 1 || pushDropStreak % PUSH_DROP_REMINDER === 0) {
+      const why = result?.stale ? "no ACK after retries"
+        : result?.disconnected ? "link gone"
+        : "refused";
+      logger?.warn?.(
+        `panel: device did not take the frame (${why}); ${pushDropStreak} in a row `
+        + "-- the panel is showing whatever it last received, not what the host is rendering",
+      );
+    }
   }
 
   function push(frame) {

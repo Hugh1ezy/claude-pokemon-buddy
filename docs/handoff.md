@@ -34,6 +34,80 @@ look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
 answer this question either way; the device's serial output could, but the host
 holds COM7 while it runs.
 
+## ▶ 2026-08-04 afternoon — the panel goes stale in patches, and the host could not see it
+
+Owner: 联网显示左边显示不全, then 亲密度没了, then 右上角「9天」也显示不全. Three
+reports, one fault. **Not fixed. What follows is what was measured and what it
+rules out**, because most of an afternoon went into eliminating theories.
+
+### The glass is fine, and so is the render
+
+- **The host's own frame is complete.** `out/frame.png` was read directly at 15:44
+  and again at 16:17: every left-panel row present, 「9天」 present, 亲密度 present.
+- **No string overflows the left panel.** Measured with the real font
+  (`out/measure-left.mjs`, untracked): the widest is the weather detail line at
+  **exactly 204.0px against a 204px limit**. Nothing is cut today, but that row has
+  **zero slack** — a three-digit wind or a negative low will push it over the
+  divider into the buddy panel. Worth fixing before it bites; unrelated to this.
+- **The panel shows the whole framebuffer.** `out/edge-ruler.mjs` (untracked)
+  pushes five nested 2px rings at insets 0/4/8/12/16 plus a block in each corner
+  and re-pushes every 25s so the 120s local-clock timeout cannot wipe it. Owner
+  read it off the hardware: **all five rings, all four corners, nothing missing**.
+  So the theory that the glass loses its outer pixels — which would have explained
+  all three reports at once, since 亲密度's baseline is 4px off the bottom, the
+  left column starts at x=10 and 「9天」 sits 14px from the right — is **dead**.
+
+### What is left, and it fits the wedge
+
+The panel keeps **patches** of an older frame. The regions that stay wrong are the
+ones that change least often — the left column moves once a minute, 亲密度 and the
+name line almost never — which is exactly what a partly-applied frame looks like
+once the host believes it landed: `previousBytes` is updated on the **ACK**, so
+every later diff is computed against a state the glass never reached, and those
+pixels are never sent again. A full repaint fixes it (host restart, or RESYNC),
+and it comes back.
+
+Same afternoon, same device, measured in the same hour:
+
+| time | measurement |
+|---|---|
+| ~16:05 | owner pressed BOOT double then BOOT short. Host logged `device left local-clock mode (RESYNC)`, then a second `button BOOT short` |
+| 16:12 | host stopped, `scripts/probe-downlink.js` → **`{"ok":false,"stale":true}`** — retries exhausted, no ACK |
+| 16:12 | 35s of serial silence → **13 bytes**, one T_SENSOR frame. The MCU was alive; only the downlink was stuck |
+| 16:13 | host restarted → RESYNC arrived, i.e. rx_task processed a frame again |
+| 16:14 | host stopped, probe again → **`{"ok":true}`** |
+
+**It recovered without a power cycle**, which is what makes it *not* simply the
+08-01 wedge — that one only ever came back from the plug. The 08-01 fix
+(`panel_mutex`) is on the device, flashed 08-03. So either it does not cover
+everything, or this is a second thing wearing the same face. Two BOOT presses is
+all it took to provoke.
+
+> Do not read the second `button BOOT short` as the owner toggling himself back
+> into power-save. Entry is BOOT **double** only (`main.cpp:797`), with a 2s
+> re-arm guard after an exit. The device had left; the panel had not followed.
+
+### What was actually changed: the host now reports what the device took
+
+`push()` results were being thrown away. That is why the log said `wrote
+out/frame.png` all night on 08-01 with nothing reaching the device, and why 08-04
+needed the host stopped and a probe run by hand to learn the same thing.
+
+`notePushResult()` in `transport/index.js` — every push in the process goes through
+`doPush`, so it is the one place that can answer it. Logs on the **edges** plus a
+reminder every 200 dropped frames (~1/min against the animator's 3/s), so an
+outage leaves a timestamped trail without burying the log. `skipped` (nothing
+changed, nothing sent) counts as neither, because it says nothing about the link.
+Two tests. Suite **698 / 687 pass / 11 fail**, the standing Windows set, unchanged
+from before the edit.
+
+**What this still cannot see, and it is the important limit:** a frame the device
+**ACKs and then applies only partly**. Nothing on the host can detect that. The
+honest fix for that class is a **periodic forced full repaint** — drop
+`previousBytes` every N minutes so any stale patch is corrected within a bounded
+time. A full flush measured **11.75ms** on 07-31, so the cost is nil. Not done;
+it needs the owner's call on the interval.
+
 ## ▶ The capture screen has no background music (owner, 2026-08-04)
 
 Asked for plainly: 野生宝可梦出现的捕捉显示中，把背景音乐去除. The looping BGM is
