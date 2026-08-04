@@ -34,6 +34,51 @@ look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
 answer this question either way; the device's serial output could, but the host
 holds COM7 while it runs.
 
+## ▶ The capture screen has no background music (owner, 2026-08-04)
+
+Asked for plainly: 野生宝可梦出现的捕捉显示中，把背景音乐去除. The looping BGM is
+gone. **Host-only — no reflash**, and the firmware's music table is untouched.
+
+**The trap, and it is the whole reason this is not a one-line deletion.** KEY on
+the capture screen is the *throw* button, and the firmware answers KEY with the
+buddy's own cry unless something tells it otherwise. That something was
+`g_bgm_active` — set as a side effect of the BGM being queued. Deleting the music
+alone would therefore have put a cry on **every throw**, i.e. re-created by
+accident the exact noise the pokedex fix removed the night before.
+
+So the flag moved to the one that actually means it. `syncScreenHold()` now reads
+`dexView != null || captureActive`, and `startCapture()` raises it before the
+first frame and drops it in the `finally` that already resumes the animator. The
+two screens are mutually exclusive — an open capture swallows every press before
+the pokedex branch is reached — so one boolean covers both. It replays on
+reconnect for free, since `setHostScreen` was already state rather than
+fire-and-forget.
+
+**`capture_bgm` and `capture_bgm_stop` stay in `seed/music.json` and in the
+firmware table.** A sound id is `soundBase + index`; removing two entries would
+repoint every id after them against an already-flashed image, which is the
+lockstep-reflash trap written up in the 07-31 section. The host simply stops
+asking for them. The catch jingle is untouched and is now the only sound this
+screen makes on its own; the wild cry when the offer appears is a different path
+and is also untouched.
+
+Tests: the two capture-session tests that pinned "the BGM starts once and stops on
+every exit" now pin the opposite, on the same exit paths including the renderer
+that throws. Two new dispatcher tests cover what nothing covered before — the
+capture screen was only ever tested at the session level, so the flag it now
+depends on had no test at all: it is raised on open, dropped on back-out, and no
+music id is queued.
+
+Suite on this machine: **696 tests, 685 pass, 11 fail**, and the 11 are the
+standing Windows set — launchd/plist ×6, the two `.inc` no-drift tests that want
+python, the statusline fan-out pair, and RM12. Nothing in a touched path. RM12
+was re-run alone three times and went fail/pass/fail, so the difference from last
+night's home count of 10 is that race, not this change. Host restarted onto it at
+**13:00:14 (pid 27540)**.
+
+**Not verified by ear yet** — that needs the owner and an encounter, and wild
+offers arrive on their own schedule.
+
 ### Correction: `no-token` is not why a save sits still
 
 Last night's note here blamed the home host's flat 80 minutes on that machine

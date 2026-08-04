@@ -337,6 +337,78 @@ test("a screen that fails to render gives the KEY cry back", async () => {
   assert.deepEqual(screen, [true, false], "the unwind has to undo the flag as well as the animator");
 });
 
+// ── The capture screen holds the same flag (owner, 2026-08-04) ──────────────
+// KEY on this screen is the THROW button, and until today the throw was kept
+// quiet by g_bgm_active -- a side effect of the capture music being queued. The
+// music is gone, so the flag is the only thing left holding that line. Without
+// these, removing a background track silently puts a cry on every throw.
+function captureHarness() {
+  let onButton = null;
+  const screen = [];
+  const sounds = [];
+  const pet = {
+    species: "bulbasaur",
+    dexCaught: ["bulbasaur"],
+    capturedCount: 1,
+    box: [],
+    encounter: { species: "pidgey", offeredAt: 0 },
+  };
+
+  const dispatcher = createButtonDispatcher({
+    transport: {
+      onButton: (fn) => { onButton = fn; return () => {}; },
+      push: async () => {},
+      playSound: (id) => { sounds.push(id); },
+      setHostScreen: (on) => { screen.push(on); },
+    },
+    getPet: () => pet,
+    getModel: () => ({ buddy: {} }),
+    actions: createActionQueue(),
+    animator: { pause() {}, resume() {} },
+    dexSource: () => ({ dex: pet, progress: { dexCaught: 1, dexTotal: 151 } }),
+    renderDex: async () => "page",
+    captureResults: [],
+    renderCapture: async () => "capture-frame",
+    // Frozen at 0 so the offer never expires under the test; a real clock here
+    // would make this depend on how fast the machine runs. With the clock frozen
+    // no phase ever reaches its duration, so every phase runs until the abort --
+    // which is the path being tested.
+    captureNow: () => 0,
+    // Still a macrotask, so the test's own presses get scheduled between frames.
+    // An already-resolved promise here would starve them and hang the run.
+    captureSleep: () => new Promise((resolve) => setTimeout(resolve, 0)),
+    logger: null,
+  });
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  return { press: (key, kind) => { onButton({ key, kind }); return settle(); }, settle, screen, sounds, dispatcher };
+}
+
+test("the capture screen takes the device's KEY cry, and backing out gives it back", async () => {
+  const h = captureHarness();
+
+  await h.press("KEY", "double");            // wild pokemon on offer -> capture, not pokedex
+  assert.equal(h.dispatcher.isCaptureOpen(), true);
+  assert.deepEqual(h.screen, [true], "the device must be told before the first throw can land");
+
+  await h.press("BOOT", "short");            // back out
+  for (let i = 0; i < 200 && h.dispatcher.isCaptureOpen(); i += 1) await h.settle();
+
+  assert.equal(h.dispatcher.isCaptureOpen(), false);
+  assert.deepEqual(h.screen, [true, false], "and told again the moment the buddy has the panel back");
+});
+
+test("the capture screen queues no music", async () => {
+  const h = captureHarness();
+
+  await h.press("KEY", "double");
+  await h.press("KEY", "short");             // a throw
+  await h.press("BOOT", "short");
+  for (let i = 0; i < 200 && h.dispatcher.isCaptureOpen(); i += 1) await h.settle();
+
+  assert.deepEqual(h.sounds, [], "no loop, no stop -- the screen is silent unless a catch lands");
+});
+
 // The mock transport has no setHostScreen at all, and neither does an older one.
 test("a transport without setHostScreen still runs the pokedex", async () => {
   let onButton = null;

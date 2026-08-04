@@ -48,85 +48,85 @@ export async function runCaptureSession({
   // whether this throw is an attack or the capture.
   let kind = null;
 
-  // Starts before the first frame and stops on EVERY exit -- caught, escaped,
-  // aborted, or a throw from the renderer. The device loops it on its own and has
-  // no idea the screen closed, so a missed stop is music that outlives the
-  // encounter; that is what the `finally` is for, not tidiness.
+  // **No background music.** Owner's call, 2026-08-04: the capture screen used to
+  // open a looping BGM here and stop it on every exit. It plays nothing now, and
+  // the catch jingle below is the only sound this screen makes on its own.
   //
-  // Not quiet-hours gated, and it must not be: this only ever plays because the
-  // owner just pressed KEY to open the screen. The gate exists for the things the
-  // clock does on its own (the hour chime, a wild cry announcing itself), and
-  // silencing a button someone is holding would read as a broken device.
-  playSound(MUSIC.CAPTURE_BGM);
-  try {
-    for (;;) {
-      kind = stepKind(rules);
-      const aimStart = now();
-      takePress();                       // discard the press that opened the screen
+  // What the removal is NOT allowed to cost: silence on the throw button. KEY
+  // short is the throw, and the firmware answers KEY with the buddy's own cry
+  // unless something tells it the host owns the screen. That used to be
+  // `g_bgm_active`, set as a side effect of the loop being queued -- so deleting
+  // the music would have handed every throw a cry, which is the noise the pokedex
+  // had removed the night before. The caller holds `g_host_screen` up for the
+  // whole session instead (`syncScreenHold()` in index.js), which is the flag
+  // that actually means what is wanted here.
+  //
+  // `MUSIC.CAPTURE_BGM` and `CAPTURE_BGM_STOP` deliberately stay in the sound
+  // table: an id is `soundBase + index`, so dropping them from seed/music.json
+  // would repoint every id after them against an already-flashed image.
+  for (;;) {
+    kind = stepKind(rules);
+    const aimStart = now();
+    takePress();                       // discard the press that opened the screen
 
-      let zone = null;
-      while (zone == null) {
-        if (aborted()) return { outcome: "aborted" };
-        if (pressed()) {
-          takePress();
-          const frozenAt = now() - aimStart;
-          zone = judgeZone(slider, frozenAt);
-          slider.frozenAt = frozenAt;
-          break;
-        }
-        await push(await render({
-          species, zh, phase: PHASE.AIM, elapsed: now() - aimStart,
-          state: slider, rules, kind,
-        }));
-        await sleep(FRAME_MS);
+    let zone = null;
+    while (zone == null) {
+      if (aborted()) return { outcome: "aborted" };
+      if (pressed()) {
+        takePress();
+        const frozenAt = now() - aimStart;
+        zone = judgeZone(slider, frozenAt);
+        slider.frozenAt = frozenAt;
+        break;
       }
-
-      const before = rules;
-      const applied = applyThrow(rules, zone);
-      rules = applied.state;
-      logger?.log?.(`capture: ${kind} landed ${zone}${applied.outcome ? ` -> ${applied.outcome}` : ""}`);
-
-      // The throw flies whatever it was for -- the ball on a capture, a strike on
-      // an attack. Both need the same beat before the result lands.
-      await play(PHASE.THROW, phases[PHASE.THROW]);
-
-      if (kind === STEP.ATTACK) {
-        // The bar drops during this, so it has to be its own phase rather than a
-        // side effect of the next aim frame: watching it fall is the feedback
-        // that says the attack connected.
-        await play(PHASE.HIT, phases[PHASE.HIT], { before });
-        continue;
-      }
-
-      if (applied.outcome === OUTCOME.FLED) {
-        await play(PHASE.ESCAPED, phases[PHASE.ESCAPED]);
-        return { outcome: "escaped" };
-      }
-
-      // Both remaining outcomes rock the ball first. Showing the wobble only on a
-      // success would give the result away before it played.
-      await play(PHASE.WOBBLE, phases[PHASE.WOBBLE]);
-
-      if (applied.outcome === OUTCOME.CAUGHT) {
-        // Fired before the phase rather than inside it: `play` loops for the whole
-        // duration, so anything in there would retrigger every 50ms frame.
-        //
-        // This used to borrow the evolution fanfare, because the firmware had three
-        // system sounds and none of them was a catch. It has its own now, written
-        // in the same key as the loop it interrupts so the cut lands as a
-        // resolution rather than a collision. Queueing it is also what stops the
-        // BGM -- the device drops the loop the moment anything else wants the
-        // speaker -- so the STOP in the `finally` is belt and braces here, and the
-        // real thing on every other exit.
-        playSound(MUSIC.CAPTURE_CAUGHT);
-        await play(PHASE.CAUGHT, phases[PHASE.CAUGHT]);
-        return { outcome: "caught" };
-      }
-
-      await play(PHASE.RETRY, phases[PHASE.RETRY]);
+      await push(await render({
+        species, zh, phase: PHASE.AIM, elapsed: now() - aimStart,
+        state: slider, rules, kind,
+      }));
+      await sleep(FRAME_MS);
     }
-  } finally {
-    playSound(MUSIC.CAPTURE_BGM_STOP);
+
+    const before = rules;
+    const applied = applyThrow(rules, zone);
+    rules = applied.state;
+    logger?.log?.(`capture: ${kind} landed ${zone}${applied.outcome ? ` -> ${applied.outcome}` : ""}`);
+
+    // The throw flies whatever it was for -- the ball on a capture, a strike on
+    // an attack. Both need the same beat before the result lands.
+    await play(PHASE.THROW, phases[PHASE.THROW]);
+
+    if (kind === STEP.ATTACK) {
+      // The bar drops during this, so it has to be its own phase rather than a
+      // side effect of the next aim frame: watching it fall is the feedback
+      // that says the attack connected.
+      await play(PHASE.HIT, phases[PHASE.HIT], { before });
+      continue;
+    }
+
+    if (applied.outcome === OUTCOME.FLED) {
+      await play(PHASE.ESCAPED, phases[PHASE.ESCAPED]);
+      return { outcome: "escaped" };
+    }
+
+    // Both remaining outcomes rock the ball first. Showing the wobble only on a
+    // success would give the result away before it played.
+    await play(PHASE.WOBBLE, phases[PHASE.WOBBLE]);
+
+    if (applied.outcome === OUTCOME.CAUGHT) {
+      // Fired before the phase rather than inside it: `play` loops for the whole
+      // duration, so anything in there would retrigger every 50ms frame.
+      //
+      // This used to borrow the evolution fanfare, because the firmware had three
+      // system sounds and none of them was a catch. It has had its own since
+      // 07-31, written in the same key as the BGM it used to interrupt -- that
+      // relationship is now only history, since there is nothing to interrupt.
+      // It is the one sound left on this screen.
+      playSound(MUSIC.CAPTURE_CAUGHT);
+      await play(PHASE.CAUGHT, phases[PHASE.CAUGHT]);
+      return { outcome: "caught" };
+    }
+
+    await play(PHASE.RETRY, phases[PHASE.RETRY]);
   }
 
   // `kind` has to be forwarded, not just the phase. Without it every frame that

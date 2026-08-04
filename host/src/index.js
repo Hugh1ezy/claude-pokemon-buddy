@@ -226,20 +226,29 @@ export function createButtonDispatcher({
     }).catch(onSignatureError).finally(() => { signatureInFlight = false; });
   });
 
-  // Tell the device whether the pokedex is up, so it can stop answering KEY with
-  // the buddy's cry. Browsing is one KEY short per row and the firmware has no
-  // idea whose screen is on the panel, so every step of the cursor fired a cry
-  // underneath a screen that is supposed to speak only when you zoom in. Owner
-  // heard it on hardware, 2026-08-03 evening.
+  // Tell the device whether a HOST screen is up, so it can stop answering KEY
+  // with the buddy's cry. The firmware has no idea whose screen is on the panel,
+  // and both of the screens here answer KEY with something of their own:
   //
-  // Called after EVERY assignment to dexView, including the idle self-close and
-  // the render-failure unwind: the flag has a matching off, and a missed off
-  // leaves the button silent long after the screen is gone. Sent only on a
-  // transition, since the press that opens (KEY double) and the one that closes
-  // (KEY long) do not cry in the firmware anyway -- there is no race to win, only
-  // a state to keep honest.
+  // - the pokedex, where browsing is one KEY short per row, so every step of the
+  //   cursor fired a cry underneath a screen that is supposed to speak only when
+  //   you zoom in (owner heard it on hardware, 2026-08-03 evening);
+  // - the capture screen, where KEY is the throw button. That one used to be
+  //   covered by `g_bgm_active` as a side effect of the music being queued, so
+  //   removing the music (2026-08-04, owner's call) would have put a cry on every
+  //   throw. Covered here instead, which is the flag that actually means it.
+  //
+  // The two are mutually exclusive -- an open capture swallows every press before
+  // the pokedex branch is reached -- so one boolean is enough for both.
+  //
+  // Called after EVERY assignment to dexView and to captureActive, including the
+  // idle self-close and the render-failure unwind: the flag has a matching off,
+  // and a missed off leaves the button silent long after the screen is gone. Sent
+  // only on a transition, since the press that opens (KEY double) and the one that
+  // closes (KEY long) do not cry in the firmware anyway -- there is no race to
+  // win, only a state to keep honest.
   function syncScreenHold() {
-    const held = dexView != null;
+    const held = dexView != null || captureActive;
     if (held === screenHeld) return;
     screenHeld = held;
     transport.setHostScreen?.(held);
@@ -273,6 +282,9 @@ export function createButtonDispatcher({
     const offer = liveEncounter();
     if (!offer || captureActive) return;
     captureActive = true;
+    // Before the first frame and before any press can arrive: KEY on this screen
+    // is the throw, and the device has to already know not to cry on it.
+    syncScreenHold();
     capturePress = false;
     captureAbort = false;
 
@@ -307,6 +319,11 @@ export function createButtonDispatcher({
         logger?.log?.(`capture: ${zhName(offer.species)} ${result.outcome}${result.reason ? ` (${result.reason})` : ""}`);
       } finally {
         captureActive = false;
+        // In the `finally` for the same reason the animator resume is: every way
+        // out of the session -- caught, escaped, aborted, or a renderer that threw
+        // -- has to hand KEY back to the buddy, or the button stays silent on the
+        // panel until the next reconnect.
+        syncScreenHold();
         animator.resume();
       }
     }).catch((error) => {

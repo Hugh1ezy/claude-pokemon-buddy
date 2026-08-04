@@ -175,22 +175,22 @@ test("a catch plays the fanfare exactly once, and an abort plays nothing", async
   // Once, not once per frame: PHASE.CAUGHT loops at 20fps for its whole
   // duration, so a call placed inside that loop would fire ~2 times here and
   // dozens of times with the real phase lengths.
-  assert.deepEqual(heard,
-    [MUSIC.CAPTURE_BGM, MUSIC.CAPTURE_CAUGHT, MUSIC.CAPTURE_BGM_STOP]);
+  assert.deepEqual(heard, [MUSIC.CAPTURE_CAUGHT]);
 
   const bailed = harness({ target: start, aimOffsets: [FRAME_MS], abortAfter: 1 });
   const quiet = [];
   const out = await runCaptureSession({ ...bailed.io, playSound: (id) => quiet.push(id) });
 
   assert.equal(out.outcome, "aborted");
-  assert.deepEqual(quiet, [MUSIC.CAPTURE_BGM, MUSIC.CAPTURE_BGM_STOP],
-    "backing out of the screen is not a catch -- but the music still has to stop");
+  assert.deepEqual(quiet, [],
+    "backing out of the screen is not a catch, and there is no music to stop");
 });
 
-// The device loops the BGM on its own and cannot tell that the screen closed, so
-// every way out of the session has to send the stop. A missed one is not a subtle
-// bug: it is battle music playing over the clock face until the next reboot.
-test("the capture BGM starts once and is stopped on every exit", async () => {
+// Owner's call, 2026-08-04: the capture screen has no background music. Pinned on
+// every exit path rather than just the happy one, because the loop it replaced was
+// started before the first frame and stopped in a `finally` -- anything that
+// brought it back would come back the same way.
+test("the capture screen plays no music, on any exit", async () => {
   const start = sliderCentre({ params: PARAMS, phase: 0, target: 0 }, FRAME_MS);
 
   // Escaped: aim the capture throw into the miss zone (target parked at the far
@@ -199,11 +199,13 @@ test("the capture BGM starts once and is stopped on every exit", async () => {
   const escapedHeard = [];
   const escaped = await runCaptureSession({ ...fled.io, playSound: (id) => escapedHeard.push(id) });
   assert.ok(["escaped", "caught"].includes(escaped.outcome));
-  assert.equal(escapedHeard[0], MUSIC.CAPTURE_BGM, "the loop starts before the first frame");
-  assert.equal(escapedHeard.at(-1), MUSIC.CAPTURE_BGM_STOP, "and is the last thing sent");
+  assert.ok(
+    !escapedHeard.includes(MUSIC.CAPTURE_BGM) && !escapedHeard.includes(MUSIC.CAPTURE_BGM_STOP),
+    "no loop is started, so there is nothing to stop",
+  );
 
   // A renderer that throws is the case a plain "stop it at each return" would
-  // miss, which is why the stop is in a `finally` rather than at the exits.
+  // have missed. Nothing is owed on this path now, and nothing may be sent.
   const broken = harness({ target: start, aimOffsets: [FRAME_MS] });
   const afterThrow = [];
   await assert.rejects(
@@ -214,5 +216,5 @@ test("the capture BGM starts once and is stopped on every exit", async () => {
     }),
     /panel died mid-encounter/,
   );
-  assert.deepEqual(afterThrow, [MUSIC.CAPTURE_BGM, MUSIC.CAPTURE_BGM_STOP]);
+  assert.deepEqual(afterThrow, []);
 });
