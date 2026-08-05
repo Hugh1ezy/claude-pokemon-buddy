@@ -142,33 +142,34 @@ $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('<原来的 comm
 
 （其它字段走默认；名字默认"阿布"，主人以后可在 dashboard 改。）
 
-## 6. 开机自启
-
-先确保日志目录存在、拿到 node **绝对路径**（自启环境的 PATH 不可依赖）：
+## 6. 开机自启（计划任务，会自动拉起）
 
 ```powershell
-New-Item "$HOME\claude-pokemon-buddy\host\out" -ItemType Directory -Force
-(Get-Command node).Source   # 记下绝对路径，写进下面的 vbs
-```
-
-写 `$HOME\claude-pokemon-buddy\start-buddy.vbs`（`<用户名>` 与 `<node绝对路径>` 用上面查到的真实值替换）：
-
-```vbscript
-Set sh = CreateObject("WScript.Shell")
-sh.CurrentDirectory = "C:\Users\<用户名>\claude-pokemon-buddy\host"
-sh.Run "cmd /c """"<node绝对路径>"" src\index.js >> out\host-autostart.log 2>&1""", 0, False
-```
-
-复制进 Startup 文件夹并**实测一次**：
-
-```powershell
-Copy-Item "$HOME\claude-pokemon-buddy\start-buddy.vbs" "$([Environment]::GetFolderPath('Startup'))"
 Get-Process node -ErrorAction SilentlyContinue | Stop-Process   # 清掉手动起的实例
-wscript "$HOME\claude-pokemon-buddy\start-buddy.vbs"
-Start-Sleep 8; Get-Process node                                  # 预期：node 进程存在
+cd "$HOME\claude-pokemon-buddy\host"
+node scripts/autostart-windows.mjs install
+schtasks /Run /TN ClaudePokemonBuddyHost
+Start-Sleep 15; node scripts/autostart-windows.mjs status
 ```
 
-预期：`Get-Process node` 有输出，且**屏幕出现画面**（问主人确认）。
+预期：`state: Running`、`host process: running (pid …)`，且**屏幕出现画面**（问主人确认）。
+
+这个计划任务登录时启动 host，并且**每分钟检查一次**，没在跑就拉起来
+（`MultipleInstancesPolicy=IgnoreNew`，所以在跑的时候这个检查什么都不做）。
+一分钟这个数是有来由的：设备 120 秒收不到帧就会自己切到本地时钟面，一分钟内
+恢复意味着主人根本看不到这次故障。
+
+> ⚠ **2026-08-05 起不再用 Startup 文件夹里的 `start-buddy.vbs`。** 那个只在
+> 登录时跑一次，之后没有任何东西看着这个进程；host 死掉的唯一症状就是设备两分钟后
+> 切到时钟面，从主人那边看是「机器自己切到默认显示了，按 BOOT 也回不来」。这个答案
+> 一周之内对了四次。**升级老机器时要把 Startup 里那份删掉或改名**，否则登录瞬间
+> 两个 host 会抢同一个串口。
+>
+> `RestartOnFailure` 也写进任务里了，但**实测它不管用**：进程被杀之后任务变成
+> Ready、last result 0xFFFFFFFF，什么都没发生，一直等到下一次定时触发。真正干活的
+> 是每分钟那个触发器，别把它当成重复的东西删掉。
+
+卸载：`node scripts/autostart-windows.mjs uninstall`。
 
 ## 7. 端到端验证
 

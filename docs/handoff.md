@@ -34,6 +34,62 @@ look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
 answer this question either way; the device's serial output could, but the host
 holds COM7 while it runs.
 
+## ▶ 2026-08-05 — "it switched to the default display by itself" was the host being dead
+
+Reported as 机器又莫名其妙自己切换到默认显示了，而且按 boot 切不回来. **Nothing was
+wrong with the device.** There was no host running.
+
+`out/frame.png` was last written at **10:31:55**; from then until 13:33 no node
+process existed on this machine. The device raises its own clock face after 120s
+without a frame, which is the "default display". BOOT genuinely could not fix it:
+BOOT does leave local-clock mode, but with nothing feeding the panel the device
+falls straight back 120s later, so from the front the button looks dead.
+
+**Yesterday's instrumentation earned its keep by staying silent** — not one
+`panel:` line in the whole log, so the device was taking frames right up to the
+moment the host vanished. That ruled out the 08-04 stale-patch fault and the
+08-01 wedge in one look, without touching the device.
+
+**It was not a graceful exit.** `runHost`'s `finally` force-publishes the save
+when the device is attached at exit; the local save was found **ahead** of the
+remote (bond 7.2 vs 6.8), so that never ran. Killed or hard-crashed, not stopped.
+
+**Why it died is unknown, and it is recorded as unknown.** No reboot (last boot
+07-16), no sleep/wake events, no node crash in the Application log around 10:31,
+no Defender action in that window, and the last log lines are ordinary. Four
+places checked, nothing in any of them.
+
+### Two fixes, both on this machine, both verified
+
+**1. The host log has timestamps** (`src/log-timestamps.js`, installed from the
+CLI entry only — installing it at import time would rewrite every console
+assertion in the suite). Local time, matching every other clock in this project.
+This is the direct cost of not having it: 33,160 lines of log could not date the
+death, and `frame.png`'s mtime had to.
+
+**2. The host is supervised** (`scripts/autostart-windows.mjs install`), the
+Windows equivalent of what macOS has had from launchd's `KeepAlive`. A scheduled
+task starts it at logon and **re-checks every minute**, with
+`MultipleInstancesPolicy=IgnoreNew` so the check is free while it is up. One
+minute is load-bearing: it beats the device's 120s clock-face timeout, so a
+restart is invisible rather than a bug report.
+
+> **`RestartOnFailure` does not do what its name says, measured here.** Host
+> killed 13:43:00 → task went to Ready with `last result 0xFFFFFFFF` → **nothing
+> restarted it** until the repeating trigger fired at 13:45:01. It is left in the
+> XML as a second line but it is not the mechanism. Do not delete the repeating
+> trigger as a duplicate of it.
+
+Verified end to end, not assumed: killed the host, it came back **by itself
+within a minute** (13:47:01, pid 21116), log timestamped, save in sync, device
+attached. `SETUP-WINDOWS.md` §6 rewritten.
+
+**The Startup-folder `start-buddy.vbs` is now renamed to `.disabled`** on this
+machine (`%APPDATA%\...\Startup\`). It has to go, not just be ignored: at logon
+it and the task would race two hosts onto one serial port. The repo's own copy of
+the .vbs is untouched and still works as a manual start. **The work PC is done;
+the home PC still has the old Startup .vbs and no task.**
+
 ## ▶ 2026-08-04 afternoon — the panel goes stale in patches, and the host could not see it
 
 Owner: 联网显示左边显示不全, then 亲密度没了, then 右上角「9天」也显示不全. Three

@@ -35,6 +35,7 @@ import { PHASE, PHASE_MS, renderCaptureFrame } from "./render/capture-screen.js"
 import { DEX_PAGE_SIZE, dexPageCount, renderDexConfirm, renderDexPage } from "./render/dex-screen.js";
 import { SOUND } from "./transport/proto.js";
 import { loadRateLimits } from "./rate-limits.js";
+import { installLogTimestamps } from "./log-timestamps.js";
 import { pollUsageOnce } from "./usage-poll.mjs";
 import { loadUsageSnapshot, usageForDisplay } from "./usage.js";
 import { startWebServer } from "./web/server.js";
@@ -1467,6 +1468,8 @@ const isCli = process.argv[1] && existsSync(process.argv[1])
   : false;
 
 if (isCli) {
+  // CLI only -- see log-timestamps.js for why this must not happen on import.
+  installLogTimestamps();
   main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
