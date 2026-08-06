@@ -154,6 +154,12 @@ Start-Sleep 15; node scripts/autostart-windows.mjs status
 
 预期：`state: Running`、`host process: running (pid …)`，且**屏幕出现画面**（问主人确认）。
 
+**桌面上不应该出现任何窗口。** 任务跑的是 `wscript.exe scripts/run-host-hidden.vbs`，
+不是 cmd —— 2026-08-05 第一版直接用 cmd 当 action，结果桌面上常驻一个控制台窗口，
+主人当成垃圾关掉了，host 就跟着死了（退出码 0xC000013A 就是「控制台没了」），设备两分钟后
+掉到时钟面。`<Hidden>true</Hidden>` **不管窗口**，它只是在任务计划程序列表里隐藏这个任务。
+装完请让主人确认一眼桌面上没有多出来的窗口。
+
 这个计划任务登录时启动 host，并且**每分钟检查一次**，没在跑就拉起来
 （`MultipleInstancesPolicy=IgnoreNew`，所以在跑的时候这个检查什么都不做）。
 一分钟这个数是有来由的：设备 120 秒收不到帧就会自己切到本地时钟面，一分钟内

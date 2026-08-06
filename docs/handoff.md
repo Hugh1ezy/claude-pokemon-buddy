@@ -34,6 +34,58 @@ look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
 answer this question either way; the device's serial output could, but the host
 holds COM7 while it runs.
 
+## ▶ 2026-08-07 — the console window was mine, and closing it was the "stuck" device
+
+**The scheduled task installed on 08-05 put a visible cmd window on the owner's
+desktop and left it there.** He noticed it, took it for litter, closed it — and
+that killed the host. `0xC000013A` is `STATUS_CONTROL_C_EXIT`, i.e. exactly "the
+console went away"; the device then had no frames and raised its own clock face
+two minutes later, which is what got reported as 又卡住了.
+
+He volunteered the connection himself: 刚才机器卡住，发生在我把这个窗口关闭之后.
+Nothing in the host, the transport or the firmware was involved.
+
+**The mistake was reading `<Hidden>true</Hidden>` as "no window".** It is not: it
+hides the TASK in the Task Scheduler library. The window comes from the action
+being a console program (`cmd.exe`) under an `InteractiveToken` principal. The old
+Startup `.vbs` never had this problem because `WScript.Shell.Run` takes a window
+style and it passed 0.
+
+Fixed by making the action `wscript.exe scripts/run-host-hidden.vbs` — the same
+mechanism, kept deliberately. That script launches the identical `cmd /c … >>
+out\host-autostart.log 2>&1` with a hidden window **and blocks until it exits**,
+which is the part that is easy to leave out: a wrapper that launched and returned
+would drop the task straight back to Ready, and `MultipleInstancesPolicy=IgnoreNew`
+would stop protecting anything, so the every-minute trigger would start a second
+host onto the same serial port.
+
+> **S4U is the better fix and cannot be used here.** A principal of
+> `<LogonType>S4U</LogonType>` ("run whether the user is logged on or not") has no
+> session and therefore no window, with no wrapper at all — but registering it
+> needs elevation: `schtasks /Create` answered **Access is denied** from an
+> ordinary prompt, measured today. Use it if you ever have admin. VBScript is
+> deprecated on Windows 11 (this machine logs a `VBScriptDeprecationAlert`), so
+> when it finally goes, S4U is the replacement — not another wrapper.
+
+Verified after the change: task Running with the host up (which is itself the
+proof that the wrapper waits rather than returning), killed the host at 09:39 and
+it was back **by itself at 09:40:01**, pid 37148. **The owner still has to confirm
+the window is actually gone from his desktop** — that cannot be checked from a
+tool session, which is why it was never caught here in the first place.
+
+### What this does and does not explain
+
+- **08-07 ~09:12, explained.** The window was closed.
+- **08-05 10:31:55, still unexplained.** That host was started by the Startup
+  `.vbs` before the task existed, so it had no window to close. No reboot, no
+  sleep event, no crash record, no Defender action. Leave it open.
+- The **09:20:34 GPU error** the same morning (`nvlddmkm` 153 ×2, Bannerlord's
+  D3D device removed) is unrelated to any of this: nothing in this project touches
+  the GPU, the host renders 400x300 1-bit frames on the CPU via `@napi-rs/canvas`,
+  and it was idle between two frame writes at that moment. The only notable
+  system event near it is the resume from a 14-hour hibernation ten minutes
+  earlier, which is a **common** cause of device-removed and was **not** confirmed.
+
 ## ▶ 2026-08-05 — "it switched to the default display by itself" was the host being dead
 
 Reported as 机器又莫名其妙自己切换到默认显示了，而且按 boot 切不回来. **Nothing was

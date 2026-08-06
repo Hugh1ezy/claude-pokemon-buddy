@@ -40,20 +40,49 @@ const TASK_NAME = "ClaudePokemonBuddyHost";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const HOST_DIR = resolve(dirname(SCRIPT_PATH), "..");
 
-// Task Scheduler cannot redirect an action's output, so the action is cmd.exe
-// with the same append-redirect the .vbs used -- which also keeps the log file
-// continuous across this migration instead of starting a second one.
-export function buildActionCommand({ nodePath, hostDir }) {
+// The action is wscript.exe running run-host-hidden.vbs, NOT cmd.exe directly.
+// cmd.exe under an interactive logon puts a console window on the desktop and
+// leaves it there; see the .vbs for what that cost. The .vbs launches the same
+// cmd redirect with a hidden window and blocks until it exits, so the task stays
+// Running for the host's whole life and IgnoreNew keeps meaning something.
+//
+// Task Scheduler cannot redirect an action's output at all, which is why there
+// is a cmd in the chain anywhere: it carries the same append-redirect the old
+// Startup .vbs used, so the log file stays continuous across this change rather
+// than a second one appearing next to it.
+export function buildAction({ nodePath, hostDir }) {
   const dir = stripTrailingSlashes(normalize(hostDir));
-  const node = normalize(nodePath);
-  const log = join("out", "host-autostart.log");
-  // cmd's own quoting rule: with /c and a command that starts with a quote, the
-  // OUTER pair is stripped, so the whole thing needs wrapping again.
-  return `/c ""${node}" "${join("src", "index.js")}" >> "${log}" 2>&1"`;
+  return {
+    command: join(process.env.SystemRoot || "C:\\Windows", "System32", "wscript.exe"),
+    arguments: `"${join(dir, "scripts", "run-host-hidden.vbs")}" "${normalize(nodePath)}"`,
+    workingDirectory: dir,
+  };
 }
 
+// **The action must not be a console program.** The first version of this task
+// ran cmd.exe under an interactive logon, which parks a visible console window on
+// the owner's desktop and leaves it there. It sat there from 2026-08-05 to 08-07,
+// the owner reasonably took it for litter and closed it, and closing it killed
+// the host: exit 0xC000013A is STATUS_CONTROL_C_EXIT, i.e. exactly "the console
+// went away". The device fell to its clock face two minutes later and was
+// reported as stuck. A window that is visible is a window that gets closed.
+//
+// `<Hidden>` does NOT prevent it and never did: it hides the task in the Task
+// Scheduler library, not the window. Believing otherwise is what put the window
+// there. The old Startup .vbs never had this problem because WScript.Shell.Run
+// takes a window style, and run-host-hidden.vbs is that mechanism kept.
+//
+// The cleaner fix is an S4U principal ("run whether the user is logged on or
+// not"), which has no session and therefore no window at all. **It needs
+// elevation to register** -- `schtasks /Create` returns "Access is denied" from
+// an ordinary prompt, measured 2026-08-07 -- and this install has to work
+// without admin. Prefer it if you ever have the rights.
+//
+// Also note XML comments may not contain a double hyphen, which is why the
+// reasoning lives out here in JS rather than inside the document.
 export function buildTaskXml({ nodePath, hostDir, userId }) {
   const dir = stripTrailingSlashes(normalize(hostDir));
+  const action = buildAction({ nodePath, hostDir: dir });
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
@@ -77,6 +106,8 @@ export function buildTaskXml({ nodePath, hostDir, userId }) {
   <Principals>
     <Principal id="Author">
       <UserId>${escapeXml(userId)}</UserId>
+      <!-- S4U would need elevation to register; the hidden wrapper is what keeps
+           the window off the desktop instead. See the note above buildTaskXml. -->
       <LogonType>InteractiveToken</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
@@ -110,9 +141,9 @@ export function buildTaskXml({ nodePath, hostDir, userId }) {
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>${escapeXml(process.env.COMSPEC || "C:\\Windows\\System32\\cmd.exe")}</Command>
-      <Arguments>${escapeXml(buildActionCommand({ nodePath, hostDir: dir }))}</Arguments>
-      <WorkingDirectory>${escapeXml(dir)}</WorkingDirectory>
+      <Command>${escapeXml(action.command)}</Command>
+      <Arguments>${escapeXml(action.arguments)}</Arguments>
+      <WorkingDirectory>${escapeXml(action.workingDirectory)}</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

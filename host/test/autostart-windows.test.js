@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  buildActionCommand,
+  buildAction,
   buildTaskXml,
   isHostCommandLine,
   main,
@@ -11,21 +11,24 @@ import {
 const HOST_DIR = "C:\\Users\\zy948\\claude-pokemon-buddy\\host";
 const NODE = "C:\\Program Files\\nodejs\\node.exe";
 
-test("the action redirects to the same log the .vbs appended to", () => {
-  const args = buildActionCommand({ nodePath: NODE, hostDir: HOST_DIR });
-  // Continuity matters: a new log file would have split the history at exactly
-  // the point someone goes looking for what happened before the change.
-  assert.match(args, /out\\host-autostart\.log/);
-  assert.match(args, />> /);
-  assert.match(args, /2>&1/);
-  // cmd /c strips the outer quote pair when the command starts with one, so the
-  // whole command must be wrapped a second time or the quoted node path breaks.
-  assert.ok(args.startsWith('/c ""'), `expected the double wrap, got ${args}`);
+// The whole point of the wrapper. A console action under an interactive logon
+// leaves a window on the owner's desktop, and on 2026-08-07 closing that window
+// killed the host. If anyone points this action back at cmd.exe, the window
+// comes back with it.
+test("the action is the hidden wrapper, not a console program", () => {
+  const action = buildAction({ nodePath: NODE, hostDir: HOST_DIR });
+  assert.match(action.command, /wscript\.exe$/i);
+  assert.ok(!/cmd\.exe/i.test(action.command), "cmd.exe as the action is the visible-window bug");
+  assert.match(action.arguments, /run-host-hidden\.vbs/);
+  // The node path has a space in it on every normal Windows install.
+  assert.match(action.arguments, /"C:\\Program Files\\nodejs\\node\.exe"/);
+  assert.equal(action.workingDirectory, HOST_DIR);
 });
 
 test("a trailing separator on hostDir does not produce a doubled slash", () => {
-  const args = buildActionCommand({ nodePath: NODE, hostDir: `${HOST_DIR}\\` });
-  assert.ok(!args.includes("\\\\src"), args);
+  const action = buildAction({ nodePath: NODE, hostDir: `${HOST_DIR}\\` });
+  assert.ok(!action.arguments.includes("\\\\scripts"), action.arguments);
+  assert.equal(action.workingDirectory, HOST_DIR);
 });
 
 test("the task supervises in both of the two independent ways", () => {
@@ -48,6 +51,28 @@ test("the task supervises in both of the two independent ways", () => {
   assert.match(xml, /<ExecutionTimeLimit>PT0S<\/ExecutionTimeLimit>/);
   assert.match(xml, /<LogonTrigger>/);
   assert.match(xml, /<StopIfGoingOnBatteries>false<\/StopIfGoingOnBatteries>/);
+});
+
+// The owner ran with a console window on his desktop from 2026-08-05 to 08-07,
+// closed it -- reasonably, it looked like litter -- and that killed the host.
+// InteractiveToken is what put it there; `<Hidden>` is about the Task Scheduler
+// library and does nothing for windows. This is the assertion that stops anyone
+// "fixing" the principal back.
+test("the task runs with no interactive session, so there is no console window", () => {
+  const xml = buildTaskXml({ nodePath: NODE, hostDir: HOST_DIR, userId: "HUGHIE\\zy948" });
+  assert.match(xml, /<Command>[^<]*wscript\.exe<\/Command>/i);
+  assert.ok(!/<Command>[^<]*cmd\.exe<\/Command>/i.test(xml), "cmd.exe as the action is the visible-window bug");
+});
+
+// XML comments cannot contain a double hyphen, and this document is assembled by
+// hand from prose that is full of them. schtasks rejects the whole task with
+// "incorrect comment syntax" and no host starts at all -- which is how this was
+// found, by breaking it.
+test("the generated document is a legal XML comment-wise", () => {
+  const xml = buildTaskXml({ nodePath: NODE, hostDir: HOST_DIR, userId: "HUGHIE\\zy948" });
+  for (const [, body] of xml.matchAll(/<!--([\s\S]*?)-->/g)) {
+    assert.ok(!body.includes("--"), `XML comment contains a double hyphen: ${body.trim().slice(0, 60)}`);
+  }
 });
 
 test("XML special characters in a path cannot break the document", () => {
