@@ -84,6 +84,23 @@ Verified end to end, not assumed: killed the host, it came back **by itself
 within a minute** (13:47:01, pid 21116), log timestamped, save in sync, device
 attached. `SETUP-WINDOWS.md` §6 rewritten.
 
+> ⚠ **Corrected 2026-08-07: that verification does not cover sleep/resume, and
+> the task does NOT recover the host across one.** The machine hibernated
+> 08-06 19:13:44 and woke 08-07 09:10:41 (lid). The host exited shortly after,
+> at ~09:12, with `0xC000013A`. Checked twice, at 09:13:03 and 09:15:19: the task
+> sat at `Ready` with **`last run` still 08-06 19:13:01** while `next run`
+> advanced 09:14 → 09:16 every minute. The every-minute trigger did not fire once
+> in those two-plus minutes; the host only came back when `schtasks /Run` was
+> issued by hand at 09:15:5x.
+>
+> So supervision works for a plain kill (measured 08-05) and does **not** work
+> after a resume (measured 08-07). Why Windows does not catch the trigger up is
+> not established — do not write down a cause that has not been checked. The
+> repetition is registered with **no `<Duration>`**, which is the first thing to
+> suspect. Three things worth adding, none of which depend on knowing the answer:
+> a `SessionStateChangeTrigger` on unlock/console-connect (which is exactly the
+> lid-open that happened here), a `BootTrigger`, and an explicit `<Duration>`.
+
 **The Startup-folder `start-buddy.vbs` is now renamed to `.disabled`** on this
 machine (`%APPDATA%\...\Startup\`). It has to go, not just be ignored: at logon
 it and the task would race two hosts onto one serial port. The repo's own copy of
