@@ -34,6 +34,79 @@ look is `syncScreenHold()` in `host/src/index.js` and `g_host_screen` in
 answer this question either way; the device's serial output could, but the host
 holds COM7 while it runs.
 
+## ▶ 2026-08-11 — the usage feed, and a pace check that says do not touch the weights
+
+### `ccusage active block missing` was never an error, and it cost the day's exp
+
+Fifteen of these are in the log and every one is benign: it means nothing has been
+spent in the last five hours. `normalizeUsage` **threw** on it, which failed the
+whole snapshot and took the `daily` half down with it — and `daily` is what the
+day's exp is computed from. After any idle stretch the next tick fell back to a
+`lastKnownUsage` whose `todayPeriod` was yesterday's, so `creditedTokens` went to
+0 and the buddy earned nothing until a tick happened to land inside an active
+block. Seen live at 10:20 today: `todayCreditedExp: 0` with 3.5M tokens already
+spent. Only `activeTokens` depends on the block, and `null` is a value that field
+has always carried (`usageForDisplay`'s degraded shape uses it), so it degrades
+instead of throwing now.
+
+### npx was being re-resolved twice a minute, forever
+
+`npx --yes ccusage` resolves the package on **every** spawn, and the tick spawns
+two. A resolve that meets a network in transition does not fail, it hangs — all
+five 60s timeouts in the log sit next to a sleep or a wake. ccusage is a
+dependency now and the tick runs the installed copy with plain node:
+
+| | snapshot |
+|---|---|
+| via npx | 3.1 s |
+| installed copy, no shell | **0.75 s** |
+
+Dropping `shell: true` also removed the `DEP0190` warning that headed every host
+start — that is where it came from, and it was only there because npx on Windows
+is npx.cmd. **The npx path is kept as a fallback** for a checkout that has not run
+`npm install`: degrading to slow beats degrading to nothing.
+
+> **Both machines need `npm install` in `host/`.** This is the first dependency
+> the *tick* has gained (the 08-03 one was a devDependency for a script). Without
+> it the fallback keeps things working, just slowly.
+
+### Pace: 16 days, 图鉴 25, 捕捉 23 — on target, and the limiter is uptime
+
+Asked whether that is too slow or too fast. Measured rather than judged, and
+reported as counts only.
+
+`out/pace-check.mjs` (untracked) runs the real table through the real
+`stepEncounter` and reports **offers per day only** — written instead of
+`sim-encounters.mjs` because that one prints species and every tool result this
+session was visible to the owner. No weather is supplied, so weather-gated
+entries never fire and every figure is a **floor**:
+
+| uptime | offers/day |
+|---|---|
+| 900 ticks (17.5h) — what the tuning assumes | 6.4 |
+| 480 ticks (9.3h) — a good work day here | **3.5** |
+| 181 ticks (3.5h) — the last 7 days averaged | 1.4 |
+
+Against that, what the host log actually recorded over its three fully-logged
+days: **7 offers, 5 capture sessions, 4 new dex entries** — i.e. 2.3 offers a day,
+sitting between the 1.4 and 3.5 rows, and a **71% conversion** from offer to
+session. The engine is doing exactly what it is tuned to do.
+
+**The one figure below design is uptime.** The tuning assumes ~17.5h awake; this
+machine gives ~9.3h on a good day and gave **zero on 08-08 and 08-09** — the
+weekend does not appear in the log at all. 25 entries in 16 days extrapolates
+well inside the ~330-day completion curve the code aims at, so the early phase is
+at or ahead of target.
+
+> **No weight was changed and none should be.** `encounter.js` says it plainly
+> already: "Throughput is NOT what makes the pokedex slow; the tail is. Do not
+> reach for this knob first." If the dex wants to be faster, the lever is hours
+> running, not rarity.
+>
+> One honest gap: the code's comment claims ~8.5 offers/day at 900 ticks and this
+> simulation floors it at 6.4. The missing weather gating explains part of it; the
+> rest is unverified. Do not treat 8.5 as measured.
+
 ## ▶ 2026-08-07 — the console window was mine, and closing it was the "stuck" device
 
 **The scheduled task installed on 08-05 put a visible cmd window on the owner's

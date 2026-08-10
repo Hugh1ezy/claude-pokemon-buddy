@@ -2,7 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { loadUsageSnapshot, normalizeUsage, usageForDisplay, hostTimeZone, ccusageEnv, runCcusage } from "../src/usage.js";
+import {
+  ccusageCommand,
+  ccusageEnv,
+  hostTimeZone,
+  loadUsageSnapshot,
+  normalizeUsage,
+  resetCcusageCommand,
+  runCcusage,
+  usageForDisplay,
+} from "../src/usage.js";
 
 const blocksJson = readFileSync(
   new URL("./fixtures/ccusage-blocks.json", import.meta.url),
@@ -30,6 +39,70 @@ test("normalizeUsage outputs cost/token and leaves percent null (rate-limits own
   assert.equal(u.todayTokens, lastDaily.totalTokens);
   assert.equal(u.todayCost, lastDaily.totalCost);
   assert.equal(u.weekTokens, weekTokens);
+});
+
+// npx re-resolves the package on every spawn, twice a tick, forever. A resolve
+// that meets a network in transition does not fail, it hangs -- five 60s timeouts
+// in the host log, each next to a sleep or a wake. Running the installed copy
+// directly took a snapshot from 3.1s to 0.75s, measured 2026-08-11.
+test("the installed ccusage is run directly, with no npx and no shell", () => {
+  resetCcusageCommand();
+  try {
+    const resolve = (id) => `C:\\proj\\host\\node_modules\\ccusage\\package.json`;
+    const requireImpl = Object.assign((id) => ({ bin: { ccusage: "./src/cli.js" } }), { resolve });
+    const cmd = ccusageCommand({ require: requireImpl });
+
+    assert.equal(cmd.command, process.execPath, "node runs the bin script itself");
+    assert.match(cmd.prefix[0], /ccusage[\\/]src[\\/]cli\.js$/);
+    assert.equal(cmd.shell, false, "shell:true is what produced DEP0190 on every start");
+  } finally {
+    resetCcusageCommand();
+  }
+});
+
+test("a checkout that has not run npm install still falls back to npx", () => {
+  resetCcusageCommand();
+  try {
+    const requireImpl = Object.assign(() => { throw new Error("not installed"); }, {
+      resolve: () => { throw new Error("Cannot find module 'ccusage/package.json'"); },
+    });
+    const cmd = ccusageCommand({ require: requireImpl });
+
+    assert.equal(cmd.command, "npx");
+    assert.deepEqual(cmd.prefix, ["--yes", "ccusage"]);
+    // Degrading to slow beats degrading to nothing: no usage feed costs the WEEK
+    // row and the whole day's growth.
+  } finally {
+    resetCcusageCommand();
+  }
+});
+
+// No active block means "nothing spent in the last five hours". It is the normal
+// state of an idle machine and it used to throw, which failed the WHOLE snapshot
+// and took `daily` down with it -- and `daily` is what the day's exp is computed
+// from. After any idle stretch the next tick fell back to a lastKnownUsage whose
+// todayPeriod was yesterday's, so the day credited 0 tokens and the buddy earned
+// nothing until a tick happened to land inside an active block. Fifteen of these
+// are in the host log and every one was benign.
+test("no active block degrades activeTokens only, and keeps the day's figures", () => {
+  const noActive = JSON.stringify({
+    blocks: JSON.parse(blocksJson).blocks.map((block) => ({ ...block, isActive: false })),
+  });
+  const lastDaily = dailyFixture.daily.at(-1);
+
+  const u = normalizeUsage({ blocksJson: noActive, dailyJson, today: fixtureToday });
+
+  assert.equal(u.activeTokens, null, "the only field that depends on the block");
+  assert.equal(u.todayTokens, lastDaily.totalTokens, "the day's tokens must survive -- exp is computed from these");
+  assert.equal(u.todayPeriod, fixtureToday);
+  assert.ok(u.activeDays.length > 0, "the streak's evidence must survive too");
+});
+
+test("an empty daily history still throws -- there is nothing to fall back to", () => {
+  assert.throws(
+    () => normalizeUsage({ blocksJson, dailyJson: JSON.stringify({ daily: [] }), today: fixtureToday }),
+    /daily history missing/,
+  );
 });
 
 test("normalizeUsage surfaces activeDays (periods with usage)", () => {
@@ -133,9 +206,13 @@ test("loadUsageSnapshot forwards timeZone to both ccusage runs", async () => {
 
   assert.equal(calls.length, 2);
   assert.ok(calls[0].args.includes("blocks"));
-  assert.deepEqual(calls[0].opts, { timeZone: "Pacific/Auckland" });
+  // `shell` rides along now: it is false for the installed copy and true only on
+  // the Windows npx fallback, decided once in ccusageCommand() rather than
+  // hardcoded inside runCcusage.
+  assert.equal(calls[0].opts.timeZone, "Pacific/Auckland");
+  assert.equal(typeof calls[0].opts.shell, "boolean");
   assert.ok(calls[1].args.includes("daily"));
-  assert.deepEqual(calls[1].opts, { timeZone: "Pacific/Auckland" });
+  assert.equal(calls[1].opts.timeZone, "Pacific/Auckland");
 });
 
 test("loadUsageSnapshot defaults timeZone to the host IANA zone", async () => {

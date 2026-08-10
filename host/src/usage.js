@@ -1,16 +1,53 @@
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import path from "node:path";
+
+// ccusage is a dependency now, and the tick runs the installed copy directly
+// rather than going through npx. npx re-resolves the package on EVERY spawn,
+// which is twice a tick, i.e. roughly twice a minute forever -- and a resolve
+// that meets a network in transition does not fail, it hangs. Five 60s timeouts
+// are in the log and every one of them sits next to a sleep or a wake.
+//
+// Running node against the package's own bin also drops `shell: true`, which
+// was only ever there because npx on Windows is npx.cmd and CreateProcess will
+// not run a .cmd without a shell. That is where the DEP0190 warning at the top
+// of every host log came from.
+//
+// The npx path stays as a fallback for a checkout that has not run
+// `npm install` yet: a missing usage feed costs the WEEK row and the day's
+// growth, so degrading to slow is better than degrading to nothing.
+let cachedCommand;
+export function ccusageCommand({ require: requireImpl = createRequire(import.meta.url) } = {}) {
+  if (cachedCommand !== undefined) return cachedCommand;
+  try {
+    const pkgPath = requireImpl.resolve("ccusage/package.json");
+    const bin = requireImpl("ccusage/package.json").bin;
+    const rel = typeof bin === "string" ? bin : bin?.ccusage;
+    if (!rel) throw new Error("ccusage package.json has no bin");
+    cachedCommand = { command: process.execPath, prefix: [path.resolve(path.dirname(pkgPath), rel)], shell: false };
+  } catch {
+    cachedCommand = { command: "npx", prefix: ["--yes", "ccusage"], shell: process.platform === "win32" };
+  }
+  return cachedCommand;
+}
+
+// Test seam: the module-level cache would otherwise leak one test's stub into
+// the next, and into whatever ran before it.
+export function resetCcusageCommand() {
+  cachedCommand = undefined;
+}
 
 export async function loadUsageSnapshot({ run = runCcusage, today = localYmd(new Date()), timeZone = hostTimeZone() } = {}) {
   try {
-    // --yes skips npx's first-run "Ok to proceed?" prompt. With stdin ignored
-    // that prompt hangs forever and wedges the whole tick loop.
+    // --yes (npx path only) skips npx's first-run "Ok to proceed?" prompt. With
+    // stdin ignored that prompt hangs forever and wedges the whole tick loop.
     // timeZone pins ccusage's daily/blocks bucketing to the host's local calendar
     // (ccusage buckets by UTC by default), so daily.period aligns with the local
     // `today` from localYmd — otherwise non-UTC users mis-credit today's tokens and
     // mis-judge activeDays across the day boundary (see AR8/PRE-1).
-    const blocksJson = await run("npx", ["--yes", "ccusage", "blocks", "--json"], { timeZone });
-    const dailyJson = await run("npx", ["--yes", "ccusage", "daily", "--json"], { timeZone });
+    const { command, prefix, shell } = ccusageCommand();
+    const blocksJson = await run(command, [...prefix, "blocks", "--json"], { timeZone, shell });
+    const dailyJson = await run(command, [...prefix, "daily", "--json"], { timeZone, shell });
     return {
       ok: true,
       ...normalizeUsage({ blocksJson, dailyJson, today }),
@@ -60,11 +97,20 @@ export function normalizeUsage({ blocksJson, dailyJson, today = localYmd(new Dat
   const dailyRoot = JSON.parse(dailyJson);
   const blocks = arrayField(blocksRoot.blocks, "ccusage blocks schema drift");
   const daily = arrayField(dailyRoot.daily, "ccusage daily schema drift");
+  // No active block is NORMAL: it means nothing has been spent in the last five
+  // hours. It used to throw, which failed the whole snapshot and threw away the
+  // `daily` half with it -- and `daily` is what drives the day's exp. The cost of
+  // that was real and invisible: after any idle stretch the next tick fell back
+  // to lastKnownUsage, whose todayPeriod is yesterday's, so creditedTokens went
+  // to 0 and the buddy earned nothing until a tick happened to land inside an
+  // active block. Fifteen of these are in the log, every one of them benign.
+  //
+  // Only `activeTokens` depends on it, and null is already a value that field
+  // carries -- usageForDisplay's degraded shape has used null for it all along.
   const active = blocks.find((block) => block?.isActive === true);
-  if (!active) throw new Error("ccusage active block missing");
   if (daily.length === 0) throw new Error("ccusage daily history missing");
 
-  const activeTokens = numberField(active.totalTokens, "block.totalTokens");
+  const activeTokens = active ? numberField(active.totalTokens, "block.totalTokens") : null;
   const weekTokens = daily
     .slice(-7)
     .reduce((sum, day) => sum + numberField(day.totalTokens, "daily.totalTokens"), 0);
@@ -96,15 +142,18 @@ export function normalizeUsage({ blocksJson, dailyJson, today = localYmd(new Dat
   };
 }
 
-export function runCcusage(command, args, { timeoutMs = 60_000, timeZone, spawnImpl = spawn } = {}) {
+export function runCcusage(command, args, { timeoutMs = 60_000, timeZone, spawnImpl = spawn, shell = false } = {}) {
   return new Promise((resolve, reject) => {
+    // `shell` comes from ccusageCommand() and is true only on the npx fallback:
     // Windows can't exec npx directly — it's npx.cmd, and CreateProcess only runs
     // .cmd/.bat files through a shell (spawn() without shell:true throws ENOENT).
-    // args here are fixed literals (no user input), so shell interpolation is safe.
+    // args there are fixed literals (no user input), so shell interpolation is safe.
+    // The installed-package path is a plain node invocation and needs no shell,
+    // which is also what silences DEP0190 on every host start.
     const child = spawnImpl(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: ccusageEnv(timeZone),
-      shell: process.platform === "win32",
+      shell,
     });
     let stdout = "";
     let stderr = "";
