@@ -11,6 +11,7 @@ import {
 import { dirname } from "node:path";
 import { SLOTS_PER_DAY } from "./pet/bond.js";
 import { normalizeDex } from "./pet/dex.js";
+import { normalizeCareDays } from "./pet/settlement.js";
 import { isDexSpecies } from "./pet/species-meta.js";
 import { MAX_LEVEL_EXP, PARAMS, expToNextLevel } from "./pet/sim.js";
 
@@ -123,6 +124,10 @@ function salvageState(state) {
   copyString(out, state, "characteristic");
   copyStone(out, state, "stone");
   if (Array.isArray(state.pendingCandidates)) out.pendingCandidates = state.pendingCandidates;
+  // Salvaged for the same reason the dex is: a care day cannot be re-earned
+  // once it is past, and losing the record hands the next settlement a missed
+  // day it can decay a streak for.
+  copyCareDays(out, state);
   copyDex(out, state);
   copyEncounter(out, state);
   return out;
@@ -170,6 +175,11 @@ function epochMs(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+function copyCareDays(out, state) {
+  const days = normalizeCareDays(state?.careDays);
+  if (days.length > 0) out.careDays = days;
+}
+
 // The dex is the one part of the save that cannot be re-earned: a lost level
 // comes back in a day, a lost pokedex is months of encounters. So it is
 // salvaged too rather than left to the whitelist's default of "unknown key,
@@ -205,6 +215,14 @@ function normalizePet(state) {
   normalizeNumber(out, "bondUnpaid");
   normalizeNumber(out, "bondSlots");
   clampExpToLevel(out);
+  // "Only if present", like the dex and the encounter below: a save from before
+  // care days existed must round-trip byte-identical, or every load/save would
+  // hand save-sync a change to publish.
+  if ("careDays" in out) {
+    const days = normalizeCareDays(out.careDays);
+    if (days.length > 0) out.careDays = days;
+    else delete out.careDays;
+  }
   // Only when the save already carries a dex. A save from before the pokedex
   // existed stays byte-identical through a load/save round trip, which is what
   // keeps the other machine's copy from churning in save-sync for no reason.

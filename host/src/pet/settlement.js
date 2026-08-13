@@ -44,6 +44,68 @@ export function activeDaysFromUsage(usage) {
   return new Set(usage.activeDays);
 }
 
+// How many days of care history the save carries. Comfortably past
+// maxCatchupDays (30), so a settlement can never look further back than the
+// record goes; the file cost is a few hundred bytes.
+export const MAX_CARE_DAYS = 45;
+
+// The days the owner was demonstrably WITH the buddy, written into the save.
+//
+// ccusage answers a different question from the one the streak asks. It knows
+// what was spent on THIS machine and nothing else, so two whole classes of day
+// were being settled as missed: a day worked on the other PC (invisible here),
+// and a day spent pressing KEY without opening Claude at all (invisible
+// everywhere). Both are days the owner turned up, which is the only thing 「N天」
+// claims to count. Measured cost of not having this: 2026-08-13 had 15 KEY
+// presses and zero tokens on this machine, and the next morning's settlement
+// zeroed a 17-day streak.
+//
+// It lives in the save rather than in a machine-local file on purpose: it then
+// travels with the device, save-sync unions it the way it unions the dex, and a
+// fresh machine with no usage history inherits the record instead of punishing
+// the days it cannot see.
+export function careDaySet(pet) {
+  return new Set(normalizeCareDays(pet?.careDays));
+}
+
+export function normalizeCareDays(value, { maxDays = MAX_CARE_DAYS } = {}) {
+  if (!Array.isArray(value)) return [];
+  const days = [...new Set(value.filter(isYmd))].sort();
+  return days.slice(-maxDays);
+}
+
+// Has today earned anything yet? A paid 亲密度 slot answers yes on its own --
+// that is a button press on the device, the most direct evidence there is. The
+// token clause is the same test buildUsedDays already applied to lastGrowthDay,
+// kept so a day spent working and not petting still counts.
+export function isCareDay(pet, today) {
+  if (!pet || !isYmd(today)) return false;
+  if (
+    pet.bondDay === today &&
+    ((pet.bondHalves ?? 0) > 0 || (pet.bondUnpaid ?? 0) > 0 || (pet.bondSlots ?? 0) > 0)
+  ) {
+    return true;
+  }
+  return (
+    pet.lastGrowthDay === today &&
+    ((pet.todayCreditedExp ?? 0) > 0 || (pet.todayCreditedBond ?? 0) > 0)
+  );
+}
+
+// Called once a tick. Returns the pet unchanged -- same object -- when there is
+// nothing to add, so a save that has never earned a care day round-trips
+// byte-identical and save-sync has nothing to churn on.
+export function recordCareDay(pet, today, { maxDays = MAX_CARE_DAYS } = {}) {
+  if (!isCareDay(pet, today)) return pet;
+  const days = normalizeCareDays(pet.careDays, { maxDays });
+  if (days.includes(today)) return pet;
+  return { ...pet, careDays: normalizeCareDays([...days, today], { maxDays }) };
+}
+
+function isYmd(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 export function buildUsedDays(pet, today, usage, { maxCatchupDays = 30 } = {}) {
   const window = settlementWindow(pet.lastSettled, today, maxCatchupDays);
   const used = new Set();
@@ -62,8 +124,15 @@ export function buildUsedDays(pet, today, usage, { maxCatchupDays = 30 } = {}) {
     if (knownFrom === null || day < knownFrom) knownFrom = day;
   }
 
+  // The save's own record stands beside ccusage, never against it: a day either
+  // side calls active is active. Neither source can prove a day was missed --
+  // ccusage only sees this machine, and the care record only sees days a host
+  // was running -- so the union is the only reading that does not invent
+  // absence out of a blind spot.
+  const cared = careDaySet(pet);
+
   for (const day of window) {
-    if (active.has(day) || (knownFrom !== null && day < knownFrom)) used.add(day);
+    if (active.has(day) || cared.has(day) || (knownFrom !== null && day < knownFrom)) used.add(day);
   }
 
   // The in-progress last growth day, if it already earned, counts as used.

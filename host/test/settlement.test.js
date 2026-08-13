@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settleDays, settlementWindow, activeDaysFromUsage, buildUsedDays } from "../src/pet/settlement.js";
+import {
+  settleDays,
+  settlementWindow,
+  activeDaysFromUsage,
+  buildUsedDays,
+  careDaySet,
+  isCareDay,
+  normalizeCareDays,
+  recordCareDay,
+  MAX_CARE_DAYS,
+} from "../src/pet/settlement.js";
 
 test("settles each missed day once and rerun for same today is idempotent", () => {
   const pet = { bond: 100, lastSettled: "2026-05-25", streak: 5, shield: 1 };
@@ -189,4 +199,83 @@ test("buildUsedDays counts the in-progress last growth day when it earned", () =
   };
   const used = buildUsedDays(pet, "2026-05-31", { ok: false });
   assert.equal(used.has("2026-05-30"), true);
+});
+
+// --- care days -------------------------------------------------------------
+// The regression these pin is 2026-08-13: a day with 15 KEY presses and no
+// tokens on this machine, settled as missed, which zeroed a 17-day streak.
+
+test("a day the buddy was petted survives a settlement that ccusage calls empty", () => {
+  const pet = {
+    bond: 100,
+    streak: 17,
+    shield: 0,
+    lastSettled: "2026-08-12",
+    careDays: ["2026-08-13"],
+  };
+  const usage = { ok: true, activeDays: ["2026-08-11", "2026-08-14"] };
+
+  const out = settleDays(pet, "2026-08-14", { usedDays: buildUsedDays(pet, "2026-08-14", usage) });
+
+  assert.equal(out.streak, 18);
+  assert.equal(out.bond, 100);
+});
+
+test("a day with no care record and no usage still decays", () => {
+  const pet = { bond: 100, streak: 17, shield: 0, lastSettled: "2026-08-12", careDays: ["2026-08-11"] };
+  const usage = { ok: true, activeDays: ["2026-08-11", "2026-08-14"] };
+
+  const out = settleDays(pet, "2026-08-14", { usedDays: buildUsedDays(pet, "2026-08-14", usage) });
+
+  assert.equal(out.streak, 0);
+  assert.equal(out.bond, 97);
+});
+
+test("isCareDay accepts a paid bond slot, today's token credit, and nothing else", () => {
+  assert.equal(isCareDay({ bondDay: "2026-08-13", bondHalves: 1 }, "2026-08-13"), true);
+  assert.equal(isCareDay({ bondDay: "2026-08-13", bondUnpaid: 2 }, "2026-08-13"), true);
+  assert.equal(isCareDay({ bondDay: "2026-08-13", bondSlots: 16 }, "2026-08-13"), true);
+  assert.equal(isCareDay({ lastGrowthDay: "2026-08-13", todayCreditedExp: 40 }, "2026-08-13"), true);
+  assert.equal(isCareDay({ lastGrowthDay: "2026-08-13", todayCreditedBond: 4 }, "2026-08-13"), true);
+  // Yesterday's counters say nothing about today.
+  assert.equal(isCareDay({ bondDay: "2026-08-12", bondHalves: 4 }, "2026-08-13"), false);
+  assert.equal(isCareDay({ bondDay: "2026-08-13", bondHalves: 0 }, "2026-08-13"), false);
+  assert.equal(isCareDay({}, "2026-08-13"), false);
+  assert.equal(isCareDay({ bondDay: "nonsense", bondHalves: 4 }, "nonsense"), false);
+});
+
+test("recordCareDay returns the same object when there is nothing to add", () => {
+  const idle = { bondDay: "2026-08-13", bondHalves: 0 };
+  assert.equal(recordCareDay(idle, "2026-08-13"), idle);
+
+  const already = { bondDay: "2026-08-13", bondHalves: 2, careDays: ["2026-08-13"] };
+  assert.equal(recordCareDay(already, "2026-08-13"), already);
+});
+
+test("recordCareDay appends today and keeps the list sorted, unique and bounded", () => {
+  const out = recordCareDay(
+    { bondDay: "2026-08-13", bondHalves: 2, careDays: ["2026-08-12", "2026-08-12"] },
+    "2026-08-13",
+  );
+  assert.deepEqual(out.careDays, ["2026-08-12", "2026-08-13"]);
+
+  const long = Array.from({ length: MAX_CARE_DAYS + 10 }, (_, i) => {
+    const day = new Date(Date.UTC(2026, 0, 1) + i * 86_400_000);
+    return day.toISOString().slice(0, 10);
+  });
+  const trimmed = recordCareDay(
+    { bondDay: "2026-08-13", bondHalves: 2, careDays: long },
+    "2026-08-13",
+  );
+  assert.equal(trimmed.careDays.length, MAX_CARE_DAYS);
+  assert.equal(trimmed.careDays.at(-1), "2026-08-13");
+});
+
+test("normalizeCareDays drops anything that is not a plain YYYY-MM-DD", () => {
+  assert.deepEqual(normalizeCareDays(["2026-08-13", 7, null, "yesterday", "2026-8-1"]), [
+    "2026-08-13",
+  ]);
+  assert.deepEqual(normalizeCareDays("2026-08-13"), []);
+  assert.deepEqual(normalizeCareDays(undefined), []);
+  assert.deepEqual([...careDaySet({ careDays: ["2026-08-13", "2026-08-13"] })], ["2026-08-13"]);
 });

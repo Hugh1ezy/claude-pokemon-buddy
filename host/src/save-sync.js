@@ -29,6 +29,7 @@
 import { execFile } from "node:child_process";
 import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
+import { normalizeCareDays } from "./pet/settlement.js";
 
 export const DEFAULT_BRANCH = "cpb-save";
 export const DEFAULT_PUSH_INTERVAL_MS = 5 * 60_000;
@@ -187,7 +188,17 @@ export function createSaveSync({
     const counts = [remote.capturedCount, local.capturedCount].filter((n) => Number.isFinite(n));
     if (counts.length) merged.capturedCount = Math.max(...counts);
 
-    if (kept === 0 && merged.capturedCount === remote.capturedCount) {
+    // Care days are monotone in exactly the way the dex is -- a day the owner
+    // turned up stays turned up -- so the union is exact rather than a guess.
+    // This is the half of the streak fix that crosses machines: a day spent on
+    // the OTHER PC arrives here as a recorded day instead of a hole that the
+    // next settlement decays a streak for.
+    const remoteCare = normalizeCareDays(remote.careDays);
+    const localCare = normalizeCareDays(local.careDays);
+    const extraCare = localCare.filter((day) => !remoteCare.includes(day));
+    if (extraCare.length) merged.careDays = normalizeCareDays([...remoteCare, ...extraCare]);
+
+    if (kept === 0 && extraCare.length === 0 && merged.capturedCount === remote.capturedCount) {
       return { text: remoteText, kept: 0 };
     }
     // Compact and newline-free, matching saveState() in state.js -- a pull that

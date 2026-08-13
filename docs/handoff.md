@@ -1,7 +1,69 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-08-04
-10:5x (WORK PC, arrival sync done)**.
+Rolling note between the home PC and the work PC. Last updated **2026-08-14
+11:2x (WORK PC, streak fix + save repair)**.
+
+## ▶ 2026-08-14 — 「0天」: the streak was counting tokens, not days together
+
+Reported as 怎么变成0天了. **The settlement did exactly what it was written to do,
+and what it was written to do was wrong.** A day counted as active only if
+ccusage reported tokens spent on it — and ccusage knows about **this machine
+only**. Two whole classes of day were therefore settled as missed:
+
+- a day worked on the **other PC** — invisible here;
+- a day spent **pressing KEY and not opening Claude at all** — invisible
+  everywhere, and it is the one that hurt.
+
+Measured, from `save/main`'s reflog and this machine's host log:
+
+| day | KEY presses (log) | tokens (ccusage) | settled as |
+|---|---|---|---|
+| 08-11 | 20 | yes | active → streak 17 |
+| 08-12 | 11 | **none** | missed → ate the shield (1 → 0) |
+| 08-13 | 15 | **none** | missed → **streak 17 → 0**, bond 36.8 → 33.8 |
+
+So the counter the owner reads as 「N天」 — days together — was reporting a
+consecutive-token-spend streak, and 15 button presses on 08-13 bought nothing.
+
+### The fix: the save carries its own record of the days it was cared for
+
+`careDays` in the save, appended once a tick by `recordCareDay()` when the day
+has already earned something — a paid 亲密度 slot (i.e. a real press on the
+device) or the day's token credit. `buildUsedDays` then **unions** it with
+ccusage rather than choosing between them: neither source can prove a day was
+missed (ccusage sees one machine, the record sees only days a host was running),
+so a union is the only reading that does not invent absence out of a blind spot.
+
+It lives in the save and not in a machine-local file on purpose — it travels
+with the device, and `save-sync`'s `mergeCollection` unions it exactly like the
+dex, which is monotone in the same way. That is the half that fixes the
+cross-machine case: a day earned at home arrives here as a recorded day instead
+of a hole.
+
+`SCHEMA_VERSION` stays **1** — purely additive, and `state.js` only writes
+`careDays` when it is non-empty, so a save that has never earned one round-trips
+byte-identical and save-sync has nothing to churn on.
+
+Suite: **722 tests, 711 pass, 11 fail**, and the 11 are the standing Windows set
+(launchd/plist ×6, the two `.inc` no-drift tests that want python, RM12, the
+statusline fan-out pair) — unchanged from before the edit.
+
+### The save was repaired, and here is the arithmetic
+
+Both settlements were replayed under the corrected rule: 08-12 active → 18
+(shield kept), 08-13 active → 19, no bond decay. Written with the host stopped,
+previous copy at `host/out/state.json.prerepair-2026-08-14`:
+
+    streak 0 -> 19    shield 0 -> 1    bond 38.99 -> 41.99
+    careDays backfilled from the log's KEY-press days (08-05..08-14)
+
+Verified after the restart (pid 27996, 11:17:13): the state on disk still reads
+19 after a live tick, `out/frame.png` shows 「19天」, and `save-sync-cli status`
+reports both copies identical at streak 19.
+
+> **Only 08-13 onward could still have changed anything** — `lastSettled` is
+> 2026-08-13, so the older backfilled days are history, not leverage. They are
+> in the file because they are true, not because they do work.
 
 ## ▶ What the WORK PC did on arrival — ✅ 2026-08-04 10:53
 

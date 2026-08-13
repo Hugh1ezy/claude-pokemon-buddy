@@ -24,6 +24,24 @@ test("saveState/loadState roundtrip adds schemaVersion and leaves no tmp file", 
   assert.equal(existsSync(dir), true);
 });
 
+test("care days survive a roundtrip, a salvage, and stay absent when never earned", (t) => {
+  const { file } = tempState(t);
+
+  saveState(file, { level: 3, careDays: ["2026-08-13", "2026-08-12", "2026-08-12", "nope"] });
+  const loaded = loadState(file);
+  assert.deepEqual(loaded.careDays, ["2026-08-12", "2026-08-13"]);
+
+  // A save from before care days existed must round-trip unchanged, or every
+  // load/save would hand save-sync a difference to publish.
+  saveState(file, { level: 3 });
+  assert.equal("careDays" in loadState(file), false);
+
+  // Salvage: a day the owner turned up cannot be re-earned once it is past.
+  writeFileSync(file, JSON.stringify({ schemaVersion: 99, level: 3, careDays: ["2026-08-13"] }));
+  rmSync(`${file}.bak`, { force: true });
+  assert.deepEqual(loadState(file, { logger: null }).careDays, ["2026-08-13"]);
+});
+
 test("saveState creates backup and corrupt main falls back to previous backup", (t) => {
   const { file } = tempState(t);
 

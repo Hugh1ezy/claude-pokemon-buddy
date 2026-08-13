@@ -310,6 +310,25 @@ test("pull takes the remote's lineage but keeps 图鉴/捕捉 only this machine 
   assert.deepEqual(JSON.parse(readFileSync(`${statePath}.presync`, "utf8")), local);
 });
 
+test("pull unions the care days, so a day earned on this machine is not lost to the other one", async (t) => {
+  // The whole point of carrying care days in the SAVE: whichever machine the
+  // owner was on, tomorrow's settlement sees the day and does not decay a
+  // streak for it.
+  const local = { ...STALE, careDays: ["2026-08-12", "2026-08-13"] };
+  const { statePath } = tempSave(t, local);
+  const git = fakeGit({
+    blob: JSON.stringify({ ...COLLECTED, careDays: ["2026-08-11", "2026-08-12"] }),
+    tip: "aaa111",
+  });
+
+  const result = await createSaveSync({ statePath, runGit: git.run, logger: null }).pull();
+
+  assert.equal(result.status, "pulled");
+  const after = JSON.parse(readFileSync(statePath, "utf8"));
+  assert.deepEqual(after.careDays, ["2026-08-11", "2026-08-12", "2026-08-13"]);
+  assert.equal(after.level, 11, "the lineage still comes wholesale from the device's holder");
+});
+
 test("a pull with nothing local-only installs the remote save byte for byte", async (t) => {
   const { statePath } = tempSave(t, STALE);
   const git = fakeGit({ blob: JSON.stringify(COLLECTED), tip: "aaa111" });

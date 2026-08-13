@@ -15,7 +15,7 @@ import { loadEncounterTable } from "./pet/encounter-table.js";
 import { SPECIES_DEX, isDexSpecies, zhName } from "./pet/species-meta.js";
 import { isFrozenSpecies, pinFrozenGrowth, rosterEntries, swapActiveBuddy } from "./pet/roster.js";
 import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
-import { buildUsedDays, settleDays } from "./pet/settlement.js";
+import { buildUsedDays, recordCareDay, settleDays } from "./pet/settlement.js";
 import { applyPetTransitions, drainEvolutionIntents, ensurePet, evolutionContext } from "./pet/transitions.js";
 import { runOnboarding, runTutorial } from "./pet/onboarding.js";
 import { createBuddyAnimator } from "./render/buddy-animator.js";
@@ -569,6 +569,12 @@ export async function runOneTick({
   // lands -- otherwise the engine would see the offer still standing and the
   // notification would blink for a pokemon already in the box.
   pet = applyCaptureResults(pet, captureResults, logger, today);
+
+  // Write today down as a day the owner turned up, while the evidence is still
+  // in front of us. Tomorrow's settlement reads this and not just ccusage --
+  // see recordCareDay. After the captures and the bond on purpose: everything
+  // that can earn the day has now had its turn.
+  pet = recordCareDay(pet, today);
 
   // Held still while a capture is on screen. The screen has no time limit any
   // more (the owner's call: offerMs governs the NOTIFICATION, not the aiming),
