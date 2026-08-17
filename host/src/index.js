@@ -15,7 +15,13 @@ import { loadEncounterTable } from "./pet/encounter-table.js";
 import { SPECIES_DEX, isDexSpecies, zhName } from "./pet/species-meta.js";
 import { isFrozenSpecies, pinFrozenGrowth, rosterEntries, swapActiveBuddy } from "./pet/roster.js";
 import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
-import { buildUsedDays, recordCareDay, settleDays } from "./pet/settlement.js";
+import {
+  buildUsedDays,
+  daysTogether,
+  recordCareDay,
+  recordTogetherSince,
+  settleDays,
+} from "./pet/settlement.js";
 import { applyPetTransitions, drainEvolutionIntents, ensurePet, evolutionContext } from "./pet/transitions.js";
 import { runOnboarding, runTutorial } from "./pet/onboarding.js";
 import { createBuddyAnimator } from "./render/buddy-animator.js";
@@ -575,6 +581,10 @@ export async function runOneTick({
   // see recordCareDay. After the captures and the bond on purpose: everything
   // that can earn the day has now had its turn.
   pet = recordCareDay(pet, today);
+  // The 「N天」 anchor, pinned into the save the first time a tick sees a pet
+  // without one. Derived rather than defaulted (see togetherSinceOf), so a save
+  // that predates the field keeps the number it was already showing.
+  pet = recordTogetherSince(pet, today);
 
   // Held still while a capture is on screen. The screen has no time limit any
   // more (the owner's call: offerMs governs the NOTIFICATION, not the aiming),
@@ -610,7 +620,10 @@ export async function runOneTick({
 
   const cryId = cryAudioId(pet.species);
   if (cryId != null) activeTransport.setActiveCry?.(cryId);
-  const model = await buildRenderModel({ pet, usage, weather, room: sensor, now, buddyName, place });
+  // `today` explicitly rather than re-derived from `now`: the tick is given the
+  // day it is settling and 「N天」 is read off the same one, so an injected date
+  // (tests, a replay) cannot make the panel disagree with the save.
+  const model = await buildRenderModel({ pet, usage, weather, room: sensor, now, today, buddyName, place });
   onRenderModel?.(model);
   const { pngBuffer, bitmap } = await renderFrame(model);
 
@@ -622,7 +635,9 @@ export async function runOneTick({
 
 // Shared by the tick and by the cold-start first paint (paintFromDisk), so the
 // two can never drift into rendering the same buddy differently.
-export async function buildRenderModel({ pet, usage, weather, room, now, buddyName, place = null }) {
+export async function buildRenderModel({
+  pet, usage, weather, room, now, buddyName, place = null, today = localYmd(now),
+}) {
   const mood = deriveMood(usage);
   const sprite = await loadBuddySprite(pet.species);
   return {
@@ -630,7 +645,10 @@ export async function buildRenderModel({ pet, usage, weather, room, now, buddyNa
     now,
     weather,
     room,
-    streak: pet.streak ?? 0,
+    // 「N天」 is days together, NOT the settlement streak -- see daysTogether.
+    // Derived from the date on every paint, so it advances at midnight whether
+    // or not a host was running, and no settlement can take a day back.
+    streak: daysTogether(pet, today),
     out: {
       t: weather.temp ?? 0,
       h: weather.humidity ?? 64,
@@ -1361,6 +1379,8 @@ async function finishTutorial(statePath, pet, tutorial) {
 function makeNewborn(species, name, today, personalityRng = Math.random) {
   return {
     species, name, level: 1, exp: 0, bond: 0, streak: 0, shield: 0,
+    // 孵化日即在一起的第 1 天；和 lastSettled 一样必须取 onboarding 完成的那天。
+    togetherSince: today,
     lastSettled: today, lastGrowthDay: null, todayCreditedExp: 0, todayCreditedBond: 0,
     hatched: true, ...rollPersonality(personalityRng),
   };

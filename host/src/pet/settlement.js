@@ -102,8 +102,71 @@ export function recordCareDay(pet, today, { maxDays = MAX_CARE_DAYS } = {}) {
   return { ...pet, careDays: normalizeCareDays([...days, today], { maxDays }) };
 }
 
+// 「N天」 -- days together. It counts CALENDAR days and nothing else.
+//
+// It used to be `streak`, the settlement counter, and that is a different
+// question: streak asks "did you show up", and every source of that evidence is
+// blind to a day when no host ran anywhere. ccusage sees one machine's tokens;
+// careDays sees only days a host was up to write one. So a weekend with both
+// PCs off reads as absence -- measured 2026-08-17, 19 天 -> 0 天 over 08-15/16,
+// the third time this same blind spot has been paid for.
+//
+// The owner's call, and it settles the question rather than patching it again:
+// the number says how long the two of them have been together, so it advances
+// with the date and nothing can take a day back. A powered-down weekend, a flat
+// battery, a fortnight's holiday -- none of them are days they stopped being
+// together, and none of them can be told apart from each other by anything the
+// host can see.
+//
+// `streak` is untouched and still settles exactly as it did: it grants the
+// shield and drives the bond decay, which ARE about care and should notice an
+// absent day. It is simply no longer what the panel shows.
+export function daysTogether(pet, today) {
+  const since = togetherSinceOf(pet, today);
+  if (!isYmd(since) || !isYmd(today) || today < since) return 0;
+  return daySpan(since, today) + 1; // inclusive: the day you met is day 1
+}
+
+// The anchor, and where it comes from when a save predates the field.
+//
+// Derived from the settled streak rather than defaulted to today, so a save
+// arriving from the other machine keeps the number it was already showing
+// instead of restarting at 1. `lastSettled` is the day `streak` counts through,
+// and the count is inclusive, hence streak - 1.
+export function togetherSinceOf(pet, today) {
+  if (isYmd(pet?.togetherSince)) return pet.togetherSince;
+  const streak = Number(pet?.streak ?? 0);
+  if (isYmd(pet?.lastSettled) && Number.isFinite(streak) && streak > 0) {
+    return addDays(pet.lastSettled, -(streak - 1));
+  }
+  return isYmd(today) ? today : null;
+}
+
+// Written once, on the tick, beside recordCareDay. Returns the pet unchanged --
+// same object -- when the anchor is already there, so a save that has one
+// round-trips byte-identical and save-sync has nothing to churn on.
+export function recordTogetherSince(pet, today) {
+  if (!pet || isYmd(pet.togetherSince)) return pet;
+  const since = togetherSinceOf(pet, today);
+  if (!isYmd(since)) return pet;
+  return { ...pet, togetherSince: since };
+}
+
 function isYmd(value) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function daySpan(from, to) {
+  const start = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
+  const delta = Math.floor((Number(end) - Number(start)) / DAY_MS);
+  return Number.isFinite(delta) ? delta : 0;
+}
+
+function addDays(day, offset) {
+  const base = new Date(`${day}T00:00:00Z`);
+  if (!Number.isFinite(Number(base))) return null;
+  return toYmd(new Date(Number(base) + offset * DAY_MS));
 }
 
 export function buildUsedDays(pet, today, usage, { maxCatchupDays = 30 } = {}) {

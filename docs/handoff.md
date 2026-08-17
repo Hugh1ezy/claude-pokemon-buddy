@@ -1,7 +1,100 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-08-14
-11:2x (WORK PC, streak fix + save repair)**.
+Rolling note between the home PC and the work PC. Last updated **2026-08-17
+14:5x (WORK PC, 「N天」 decoupled from the streak)**.
+
+## ▶ 2026-08-17 — 「0天」 again, and the counter has stopped being a streak
+
+Reported as 又变成0天了, three days after the 08-14 fix. **That fix was not
+undone and it is not the same bug — it simply cannot see the case that bit
+here.** Both PCs were off for the weekend, so neither evidence source existed:
+
+| source | why it is blind to 08-15/08-16 |
+|---|---|
+| ccusage `activeDays` | reads `…08-14, 08-17` — it only knows tokens spent on this machine |
+| the save's `careDays` | reads `…08-14, 08-17` — `recordCareDay()` runs on a tick, and no host ticked |
+
+`settleDays` read that silence as absence: **08-15 ate the shield (1→0), 08-16
+took streak 19 → 0 and bond −3**. Measured from `refs/remotes/save/main`'s
+reflog, which has nothing at all between `ae086cf` (08-14 18:45, streak 19,
+shield 1, lastSettled 08-13) and `fca4515` (08-17 10:02:18, streak 0,
+lastSettled 08-16) — the settlement is the only thing that happened in between.
+
+> The host process itself survived the weekend: **pid 27996, created 08-14
+> 11:17:13, still alive on 08-17**. The machine hibernated rather than shut
+> down, which is why there is no restart in the log and no lines at all for
+> 08-15/08-16. A host being up is not the same as a host ticking.
+
+### The owner's call: 「N天」 is days together, and only ever goes up
+
+Asked directly, and the answer was: **天数不会因为关机归0或是跳过，始终每日+1**.
+He also confirmed the device was not with him over the weekend — so the absence
+was real, and the counter still should not have moved backwards. Those two facts
+together are the whole design: *being together* is not the same question as
+*being cared for*, and only the second one has evidence behind it.
+
+So the panel number is no longer `streak`. `daysTogether()` in `settlement.js`
+counts calendar days from a new save field, **`togetherSince`**, inclusive of the
+day they met. It is derived on every paint from the date, so it advances at
+midnight whether or not a host is running, and no settlement can take a day back.
+A powered-down weekend, a flat battery and a fortnight's holiday are now
+indistinguishable from each other — which is honest, because nothing the host can
+see tells them apart either.
+
+**`streak` is untouched and still settles exactly as before.** It grants the
+shield every 7 days and drives `bondDecayPerMissed`, both of which *are* about
+care and *should* notice an absent day. It is simply no longer displayed. The
+weekend's shield and −3 bond were therefore left alone on purpose: by the owner's
+own account those two days were genuinely missed, and that half of the mechanic
+did the right thing.
+
+`SCHEMA_VERSION` stays **1** — purely additive again. Three places had to learn
+the field, and each for a reason that has already cost something once:
+
+- `state.js` salvage copies it — losing it re-anchors the counter to the salvage
+  day, and it is the one number in the save that cannot be re-earned by playing;
+- `save-sync`'s `mergeCollection` takes the **earlier** of the two anchors, the
+  same monotone argument as the dex and `careDays`. Without it, a machine whose
+  anchor was derived from a streak it had just had zeroed would hand its shorter
+  history to the machine that kept the record;
+- a save with no anchor derives one from `lastSettled - (streak - 1)` rather than
+  defaulting to today, so a save arriving from the other PC keeps the number it
+  was already showing instead of restarting at 1.
+
+### The save was repaired, and the anchor is not a guess
+
+**`togetherSince = 2026-07-27`**, written with the host stopped (previous copy at
+`host/out/state.json.prerepair-2026-08-17`). That date is the only one consistent
+with the last display anyone verified: 07-27..08-14 inclusive is **19**, and
+`out/frame.png` read 「19天」 on 08-14 at 11:17. It then gives 22 for today.
+
+Verified after the restart (task re-enabled, pid 20772, 14:51:09): the anchor
+survived a live tick, `out/frame.png` reads **「22天」**, and `save-sync-cli
+status` reports both copies identical with the field present on `save/main`.
+
+Suite: **726 tests, 715 pass, 11 fail**, and the 11 are the standing Windows set
+(launchd/plist ×6, the two `.inc` tests that want python, RM12, the statusline
+fan-out pair) — unchanged from before the edit. One existing test did have to
+move: `render model carries the pet's streak from state` was reading a field the
+panel no longer shows, and the fix it exposed was real — `buildRenderModel` was
+re-deriving the day from `now` instead of the `today` the tick was handed, so an
+injected date made the panel disagree with the save. It takes `today` explicitly
+now.
+
+> **Still owed on the home PC:** nothing but a `git pull hugh main` and a host
+> restart. The save already carries the anchor, so a plain `pull` brings the
+> right number with it; no repair is needed there.
+
+> **Unresolved, and worth not inventing an answer for:** why the 08-08/08-09
+> weekend did *not* zero the streak. The save went 12 (08-07) → 15 (08-10), i.e.
+> all three days counted as active, with the shield granted at 14 — so
+> `buildUsedDays` must have failed open, and the only route to that is a usage
+> snapshot with no `activeDays`. The obvious suspect is the 08-11 change that
+> stopped `normalizeUsage` throwing on `active block missing`, which would have
+> been failing after every idle stretch until then. **But there is no
+> `loadUsageSnapshot failed` line in the log for the morning of 08-10**, so that
+> chain is not established. It no longer costs anything now that the counter does
+> not depend on it.
 
 ## ▶ 2026-08-14 — 「0天」: the streak was counting tokens, not days together
 

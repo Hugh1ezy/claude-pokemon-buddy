@@ -113,6 +113,9 @@ function salvageState(state) {
   copyNumber(out, state, "bondHalves");
   copyNumber(out, state, "bondUnpaid");
   copyNumber(out, state, "bondSlots");
+  // Losing this re-anchors 「N天」 to the salvage day and the counter restarts
+  // from 1 -- the one number in the save that cannot be re-earned by playing.
+  copyString(out, state, "togetherSince");
   copyString(out, state, "lastSettled");
   copyString(out, state, "lastGrowthDay");
   copyString(out, state, "bondDay");

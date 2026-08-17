@@ -198,7 +198,20 @@ export function createSaveSync({
     const extraCare = localCare.filter((day) => !remoteCare.includes(day));
     if (extraCare.length) merged.careDays = normalizeCareDays([...remoteCare, ...extraCare]);
 
-    if (kept === 0 && extraCare.length === 0 && merged.capturedCount === remote.capturedCount) {
+    // 「N天」's anchor takes the EARLIER of the two, which is monotone in the
+    // same direction as everything else here: the day they met is a fact about
+    // the past, so the copy that remembers more of it is the correct one. A
+    // machine whose anchor was derived from a streak it had just had zeroed
+    // would otherwise hand its shorter history to the one that kept the record.
+    const sinceDays = [remote.togetherSince, local.togetherSince].filter(isYmdDay);
+    const earliestSince = sinceDays.length ? sinceDays.sort()[0] : null;
+    const sinceMoved = earliestSince != null && earliestSince !== remote.togetherSince;
+    if (sinceMoved) merged.togetherSince = earliestSince;
+
+    if (
+      kept === 0 && extraCare.length === 0 && !sinceMoved &&
+      merged.capturedCount === remote.capturedCount
+    ) {
       return { text: remoteText, kept: 0 };
     }
     // Compact and newline-free, matching saveState() in state.js -- a pull that
@@ -364,6 +377,12 @@ function parseSave(text) {
   } catch {
     return null;
   }
+}
+
+// Local rather than imported: this file already keeps its own deliberately weak
+// view of a save (see parseSave) instead of pulling in state.js's rules.
+function isYmdDay(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function trim(text) {

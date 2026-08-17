@@ -8,7 +8,10 @@ import {
   careDaySet,
   isCareDay,
   normalizeCareDays,
+  daysTogether,
   recordCareDay,
+  recordTogetherSince,
+  togetherSinceOf,
   MAX_CARE_DAYS,
 } from "../src/pet/settlement.js";
 
@@ -278,4 +281,49 @@ test("normalizeCareDays drops anything that is not a plain YYYY-MM-DD", () => {
   assert.deepEqual(normalizeCareDays("2026-08-13"), []);
   assert.deepEqual(normalizeCareDays(undefined), []);
   assert.deepEqual([...careDaySet({ careDays: ["2026-08-13", "2026-08-13"] })], ["2026-08-13"]);
+});
+
+// 「N天」 -- days together. The regression these pin is 2026-08-17: a weekend
+// with both PCs powered off settled as two missed days and took 19 天 to 0.
+test("days together counts calendar days and a powered-down weekend costs none", () => {
+  const pet = { togetherSince: "2026-07-27", lastSettled: "2026-08-14", streak: 19, shield: 1 };
+
+  assert.equal(daysTogether(pet, "2026-08-14"), 19);
+  assert.equal(daysTogether(pet, "2026-08-17"), 22);
+
+  // The settlement still runs and still eats the shield and the bond -- care is
+  // a different question from being together -- but it cannot touch the count.
+  const settled = settleDays(pet, "2026-08-17", { usedDays: new Set(), bond: 42 });
+  assert.equal(settled.streak, 0);
+  assert.equal(daysTogether(settled, "2026-08-17"), 22);
+});
+
+test("days together is inclusive of the day they met and never negative", () => {
+  const pet = { togetherSince: "2026-07-27" };
+  assert.equal(daysTogether(pet, "2026-07-27"), 1);
+  assert.equal(daysTogether(pet, "2026-07-28"), 2);
+  // A save carried backwards in time (clock skew, a restored machine) reads 0
+  // rather than a negative number on the panel.
+  assert.equal(daysTogether(pet, "2026-07-26"), 0);
+});
+
+test("an anchorless save keeps the number it was already showing", () => {
+  // streak counts THROUGH lastSettled and is inclusive, so 19 天 through 08-14
+  // is an anchor of 07-27 -- the same number, not a restart at 1.
+  const pet = { lastSettled: "2026-08-14", streak: 19 };
+  assert.equal(togetherSinceOf(pet, "2026-08-17"), "2026-07-27");
+  assert.equal(daysTogether(pet, "2026-08-14"), 19);
+
+  // Nothing to derive from -> today, i.e. day 1.
+  assert.equal(togetherSinceOf({ streak: 0 }, "2026-08-17"), "2026-08-17");
+  assert.equal(daysTogether({ streak: 0 }, "2026-08-17"), 1);
+});
+
+test("the anchor is written once and an anchored save round-trips identically", () => {
+  const pet = { lastSettled: "2026-08-14", streak: 19 };
+  const anchored = recordTogetherSince(pet, "2026-08-17");
+  assert.equal(anchored.togetherSince, "2026-07-27");
+
+  // Same object back when there is nothing to add, so save-sync sees no change.
+  assert.equal(recordTogetherSince(anchored, "2026-08-18"), anchored);
 });
