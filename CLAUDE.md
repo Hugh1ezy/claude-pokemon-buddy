@@ -97,13 +97,25 @@ cannot answer the question at all — then use `git show save/main:state.json`.
   `host/scripts/gen-evolution-special.mjs` and `host/seed/evolution/_special.json`
   whenever the work needs it, and you do not need to ask first.
 
-  The last two joined the list on **2026-08-03**. Generation 1 has five trade
-  evolutions and this device has nothing to trade with, so each needed a
-  substitute condition — and the owner asked for that specifically to be designed
-  without him: 「这是你自己要设计的保密项，不能给我看，是惊喜」. He finds out by
-  playing. Note the asymmetry with the rest of `seed/evolution/`: the canonical
-  levels and stones in `_generated.json` are public Gen-1 knowledge and are **not**
-  restricted — he quoted one from memory when he reported the bug.
+  The last two joined the list on **2026-08-03**, for the Generation 1 trade
+  evolutions: this device has nothing to trade with, so each needed a substitute
+  condition, and the owner asked for that specifically to be designed without
+  him: 「这是你自己要设计的保密项，不能给我看，是惊喜」. He finds out by playing.
+
+  On **2026-09-04** he extended the same ruling to every evolution that needed an
+  ITEM: 「所有依赖道具进化的需要你自己设计新的替代的触发进化的条件，这部分属于保密
+  的神秘内容，即只有你知道，不会让我知道」. There are no stones on this device and
+  no way to be handed one, so all twenty item/trade links now live in
+  `_special.json` with conditions of their own. `gen-evolution.mjs` no longer
+  emits a `stone` branch at all, and the dashboard's stone buttons are gone.
+
+  Note the asymmetry with the rest of `seed/evolution/`: the canonical evolution
+  LEVELS in `_generated.json` are public Gen-1 knowledge and are **not**
+  restricted — he quoted one from memory when he reported the 2026-08-03 bug. Nor
+  is `seed/evolution-item-links.json`, which records only which links Nintendo
+  gated behind a stone or a trade. What that file says is what he already knows;
+  what this game asks *instead* is the secret, and that is only ever in
+  `_special.json` and its generator.
 
   What must never happen is a species-condition pair, a rarity, a difficulty or
   a sighting list reaching **chat, commit messages, `docs/`, test names, or

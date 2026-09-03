@@ -52,9 +52,7 @@ export function applyPetTransitions({
   let choiceEvolved = false;
 
   for (const intent of drainEvolutionIntents(evolutionIntents)) {
-    if (intent?.type === "stone" && isEvolutionStone(intent.stone)) {
-      next = { ...next, stone: intent.stone };
-    } else if (intent?.type === "choose" && typeof intent.to === "string") {
+    if (intent?.type === "choose" && typeof intent.to === "string") {
       const choice = resolveEvolution(next.species, evolutionContext({ pet: next, weather, room, now }))
         .candidates
         .find((candidate) => candidate.to === intent.to);
@@ -70,15 +68,8 @@ export function applyPetTransitions({
 
   // Table-driven: resolve once against the evolution tables, recompute readiness
   // every tick (can fall back to false), and reuse the same resolution for KEY.
-  const evolution = choiceEvolved
-    ? { auto: null, candidates: [] }
-    : resolveEvolution(next.species, evolutionContext({ pet: next, weather, room, now }));
-  if (!choiceEvolved && next.stone && !hasMatchingStoneCandidate(evolution.candidates, next.stone)) {
-    const { stone, ...withoutStone } = next;
-    next = withoutStone;
-  }
   const reconciledEvolution = choiceEvolved
-    ? evolution
+    ? { auto: null, candidates: [] }
     : resolveEvolution(next.species, evolutionContext({ pet: next, weather, room, now }));
   const readyToEvolve = Boolean(reconciledEvolution.auto || reconciledEvolution.candidates.length > 0);
   next = reconcilePendingCandidates({ ...next, readyToEvolve }, reconciledEvolution);
@@ -119,7 +110,15 @@ export function evolutionContext({ pet, weather, room, now }) {
     humidity: weather?.humidity,
     warmHumid: isWarmHumid(weather?.temp, weather?.humidity) || isWarmHumid(room?.t, room?.h),
     cold: isCold(weather?.temp) || isCold(room?.t),
-    stone: pet.stone,
+    // The stable key resolved in weather.js from the WMO code, never `cond`:
+    // `cond` is the panel's label and is free to be reworded, while this is a
+    // thing branches are gated on. Same reasoning, and same field, as
+    // buildEncounterContext. Absent until the first fetch lands, which correctly
+    // fails every branch that asks for weather rather than guessing one.
+    weatherKind: weather?.kind ?? null,
+    // Consecutive days shown up, as settled by settleDays. A floor, never an
+    // equality -- see THRESHOLDS in evolution.js.
+    streak: pet.streak,
   };
 }
 
@@ -141,7 +140,7 @@ export function evolutionContext({ pet, weather, room, now }) {
 // identity, growth, personality -- and for the same reason: everything else is
 // the trainer's day bookkeeping and belongs to the day, not to the pokemon.
 export function evolvePet(pet, species) {
-  const { pendingCandidates, stone, ...rest } = pet;
+  const { pendingCandidates, ...rest } = pet;
   const evolved = { ...rest, species, readyToEvolve: false };
 
   const dex = normalizeDex(pet);
@@ -205,14 +204,6 @@ function reconcilePendingCandidates(pet, evolution) {
     return { ...withoutPendingCandidates, pendingCandidates: evolution.candidates };
   }
   return withoutPendingCandidates;
-}
-
-function hasMatchingStoneCandidate(candidates, stone) {
-  return candidates.some((candidate) => candidate?.needs?.stone === stone);
-}
-
-function isEvolutionStone(stone) {
-  return stone === "water" || stone === "thunder" || stone === "fire";
 }
 
 function isWarmHumid(temp, humidity) {

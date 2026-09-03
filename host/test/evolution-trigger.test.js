@@ -169,24 +169,24 @@ test("queued choice intent evolves a currently eligible pending branch on the ne
   assert.equal(state.pendingCandidates, undefined);
 });
 
-test("stone overrides RTC branch when KEY triggers evolution", async () => {
-  const statePath = join("out", "test-stone-evolve-state.json");
-  const framePath = join("out", "test-stone-evolve-frame.png");
-  writeState(statePath, { bond: 160, readyToEvolve: true, stone: "fire" });
+test("care branch outranks the environmental one when KEY triggers evolution", async () => {
+  const statePath = join("out", "test-care-evolve-state.json");
+  const framePath = join("out", "test-care-evolve-frame.png");
+  // Warm and humid, so the environmental branch is eligible too -- and must lose.
+  writeState(statePath, { bond: 160, readyToEvolve: true, careCount: 1 });
 
   const state = await runOneTick({
     usage: usageWithTokens(0),
-    weather: weather({ temp: 12, humidity: 50 }),
+    weather: weather({ temp: 24, humidity: 70 }),
     statePath,
     framePath,
     now: new Date(2026, 4, 30, 10),
-    mock: createMockTransport({ framePath }),
+    mock: createMockTransport({ framePath, sensor: { t: 24, h: 70 } }),
     pendingButtons: [{ key: "KEY", kind: "short" }],
     evolutionDelay: async () => {},
   });
 
-  assert.equal(state.species, "flareon");
-  assert.equal(state.stone, undefined);
+  assert.equal(state.species, "sylveon");
   assert.equal(state.readyToEvolve, false);
 });
 

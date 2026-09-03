@@ -103,15 +103,11 @@ test("request entry rejects text/plain POST before routing", async () => {
 
 test("evolution endpoints inherit forged Host rejection at request entry", async () => {
   let choices = 0;
-  let stones = 0;
   const srv = await startWebServer({
     host: "127.0.0.1",
     port: 0,
     chooseEvolution: () => {
       choices += 1;
-    },
-    grantEvolutionStone: () => {
-      stones += 1;
     },
   });
 
@@ -123,18 +119,9 @@ test("evolution endpoints inherit forged Host rejection at request entry", async
       headers: { host: "evil.example", "content-type": "application/json" },
       body: JSON.stringify({ to: "espeon" }),
     });
-    const stone = await requestRaw({
-      port: srv.port,
-      path: "/api/evolution/stone",
-      method: "POST",
-      headers: { host: "evil.example", "content-type": "application/json" },
-      body: JSON.stringify({ stone: "water" }),
-    });
 
     assert.equal(choose.statusCode, 403);
-    assert.equal(stone.statusCode, 403);
     assert.equal(choices, 0);
-    assert.equal(stones, 0);
   } finally {
     await srv.close();
   }
@@ -142,15 +129,11 @@ test("evolution endpoints inherit forged Host rejection at request entry", async
 
 test("evolution endpoints inherit content-type rejection at request entry", async () => {
   let choices = 0;
-  let stones = 0;
   const srv = await startWebServer({
     host: "127.0.0.1",
     port: 0,
     chooseEvolution: () => {
       choices += 1;
-    },
-    grantEvolutionStone: () => {
-      stones += 1;
     },
   });
 
@@ -160,16 +143,9 @@ test("evolution endpoints inherit content-type rejection at request entry", asyn
       headers: { "content-type": "text/plain" },
       body: JSON.stringify({ to: "espeon" }),
     });
-    const stone = await fetch(`http://127.0.0.1:${srv.port}/api/evolution/stone`, {
-      method: "POST",
-      headers: { "content-type": "text/plain" },
-      body: JSON.stringify({ stone: "water" }),
-    });
 
     assert.equal(choose.status, 415);
-    assert.equal(stone.status, 415);
     assert.equal(choices, 0);
-    assert.equal(stones, 0);
   } finally {
     await srv.close();
   }

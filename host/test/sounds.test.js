@@ -43,8 +43,9 @@ function seedState(path, extra) {
 test("evolution plays its own track, not the hatching fanfare", async () => {
   const statePath = join("out", "test-sound-evolve-state.json");
   const framePath = join("out", "test-sound-evolve-frame.png");
-  // thunder stone => auto-evolve to jolteon once KEY is pressed
-  seedState(statePath, { stone: "thunder" });
+  // A care-gated branch is the highest-precedence one there is, so this
+  // auto-resolves and KEY acts on it. eevee's own table, nothing hidden.
+  seedState(statePath, { bond: 56, careCount: 1 });
   const transport = spyTransport([{ key: "KEY", kind: "short" }]);
 
   const pet = await runOneTick({
@@ -52,7 +53,7 @@ test("evolution plays its own track, not the hatching fanfare", async () => {
     evolutionDelay: async () => {},
   });
 
-  assert.equal(pet.species, "jolteon", "thunder stone evolves eevee -> jolteon");
+  assert.equal(pet.species, "sylveon", "the care branch evolves eevee -> sylveon");
   assert.ok(transport.sounds.includes(MUSIC.EVOLUTION), "should play the evolution track");
   // The point of the split: SOUND.EVOLVE is hatching's now, and an evolution that
   // still reached for it would be the old shared-fanfare behaviour coming back.
@@ -62,7 +63,7 @@ test("evolution plays its own track, not the hatching fanfare", async () => {
 test("no evolution => no EVOLVE sound", async () => {
   const statePath = join("out", "test-sound-noevolve-state.json");
   const framePath = join("out", "test-sound-noevolve-frame.png");
-  // no stone, bond below threshold, and no KEY press
+  // bond below every threshold, and no KEY press
   seedState(statePath, {});
   const transport = spyTransport([]);
 

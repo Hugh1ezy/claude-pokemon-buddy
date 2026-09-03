@@ -133,7 +133,7 @@ function renderBuddy(buddy, difficulty) {
 
   renderIv(buddy.iv ?? []);
   renderBadges(buddy.badges ?? []);
-  renderNextEvo(buddy.nextEvo ?? {}, buddy);
+  renderNextEvo(buddy.nextEvo ?? {});
 }
 
 function renderIv(iv) {
@@ -170,24 +170,27 @@ function renderBadges(badges) {
   }
 }
 
-function renderNextEvo(nextEvo, buddy = {}) {
+function renderNextEvo(nextEvo) {
   const bond = Number(nextEvo.bond ?? 0);
   const threshold = Number(nextEvo.threshold ?? 0);
   const pct = threshold > 0 ? Math.round((bond / threshold) * 100) : 0;
   const ready = nextEvo.ready ? " · READY" : "";
   setText("next-evo-label", threshold > 0 ? `亲密 ${bond} / ${threshold}${ready}` : "--");
   document.getElementById("next-evo-bar").style.width = `${Math.max(0, Math.min(100, pct))}%`;
-  renderEvolutionControls(nextEvo, buddy);
+  renderEvolutionControls(nextEvo);
 }
 
-function renderEvolutionControls(nextEvo, buddy) {
+function renderEvolutionControls(nextEvo) {
   const root = ensureEvolutionControls();
   if (!root) return;
   root.textContent = "";
 
+  // Only a genuine fork puts buttons here. Nothing in this game is handed to a
+  // pokemon any more -- every line that once wanted an item now asks the world
+  // for something instead -- so the panel's job is to break a tie, never to
+  // dispense one.
   const candidates = nextEvo.ready && Array.isArray(nextEvo.pendingCandidates) ? nextEvo.pendingCandidates : [];
-  const showStoneButtons = buddy.species === "eevee";
-  if (candidates.length === 0 && !showStoneButtons) {
+  if (candidates.length === 0) {
     root.hidden = true;
     return;
   }
@@ -198,18 +201,6 @@ function renderEvolutionControls(nextEvo, buddy) {
     root.appendChild(makeEvolutionButton(`选择 ${speciesInfo(candidate.to).label}`, () => (
       postEvolutionIntent("/api/evolution/choose", { to: candidate.to })
     )));
-  }
-
-  if (showStoneButtons) {
-    for (const [stone, label] of [
-      ["water", "水之石"],
-      ["thunder", "雷之石"],
-      ["fire", "火之石"],
-    ]) {
-      root.appendChild(makeEvolutionButton(label, () => (
-        postEvolutionIntent("/api/evolution/stone", { stone })
-      )));
-    }
   }
 }
 

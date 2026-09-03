@@ -1,7 +1,113 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-08-17
-14:5x (WORK PC, 「N天」 decoupled from the streak)**.
+Rolling note between the home PC and the work PC. Last updated **2026-09-04
+(WORK PC, item evolutions and two dead branches)**.
+
+## ▶ 2026-09-04 — the buddy stuck at Lv.32, and two branches that were never alive
+
+Two questions from the owner: has EXP settlement broken, and why will a Lv.32
+卡蒂狗 not evolve. The answers turned out to be unrelated, and the second one
+uncovered two bugs that had been silently swallowing evolution branches.
+
+### EXP settlement is fine. There was nothing to settle.
+
+Measured, not inferred. `out/state.json` read at 09:43 was
+`level:32 exp:10.50 todayCreditedExp:0`; one tick later, with the day's tokens
+credited, it was `level:35 exp:24.50 todayCreditedExp:100`. The chain works.
+
+Why it looked frozen: EXP comes from `usage.todayTokens`, which is ccusage on
+**whichever machine is running the host**. `loadUsageSnapshot` on this machine
+reports its last active days as 08-11, 08-14, 08-17, then 09-04 — nothing in
+between. Across that gap the only EXP income was the half-heart conversion, and
+`careDays` shows the host was up and hearts were being earned, so the buddy was
+being looked after; there was simply no usage to convert.
+
+**Not measured, and worth instrumenting before anyone believes it:** save-sync
+takes `level/exp/bond` wholesale from whoever pushes (`save-sync.js`, the
+`mergeCollection` comment). If a day's Claude work happens on machine A while
+the device and the push are on machine B, A's EXP for that day is overwritten
+and gone. The `save` remote is force-pushed to a single commit, so there is no
+history to audit this against. A `pull` that logged local vs remote `level/exp`
+would answer it in a few days.
+
+Unrelated, still live: `pollUsage failed: no-token` is repeating in the host log
+(4417 times). That is the OAuth 5h/week gauge, not EXP — it leaves `p5h`/`pweek`
+null, which pins the mood to `focused`.
+
+### Every item evolution now has a substitute condition
+
+The owner's ruling, extending the 2026-08-03 one about trades:
+「所有依赖道具进化的需要你自己设计新的替代的触发进化的条件，这部分属于保密的神秘内容，
+即只有你知道，不会让我知道」.
+
+There are no stones on this device and now no way to be handed one. Twenty
+canonical item/trade links (16 stone, 4 trade) have conditions of their own.
+**What those conditions are is not in this file and must not be put here** — see
+`CLAUDE.md`; they live in `scripts/gen-evolution-special.mjs` and
+`seed/evolution/_special.json`, both spoiler files.
+
+What changed, in public terms:
+
+- `gen-evolution.mjs` no longer emits a `stone` branch. It writes the canonical
+  inventory to `seed/evolution-item-links.json` — which links Gen 1 gated behind
+  an item, and nothing about what this game asks instead. That file is **not** a
+  spoiler and is deliberately outside `seed/evolution/`, which `evolution.js`
+  loads wholesale.
+- It also drops an item link whose pair the table already reaches by level —
+  that is a later-generation regional form, the same class of import the
+  ice-stone and galarica-cuff exclusions exist for. One was being picked up.
+- `eevee.json` keeps its five hand-authored branches; its three item branches
+  moved to the spoiler file.
+- The whole stone mechanism is gone: `/api/evolution/stone`,
+  `grantEvolutionStone`, the `stone` save field, and the dashboard buttons. The
+  dashboard's evolution row now only ever breaks a tie between two different
+  species, never dispenses anything.
+
+### Two bugs, both of which made a branch vanish with no symptom
+
+Found while wiring the above, and both had already eaten live content:
+
+1. **`evolution.js` deduped merged branches by target species.** A species is
+   allowed more than one road to the same destination, and the second was being
+   dropped at load time, before any condition was evaluated. Casualties:
+   haunter's daytime fallback, and one entire trade substitute that had been
+   dead in the table since 2026-08-03. The identity of a branch is now target +
+   conditions + priority.
+2. **`resolveEvolution` returned `auto: null` whenever two branches were
+   eligible**, even when both named the same species — so KEY did nothing and
+   the dashboard would have offered two buttons with the same word on them. It
+   now auto-resolves when every candidate shares one target. The rule is
+   extracted as `chooseAuto` so it can be tested against invented branches
+   instead of real (spoiler) ones.
+
+Also: `needsMet` now reads `streak` and `careCount` as floors alongside
+`bond`/`level`. Anything outside that set is still `===`, which is what makes
+`careCount: 5` mean *exactly* five — a branch open for one tick in its life.
+
+### Guardrails
+
+`test/evolution-item-links.test.js` asserts properties, never values, so it can
+live in a file the owner reads: every item link has a branch; no link outside a
+multi-target species needs weather, evening or a streak; nothing is gated on
+`cold` (temp ≤ 4, which this city does not do — eevee's own glaceon branch is
+already stranded on it and was left alone, as it is his file); every numeric
+need is a threshold key; nothing is shadowed by the canonical table; and every
+single-target item line resolves to an `auto` so KEY has something to act on.
+
+### Test state
+
+733 tests, 722 pass, **11 fail — all 11 also fail at HEAD** (verified by
+stashing): six macOS-only `buildPlist`/`isHostProcess` tests, the
+`species_cries.inc` and `music.inc` drift checks, the RM12 quiet-boundary test,
+and two `usage-bridge` tests that pass alone and fail under
+`--test-concurrency=4`. Nothing in this change adds a failure.
+
+### For whoever picks this up
+
+- The running host loaded the old tables at import. **Restart it** or none of
+  this is live.
+- Not committed or pushed — the owner had not asked for a sync when this was
+  written.
 
 ## ▶ 2026-08-17 — 「0天」 again, and the counter has stopped being a streak
 

@@ -25,7 +25,6 @@ import { MAX_LEVEL_EXP, PARAMS, expToNextLevel } from "./pet/sim.js";
 // case where a version bump does harm and no good. Bump it when a field
 // changes MEANING, not when one is added. See pet/dex.js.
 export const SCHEMA_VERSION = 1;
-const STONES = new Set(["water", "thunder", "fire"]);
 const NUMBER_RANGES = {
   level: { min: 1 },
   // Static outer bound only -- the real ceiling depends on the pet's level and is
@@ -125,7 +124,6 @@ function salvageState(state) {
   copyIv(out, state, "iv");
   copyString(out, state, "nature");
   copyString(out, state, "characteristic");
-  copyStone(out, state, "stone");
   if (Array.isArray(state.pendingCandidates)) out.pendingCandidates = state.pendingCandidates;
   // Salvaged for the same reason the dex is: a care day cannot be re-earned
   // once it is past, and losing the record hands the next settlement a missed
@@ -323,10 +321,6 @@ function copyIv(out, state, key) {
   ) {
     out[key] = value;
   }
-}
-
-function copyStone(out, state, key) {
-  if (STONES.has(state[key])) out[key] = state[key];
 }
 
 function isParseableJsonFile(path) {

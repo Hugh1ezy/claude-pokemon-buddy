@@ -1296,35 +1296,22 @@ export function startDashboardServer({
       evolutionIntents.push({ type: "choose", to });
       return { to };
     },
-    grantEvolutionStone: (stone) => {
-      const { evolution } = resolveCurrentEvolution({
-        runtime: getRuntime(),
-        statePath,
-        nowProvider,
-        stone,
-      });
-      const branch = evolution.candidates.find((candidate) => candidate?.needs?.stone === stone);
-      if (!branch) throw new Error("evolution stone does not match current species");
-      evolutionIntents.push({ type: "stone", stone });
-      return { stone, to: branch.to };
-    },
   });
 }
 
-function resolveCurrentEvolution({ runtime = {}, statePath, nowProvider, stone } = {}) {
+function resolveCurrentEvolution({ runtime = {}, statePath, nowProvider } = {}) {
   const pet = runtime.pet ?? loadState(statePath);
-  const probePet = stone ? { ...pet, stone } : pet;
   const now = nowProvider();
   const evolution = resolveEvolution(
-    probePet.species,
+    pet.species,
     evolutionContext({
-      pet: probePet,
+      pet,
       weather: runtime.weather ?? DEFAULT_WEATHER,
       room: runtime.room,
       now,
     }),
   );
-  return { pet: probePet, evolution };
+  return { pet, evolution };
 }
 
 function adaptPngTransport(transport) {

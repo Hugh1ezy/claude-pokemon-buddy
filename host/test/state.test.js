@@ -148,7 +148,7 @@ test("loadState warns and salvages level and evolution fields from a partially p
   assert.match(warnings[0].message, /state/i);
 });
 
-test("loadState salvage preserves personality tuple and held evolution stone", (t) => {
+test("loadState salvage preserves the personality tuple", (t) => {
   const { file } = tempState(t);
   writeFileSync(file, "{corrupt");
   writeFileSync(
@@ -159,7 +159,6 @@ test("loadState salvage preserves personality tuple and held evolution stone", (
       iv: [31, 0, 12, 18, 24, 7],
       nature: "急性子",
       characteristic: "爱睡午觉",
-      stone: "water",
     }),
   );
 
@@ -168,7 +167,6 @@ test("loadState salvage preserves personality tuple and held evolution stone", (
   assert.deepEqual(loaded.iv, [31, 0, 12, 18, 24, 7]);
   assert.equal(loaded.nature, "急性子");
   assert.equal(loaded.characteristic, "爱睡午觉");
-  assert.equal(loaded.stone, "water");
 });
 
 function tempState(t) {

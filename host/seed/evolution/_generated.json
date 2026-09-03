@@ -15,10 +15,6 @@
     "stage": 1,
     "branches": []
   },
-  "arcanine": {
-    "stage": 1,
-    "branches": []
-  },
   "beedrill": {
     "stage": 2,
     "branches": []
@@ -51,36 +47,9 @@
       }
     ]
   },
-  "clefable": {
-    "stage": 2,
-    "branches": []
-  },
-  "clefairy": {
-    "stage": 1,
-    "branches": [
-      {
-        "to": "clefable",
-        "needs": {
-          "stone": "moon"
-        },
-        "priority": 9
-      }
-    ]
-  },
-  "cloyster": {
-    "stage": 1,
-    "branches": []
-  },
   "cubone": {
     "stage": 0,
     "branches": [
-      {
-        "to": "marowak",
-        "needs": {
-          "level": 28
-        },
-        "priority": 1
-      },
       {
         "to": "marowak",
         "needs": {
@@ -97,13 +66,6 @@
   "diglett": {
     "stage": 0,
     "branches": [
-      {
-        "to": "dugtrio",
-        "needs": {
-          "level": 26
-        },
-        "priority": 1
-      },
       {
         "to": "dugtrio",
         "needs": {
@@ -189,29 +151,6 @@
     "stage": 1,
     "branches": []
   },
-  "exeggcute": {
-    "stage": 0,
-    "branches": [
-      {
-        "to": "exeggutor",
-        "needs": {
-          "stone": "leaf"
-        },
-        "priority": 9
-      },
-      {
-        "to": "exeggutor",
-        "needs": {
-          "stone": "leaf"
-        },
-        "priority": 9
-      }
-    ]
-  },
-  "exeggutor": {
-    "stage": 1,
-    "branches": []
-  },
   "fearow": {
     "stage": 1,
     "branches": []
@@ -237,27 +176,12 @@
           "level": 25
         },
         "priority": 1
-      },
-      {
-        "to": "graveler",
-        "needs": {
-          "level": 25
-        },
-        "priority": 1
       }
     ]
   },
   "gloom": {
     "stage": 1,
-    "branches": [
-      {
-        "to": "vileplume",
-        "needs": {
-          "stone": "leaf"
-        },
-        "priority": 9
-      }
-    ]
+    "branches": []
   },
   "golbat": {
     "stage": 1,
@@ -292,32 +216,6 @@
           "level": 38
         },
         "priority": 1
-      },
-      {
-        "to": "muk",
-        "needs": {
-          "level": 38
-        },
-        "priority": 1
-      }
-    ]
-  },
-  "growlithe": {
-    "stage": 0,
-    "branches": [
-      {
-        "to": "arcanine",
-        "needs": {
-          "stone": "fire"
-        },
-        "priority": 9
-      },
-      {
-        "to": "arcanine",
-        "needs": {
-          "stone": "fire"
-        },
-        "priority": 9
       }
     ]
   },
@@ -344,18 +242,6 @@
   "hypno": {
     "stage": 1,
     "branches": []
-  },
-  "jigglypuff": {
-    "stage": 1,
-    "branches": [
-      {
-        "to": "wigglytuff",
-        "needs": {
-          "stone": "moon"
-        },
-        "priority": 9
-      }
-    ]
   },
   "kabuto": {
     "stage": 0,
@@ -396,13 +282,6 @@
   "koffing": {
     "stage": 0,
     "branches": [
-      {
-        "to": "weezing",
-        "needs": {
-          "level": 35
-        },
-        "priority": 1
-      },
       {
         "to": "weezing",
         "needs": {
@@ -512,14 +391,6 @@
     "stage": 1,
     "branches": []
   },
-  "nidoking": {
-    "stage": 2,
-    "branches": []
-  },
-  "nidoqueen": {
-    "stage": 2,
-    "branches": []
-  },
   "nidoran-f": {
     "stage": 0,
     "branches": [
@@ -546,29 +417,9 @@
   },
   "nidorina": {
     "stage": 1,
-    "branches": [
-      {
-        "to": "nidoqueen",
-        "needs": {
-          "stone": "moon"
-        },
-        "priority": 9
-      }
-    ]
+    "branches": []
   },
   "nidorino": {
-    "stage": 1,
-    "branches": [
-      {
-        "to": "nidoking",
-        "needs": {
-          "stone": "moon"
-        },
-        "priority": 9
-      }
-    ]
-  },
-  "ninetales": {
     "stage": 1,
     "branches": []
   },
@@ -648,25 +499,6 @@
       }
     ]
   },
-  "pikachu": {
-    "stage": 1,
-    "branches": [
-      {
-        "to": "raichu",
-        "needs": {
-          "stone": "thunder"
-        },
-        "priority": 9
-      },
-      {
-        "to": "raichu",
-        "needs": {
-          "stone": "thunder"
-        },
-        "priority": 9
-      }
-    ]
-  },
   "poliwag": {
     "stage": 0,
     "branches": [
@@ -681,30 +513,11 @@
   },
   "poliwhirl": {
     "stage": 1,
-    "branches": [
-      {
-        "to": "poliwrath",
-        "needs": {
-          "stone": "water"
-        },
-        "priority": 9
-      }
-    ]
-  },
-  "poliwrath": {
-    "stage": 2,
     "branches": []
   },
   "ponyta": {
     "stage": 0,
     "branches": [
-      {
-        "to": "rapidash",
-        "needs": {
-          "level": 40
-        },
-        "priority": 1
-      },
       {
         "to": "rapidash",
         "needs": {
@@ -730,10 +543,6 @@
       }
     ]
   },
-  "raichu": {
-    "stage": 2,
-    "branches": []
-  },
   "rapidash": {
     "stage": 1,
     "branches": []
@@ -745,13 +554,6 @@
   "rattata": {
     "stage": 0,
     "branches": [
-      {
-        "to": "raticate",
-        "needs": {
-          "level": 20
-        },
-        "priority": 1
-      },
       {
         "to": "raticate",
         "needs": {
@@ -813,18 +615,6 @@
       }
     ]
   },
-  "shellder": {
-    "stage": 0,
-    "branches": [
-      {
-        "to": "cloyster",
-        "needs": {
-          "stone": "water"
-        },
-        "priority": 9
-      }
-    ]
-  },
   "slowbro": {
     "stage": 1,
     "branches": []
@@ -850,22 +640,6 @@
           "level": 20
         },
         "priority": 1
-      }
-    ]
-  },
-  "starmie": {
-    "stage": 1,
-    "branches": []
-  },
-  "staryu": {
-    "stage": 0,
-    "branches": [
-      {
-        "to": "starmie",
-        "needs": {
-          "stone": "water"
-        },
-        "priority": 9
       }
     ]
   },
@@ -901,14 +675,6 @@
       }
     ]
   },
-  "victreebel": {
-    "stage": 2,
-    "branches": []
-  },
-  "vileplume": {
-    "stage": 2,
-    "branches": []
-  },
   "voltorb": {
     "stage": 0,
     "branches": [
@@ -918,25 +684,6 @@
           "level": 30
         },
         "priority": 1
-      },
-      {
-        "to": "electrode",
-        "needs": {
-          "stone": "leaf"
-        },
-        "priority": 9
-      }
-    ]
-  },
-  "vulpix": {
-    "stage": 0,
-    "branches": [
-      {
-        "to": "ninetales",
-        "needs": {
-          "stone": "fire"
-        },
-        "priority": 9
       }
     ]
   },
@@ -954,22 +701,10 @@
   },
   "weepinbell": {
     "stage": 1,
-    "branches": [
-      {
-        "to": "victreebel",
-        "needs": {
-          "stone": "leaf"
-        },
-        "priority": 9
-      }
-    ]
+    "branches": []
   },
   "weezing": {
     "stage": 1,
-    "branches": []
-  },
-  "wigglytuff": {
-    "stage": 2,
     "branches": []
   },
   "zubat": {

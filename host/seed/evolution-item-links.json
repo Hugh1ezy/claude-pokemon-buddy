@@ -1,0 +1,122 @@
+[
+  {
+    "from": "clefairy",
+    "to": "clefable",
+    "stage": 1,
+    "requires": "moon-stone"
+  },
+  {
+    "from": "eevee",
+    "to": "flareon",
+    "stage": 0,
+    "requires": "fire-stone"
+  },
+  {
+    "from": "eevee",
+    "to": "jolteon",
+    "stage": 0,
+    "requires": "thunder-stone"
+  },
+  {
+    "from": "eevee",
+    "to": "vaporeon",
+    "stage": 0,
+    "requires": "water-stone"
+  },
+  {
+    "from": "exeggcute",
+    "to": "exeggutor",
+    "stage": 0,
+    "requires": "leaf-stone"
+  },
+  {
+    "from": "gloom",
+    "to": "vileplume",
+    "stage": 1,
+    "requires": "leaf-stone"
+  },
+  {
+    "from": "graveler",
+    "to": "golem",
+    "stage": 1,
+    "requires": "trade"
+  },
+  {
+    "from": "growlithe",
+    "to": "arcanine",
+    "stage": 0,
+    "requires": "fire-stone"
+  },
+  {
+    "from": "haunter",
+    "to": "gengar",
+    "stage": 1,
+    "requires": "trade"
+  },
+  {
+    "from": "jigglypuff",
+    "to": "wigglytuff",
+    "stage": 1,
+    "requires": "moon-stone"
+  },
+  {
+    "from": "kadabra",
+    "to": "alakazam",
+    "stage": 1,
+    "requires": "trade"
+  },
+  {
+    "from": "machoke",
+    "to": "machamp",
+    "stage": 1,
+    "requires": "trade"
+  },
+  {
+    "from": "nidorina",
+    "to": "nidoqueen",
+    "stage": 1,
+    "requires": "moon-stone"
+  },
+  {
+    "from": "nidorino",
+    "to": "nidoking",
+    "stage": 1,
+    "requires": "moon-stone"
+  },
+  {
+    "from": "pikachu",
+    "to": "raichu",
+    "stage": 1,
+    "requires": "thunder-stone"
+  },
+  {
+    "from": "poliwhirl",
+    "to": "poliwrath",
+    "stage": 1,
+    "requires": "water-stone"
+  },
+  {
+    "from": "shellder",
+    "to": "cloyster",
+    "stage": 0,
+    "requires": "water-stone"
+  },
+  {
+    "from": "staryu",
+    "to": "starmie",
+    "stage": 0,
+    "requires": "water-stone"
+  },
+  {
+    "from": "vulpix",
+    "to": "ninetales",
+    "stage": 0,
+    "requires": "fire-stone"
+  },
+  {
+    "from": "weepinbell",
+    "to": "victreebel",
+    "stage": 1,
+    "requires": "leaf-stone"
+  }
+]

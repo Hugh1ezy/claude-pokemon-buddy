@@ -1,37 +1,131 @@
 {
-  "kadabra": {
-    "stage": 1,
-    "branches": [
-      {
-        "to": "alakazam",
-        "needs": {
-          "level": 20,
-          "bond": 40,
-          "care": true
-        },
-        "priority": 1
-      }
-    ]
-  },
   "alakazam": {
     "stage": 2,
     "branches": []
   },
-  "machoke": {
+  "arcanine": {
+    "stage": 1,
+    "branches": []
+  },
+  "clefable": {
+    "stage": 2,
+    "branches": []
+  },
+  "clefairy": {
     "stage": 1,
     "branches": [
       {
-        "to": "machamp",
+        "to": "clefable",
         "needs": {
-          "level": 36,
-          "bond": 48,
-          "care": true
+          "level": 30,
+          "bond": 44,
+          "daytime": true
         },
-        "priority": 1
+        "priority": 2
+      },
+      {
+        "to": "clefable",
+        "needs": {
+          "level": 26,
+          "bond": 32,
+          "night": true
+        },
+        "priority": 3
       }
     ]
   },
-  "machamp": {
+  "cloyster": {
+    "stage": 1,
+    "branches": []
+  },
+  "eevee": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "flareon",
+        "needs": {
+          "bond": 56,
+          "weatherKind": "sun"
+        },
+        "priority": 3
+      },
+      {
+        "to": "jolteon",
+        "needs": {
+          "bond": 56,
+          "streak": 12
+        },
+        "priority": 3
+      },
+      {
+        "to": "vaporeon",
+        "needs": {
+          "bond": 56,
+          "weatherKind": "rain"
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "exeggcute": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "exeggutor",
+        "needs": {
+          "level": 28,
+          "bond": 40,
+          "daytime": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "exeggutor",
+        "needs": {
+          "level": 24,
+          "bond": 28,
+          "warmHumid": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "exeggutor": {
+    "stage": 1,
+    "branches": []
+  },
+  "flareon": {
+    "stage": 1,
+    "branches": []
+  },
+  "gengar": {
+    "stage": 2,
+    "branches": []
+  },
+  "gloom": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "vileplume",
+        "needs": {
+          "level": 32,
+          "bond": 42,
+          "daytime": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "vileplume",
+        "needs": {
+          "level": 28,
+          "bond": 30,
+          "warmHumid": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "golem": {
     "stage": 2,
     "branches": []
   },
@@ -48,9 +142,28 @@
       }
     ]
   },
-  "golem": {
-    "stage": 2,
-    "branches": []
+  "growlithe": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "arcanine",
+        "needs": {
+          "level": 26,
+          "bond": 36,
+          "care": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "arcanine",
+        "needs": {
+          "level": 22,
+          "bond": 26,
+          "weatherKind": "sun"
+        },
+        "priority": 3
+      }
+    ]
   },
   "haunter": {
     "stage": 1,
@@ -75,9 +188,143 @@
       }
     ]
   },
-  "gengar": {
+  "jigglypuff": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "wigglytuff",
+        "needs": {
+          "level": 30,
+          "bond": 42,
+          "care": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "wigglytuff",
+        "needs": {
+          "level": 26,
+          "bond": 32,
+          "night": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "jolteon": {
+    "stage": 1,
+    "branches": []
+  },
+  "kadabra": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "alakazam",
+        "needs": {
+          "level": 20,
+          "bond": 40,
+          "care": true
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "machamp": {
     "stage": 2,
     "branches": []
+  },
+  "machoke": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "machamp",
+        "needs": {
+          "level": 36,
+          "bond": 48,
+          "care": true
+        },
+        "priority": 1
+      }
+    ]
+  },
+  "nidoking": {
+    "stage": 2,
+    "branches": []
+  },
+  "nidoqueen": {
+    "stage": 2,
+    "branches": []
+  },
+  "nidorina": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "nidoqueen",
+        "needs": {
+          "level": 34,
+          "bond": 44,
+          "care": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "nidoqueen",
+        "needs": {
+          "level": 30,
+          "bond": 34,
+          "night": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "nidorino": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "nidoking",
+        "needs": {
+          "level": 36,
+          "bond": 44
+        },
+        "priority": 1
+      },
+      {
+        "to": "nidoking",
+        "needs": {
+          "level": 32,
+          "bond": 34,
+          "night": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "ninetales": {
+    "stage": 1,
+    "branches": []
+  },
+  "pikachu": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "raichu",
+        "needs": {
+          "level": 30,
+          "bond": 42
+        },
+        "priority": 1
+      },
+      {
+        "to": "raichu",
+        "needs": {
+          "level": 26,
+          "bond": 30,
+          "streak": 12
+        },
+        "priority": 3
+      }
+    ]
   },
   "poliwhirl": {
     "stage": 1,
@@ -90,7 +337,135 @@
           "care": true
         },
         "priority": 2
+      },
+      {
+        "to": "poliwrath",
+        "needs": {
+          "level": 30,
+          "bond": 32,
+          "weatherKind": "rain"
+        },
+        "priority": 3
       }
     ]
+  },
+  "poliwrath": {
+    "stage": 2,
+    "branches": []
+  },
+  "raichu": {
+    "stage": 2,
+    "branches": []
+  },
+  "shellder": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "cloyster",
+        "needs": {
+          "level": 26,
+          "bond": 38,
+          "care": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "cloyster",
+        "needs": {
+          "level": 22,
+          "bond": 28,
+          "weatherKind": "rain"
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "starmie": {
+    "stage": 1,
+    "branches": []
+  },
+  "staryu": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "starmie",
+        "needs": {
+          "level": 28,
+          "bond": 38
+        },
+        "priority": 1
+      },
+      {
+        "to": "starmie",
+        "needs": {
+          "level": 24,
+          "bond": 28,
+          "weatherKind": "rain",
+          "night": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "vaporeon": {
+    "stage": 1,
+    "branches": []
+  },
+  "victreebel": {
+    "stage": 2,
+    "branches": []
+  },
+  "vileplume": {
+    "stage": 2,
+    "branches": []
+  },
+  "vulpix": {
+    "stage": 0,
+    "branches": [
+      {
+        "to": "ninetales",
+        "needs": {
+          "level": 30,
+          "bond": 42
+        },
+        "priority": 1
+      },
+      {
+        "to": "ninetales",
+        "needs": {
+          "level": 26,
+          "bond": 30,
+          "weatherKind": "sun",
+          "care": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "weepinbell": {
+    "stage": 1,
+    "branches": [
+      {
+        "to": "victreebel",
+        "needs": {
+          "level": 34,
+          "bond": 42
+        },
+        "priority": 1
+      },
+      {
+        "to": "victreebel",
+        "needs": {
+          "level": 30,
+          "bond": 30,
+          "warmHumid": true
+        },
+        "priority": 3
+      }
+    ]
+  },
+  "wigglytuff": {
+    "stage": 2,
+    "branches": []
   }
 }

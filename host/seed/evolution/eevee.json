@@ -2,14 +2,46 @@
   "eevee": {
     "stage": 0,
     "branches": [
-      { "to": "espeon", "needs": { "bond": 56, "daytime": true }, "priority": 2 },
-      { "to": "umbreon", "needs": { "bond": 56, "night": true }, "priority": 2 },
-      { "to": "sylveon", "needs": { "bond": 56, "care": true }, "priority": 1 },
-      { "to": "leafeon", "needs": { "bond": 56, "warmHumid": true }, "priority": 3 },
-      { "to": "glaceon", "needs": { "bond": 56, "cold": true }, "priority": 3 },
-      { "to": "vaporeon", "needs": { "stone": "water" }, "priority": 9 },
-      { "to": "jolteon", "needs": { "stone": "thunder" }, "priority": 9 },
-      { "to": "flareon", "needs": { "stone": "fire" }, "priority": 9 }
+      {
+        "to": "espeon",
+        "needs": {
+          "bond": 56,
+          "daytime": true
+        },
+        "priority": 2
+      },
+      {
+        "to": "umbreon",
+        "needs": {
+          "bond": 56,
+          "night": true
+        },
+        "priority": 2
+      },
+      {
+        "to": "sylveon",
+        "needs": {
+          "bond": 56,
+          "care": true
+        },
+        "priority": 1
+      },
+      {
+        "to": "leafeon",
+        "needs": {
+          "bond": 56,
+          "warmHumid": true
+        },
+        "priority": 3
+      },
+      {
+        "to": "glaceon",
+        "needs": {
+          "bond": 56,
+          "cold": true
+        },
+        "priority": 3
+      }
     ]
   }
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { eligibleBranches, resolveEvolution } from "../src/pet/evolution.js";
+import { chooseAuto, eligibleBranches, resolveEvolution } from "../src/pet/evolution.js";
 
 test("care-gated Eevee branch auto-resolves before lower-priority branches", () => {
   const cands = eligibleBranches("eevee", {
@@ -71,21 +71,41 @@ test("warm humid daytime Eevee without care waits for player branch choice", () 
   );
 });
 
-test("stone branch overrides when another branch is also eligible", () => {
-  const resolved = resolveEvolution("eevee", {
-    bond: 170,
-    daytime: true,
-    stone: "fire",
-  });
+// The rule KEY acts on, exercised against branches invented here rather than
+// against the real tables. Several of those are spoilers, and a test that had to
+// name a real condition to reach this code would put one in a file the owner
+// reads.
+test("one destination reached by several roads still evolves on KEY", () => {
+  const auto = chooseAuto([
+    { to: "portmanteau", needs: { level: 30, bond: 40 }, priority: 1 },
+    { to: "portmanteau", needs: { level: 26, bond: 30, warmHumid: true }, priority: 3 },
+  ]);
 
-  assert.equal(resolved.auto, "flareon");
-  assert.deepEqual(
-    resolved.candidates.map(({ to, priority }) => ({ to, priority })),
-    [
-      { to: "espeon", priority: 2 },
-      { to: "flareon", priority: 9 },
-    ],
-  );
+  // Two roads, one place: nothing to choose between, so it must not stall on a
+  // prompt offering the same name twice.
+  assert.equal(auto, "portmanteau");
+});
+
+test("two destinations hand the choice back to the owner", () => {
+  const auto = chooseAuto([
+    { to: "portmanteau", needs: { bond: 40 }, priority: 2 },
+    { to: "spoonerism", needs: { bond: 40 }, priority: 3 },
+  ]);
+
+  assert.equal(auto, null);
+});
+
+test("a priority-1 care branch outranks everything, however many roads there are", () => {
+  const auto = chooseAuto([
+    { to: "portmanteau", needs: { bond: 40, care: true }, priority: 1 },
+    { to: "spoonerism", needs: { bond: 40 }, priority: 2 },
+  ]);
+
+  assert.equal(auto, "portmanteau");
+});
+
+test("no eligible branch is not an evolution", () => {
+  assert.equal(chooseAuto([]), null);
 });
 
 test("bulbasaur evolves to ivysaur at level 16, ivysaur to venusaur at 32 (official gates)", () => {

@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { validateSettings } from "./settings.js";
 
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL("./public", import.meta.url));
-const EVOLUTION_STONES = new Set(["water", "thunder", "fire"]);
 const SPRITE_FILES = new Map([
   ["/sprites/eevee", fileURLToPath(new URL("../../seed/sprites/eevee.png", import.meta.url))],
   ["/sprites/vaporeon", fileURLToPath(new URL("../../seed/sprites/vaporeon.png", import.meta.url))],
@@ -34,7 +33,6 @@ export function startWebServer({
   getView = () => ({}),
   saveSettings = () => {},
   chooseEvolution = () => {},
-  grantEvolutionStone = () => {},
   framePath = "out/frame.png",
   publicDir = DEFAULT_PUBLIC_DIR,
 } = {}) {
@@ -46,7 +44,6 @@ export function startWebServer({
         getView,
         saveSettings,
         chooseEvolution,
-        grantEvolutionStone,
         framePath,
         publicDir,
       });
@@ -156,32 +153,6 @@ async function routeRequest(req, res, context) {
       return;
     }
     respondJson(res, 202, { ok: true, queued: true, to: result?.to ?? body.to });
-    return;
-  }
-
-  if (req.method === "POST" && url.pathname === "/api/evolution/stone") {
-    let body;
-    try {
-      body = await readJsonBody(req, res);
-    } catch (error) {
-      if (error.responded) return;
-      respondJson(res, 400, { error: error.message });
-      return;
-    }
-
-    if (!EVOLUTION_STONES.has(body.stone)) {
-      respondJson(res, 400, { error: "invalid evolution stone" });
-      return;
-    }
-
-    let result;
-    try {
-      result = await context.grantEvolutionStone(body.stone);
-    } catch (error) {
-      respondJson(res, 400, { error: error.message });
-      return;
-    }
-    respondJson(res, 202, { ok: true, queued: true, stone: body.stone, to: result?.to });
     return;
   }
 
