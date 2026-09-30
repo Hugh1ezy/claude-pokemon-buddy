@@ -4,6 +4,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runOneTick } from "../src/index.js";
+import { PARAMS } from "../src/pet/sim.js";
 import { createMockTransport } from "../src/transport/mock.js";
 
 test("one tick produces frame and advances state", async () => {
@@ -72,11 +73,17 @@ test("same-day usage growth credits only new token progress", async () => {
     today: "2026-05-30",
   });
 
-  assert.equal(first.expGain, 0);
-  assert.equal(second.expGain, 2);
-  assert.equal(second.exp, 2);
-  assert.equal(second.todayCreditedExp, 4);
-  assert.equal(second.todayCreditedBond, 4);
+  // Derived from PARAMS rather than written out: these numbers moved when the
+  // daily yield was doubled on 2026-09-09, and the thing under test is the
+  // DELTA -- that a second tick on the same day credits only the new tokens --
+  // not what a thousand tokens happen to be worth this month.
+  const perKTok = PARAMS.expPerKTok;
+  assert.equal(first.expGain, 0, "a newborn anchors the day it is born, it does not claim it");
+  assert.equal(first.todayCreditedExp, perKTok, "1k tokens anchored");
+  assert.equal(second.expGain, perKTok, "the second 1k, and only the second");
+  assert.equal(second.exp, perKTok);
+  assert.equal(second.todayCreditedExp, 2 * perKTok);
+  assert.equal(second.todayCreditedBond, PARAMS.bondPerActiveDay);
 });
 
 test("fresh pet state rolls personality on first tick", async () => {

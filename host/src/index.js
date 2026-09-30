@@ -13,7 +13,7 @@ import { stepEncounter } from "./pet/encounter.js";
 import { buildEncounterContext } from "./pet/encounter-context.js";
 import { loadEncounterTable } from "./pet/encounter-table.js";
 import { SPECIES_DEX, isDexSpecies, zhName } from "./pet/species-meta.js";
-import { isFrozenSpecies, pinFrozenGrowth, rosterEntries, swapActiveBuddy } from "./pet/roster.js";
+import { grantRosterExp, isFrozenSpecies, pinFrozenGrowth, rosterEntries, swapActiveBuddy } from "./pet/roster.js";
 import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
 import {
   buildUsedDays,
@@ -764,6 +764,11 @@ export function applyEncounterTick(pet, { usage, weather, room, now, rng = Math.
 // Folds what the capture screen decided into the pet. The screen itself never
 // writes the save -- it hands back a verdict and the tick applies it here, so
 // there is exactly one writer no matter how the minigame ends.
+// What a single capture is worth to every pokemon you hold, in hearts. One, and
+// it is a whole heart rather than the half the bond window pays because a catch
+// is a rarer thing than an hour going by.
+export const CAPTURE_ROSTER_HEARTS = 1;
+
 export function applyCaptureResults(pet, captureResults, logger = console, today = null) {
   const results = Array.isArray(captureResults)
     ? captureResults.splice(0)
@@ -790,6 +795,12 @@ export function applyCaptureResults(pet, captureResults, logger = console, today
     // the confirm screen has a date to show for every pokemon that has one.
     const recorded = recordCapture(next, { species: result.species, level: 5, caughtAt: today });
     next = { ...next, ...recorded.dex };
+    // Everything you hold gets a heart's worth of EXP out of it (owner,
+    // 2026-09-09). After recordCapture on purpose, so the one just caught is in
+    // the box and shares in the moment that put it there. It fires on a
+    // duplicate and on a catch the box had no room for too: both are captures,
+    // and the reward is for the catching.
+    next = grantRosterExp(next, { hearts: CAPTURE_ROSTER_HEARTS });
     logger?.log?.(
       `pokedex: ${zhName(result.species)} caught`
       + `${recorded.isNewToDex ? " (new)" : ""}${recorded.keptInBox ? "" : " (box full)"}`,

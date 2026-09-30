@@ -82,6 +82,15 @@
 // what a substitute really asks for, and the level floor is there to stop a
 // freshly caught level-5 walking straight into its final form on a rainy day.
 //
+// **2026-09-09: the daily EXP yield was doubled** (see PARAMS in src/pet/sim.js).
+// The level floors below were tuned against the old pace and are now roughly
+// half a day's work each -- they still do the one job they were given, which is
+// keeping a level-5 catch out of its final form, but they no longer pace
+// anything. The bond floors carry all of it now, which is the right place for
+// the weight: bond cannot be hurried by spending a busy afternoon. If a future
+// substitute needs to feel like it took time, put the time in the bond floor.
+// Nothing here should ever be gated on level alone.
+//
 // Trades (unchanged, 2026-08-03):     level 20-36, bond 40-64
 // Stones (this pass):                 level 22-36, bond 26-48
 //

@@ -9,8 +9,18 @@ import { LEFT_W, W } from "../src/render/palette.js";
 
 const FULL_DAY_TOKENS = 99_999_999; // more than enough to hit dailyExpCap
 
-test("one full day of usage is worth exactly one day of EXP", () => {
-  assert.equal(PARAMS.dailyExpCap, PARAMS.levelExp);
+test("one full day of usage is worth two days of the curve", () => {
+  // Doubled 2026-09-09 on the owner's instruction. `levelExp` is the unit the
+  // curve is drawn in and stays put; the day's yield is what moved.
+  assert.equal(PARAMS.dailyExpCap, PARAMS.levelExp * 2);
+});
+
+test("a full day still costs the same 50k tokens it always did", () => {
+  // The half that is easy to forget. Raising the cap without raising the rate
+  // would leave every ordinary day earning exactly what it earned before and
+  // only pay out on days over 100k tokens -- a change that reads as "doubled"
+  // and is not.
+  assert.equal(PARAMS.dailyExpCap / PARAMS.expPerKTok, 50);
 });
 
 test("the curve never gets cheaper as levels go up", () => {
@@ -31,16 +41,18 @@ test("expToNextLevel survives a garbage level instead of diverging", () => {
   assert.equal(expToNextLevel(9999), expToNextLevel(PARAMS.maxLevel));
 });
 
-// Pace: full daily usage every day should max the buddy out in roughly a month --
-// slow enough to be worth waiting for, fast enough to finish.
-test("daily full usage reaches the level cap in about a month", () => {
+// Pace: full daily usage every day should max the buddy out in about a fortnight.
+// It was about a month until 2026-09-09, when the owner said it was too slow and
+// asked for the daily yield to be doubled. Still slow enough to be worth waiting
+// for; the bond-gated evolutions are what keep the long game long now.
+test("daily full usage reaches the level cap in about a fortnight", () => {
   let pet = { level: 1, exp: 0, bond: 0, todayCreditedExp: 0, todayCreditedBond: 0, lastGrowthDay: "2026-06-09" };
   let days = 0;
   while (pet.level < PARAMS.maxLevel && days < 200) {
     days += 1;
     pet = applyDailyGrowth(pet, { todayTokens: FULL_DAY_TOKENS, today: dayString(days) });
   }
-  assert.ok(days >= 25 && days <= 40, `expected roughly a month of daily use, got ${days} days`);
+  assert.ok(days >= 12 && days <= 20, `expected roughly a fortnight of daily use, got ${days} days`);
 });
 
 test("the level 16 / 32 evolution gates land in the first days, not the first hour", () => {
@@ -52,8 +64,10 @@ test("the level 16 / 32 evolution gates land in the first days, not the first ho
       if (reached[gate] == null && pet.level >= gate) reached[gate] = day;
     }
   }
-  assert.ok(reached[16] >= 2 && reached[16] <= 5, `Lv.16 should take a few days, took ${reached[16]}`);
-  assert.ok(reached[32] > reached[16] && reached[32] <= 12, `Lv.32 should follow later, took ${reached[32]}`);
+  // Still more than a single sitting, which is the point of the test -- these are
+  // evolution gates and they should not all fall on the first afternoon.
+  assert.ok(reached[16] >= 2 && reached[16] <= 4, `Lv.16 should take a few days, took ${reached[16]}`);
+  assert.ok(reached[32] > reached[16] && reached[32] <= 8, `Lv.32 should follow later, took ${reached[32]}`);
 });
 
 test("the seed tables gate evolution on the official Pokémon levels", () => {

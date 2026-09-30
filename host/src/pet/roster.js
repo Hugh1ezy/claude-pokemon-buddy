@@ -7,8 +7,9 @@
 //
 // The test is "do I own something this evolves into", not "does this evolve",
 // which matters: a wild charmander you have never evolved is perfectly alive.
-import { settleBondExp } from "./bond.js";
+import { HALVES_PER_HEART, expForHalfHeart, settleBondExp } from "./bond.js";
 import { boxPet, normalizeDex } from "./dex.js";
+import { gainExp } from "./sim.js";
 import { SPECIES_DEX, evolutionDescendants, isDexSpecies } from "./species-meta.js";
 
 export function isFrozenSpecies(species, dex) {
@@ -144,6 +145,60 @@ function withPetFields(stored, species) {
 // its day bookkeeping -- the anchors have to keep moving or a later swap would
 // let a live buddy claim a day it did not earn -- and then its level, exp and
 // bond are put back where they were. Growth is pinned, not skipped.
+// A catch is a moment for the whole collection, not just for the one that was
+// caught. Owner, 2026-09-09: 「捕捉到任意宝可梦时，图鉴中所有宝可梦获得一颗心的
+// 经验值」.
+//
+// Denominated in HEARTS, and that is the whole design rather than a unit choice.
+// A half heart is half a percent of the level in progress (see expForHalfHeart),
+// so one heart is one percent of each pokemon's OWN bar -- it means the same
+// thing to the Lv.5 that arrived this morning as to the buddy in the forties. A
+// flat number of points could not: the curve runs from 6 EXP a level to 42, so
+// any fixed amount is either a free level down at the bottom or a rounding error
+// at the top.
+//
+// Everything that can hold EXP gets it: the pokemon on the panel and every entry
+// in the box. Not the dex list -- 图鉴 records that you have MET a species, and a
+// species you have met but do not hold has no level to add anything to.
+//
+// Keepsakes are skipped, by the same rule that governs everything else here: a
+// form you have already evolved past is displayed, not alive. Skipping it also
+// keeps it honest on screen, since a keepsake renders `Lv -` and would otherwise
+// be quietly levelling behind a dash.
+//
+// An entry with no usable level is left exactly as it is rather than being
+// treated as Lv.1 -- inventing a level for a malformed row would write the
+// invention to disk, and a box row is the one thing here with no other copy.
+export function grantRosterExp(pet, { hearts = 1 } = {}) {
+  const halves = Math.max(0, Number(hearts) || 0) * HALVES_PER_HEART;
+  if (halves <= 0 || !pet) return pet;
+
+  const grow = (level, exp) => gainExp(level, exp, expForHalfHeart(level) * halves);
+  const canGrow = (species, level) => (
+    typeof species === "string" && Number.isFinite(Number(level)) && !isFrozenSpecies(species, pet)
+  );
+
+  let next = pet;
+  if (canGrow(pet.species, pet.level)) {
+    const grown = grow(pet.level, pet.exp);
+    next = { ...next, level: grown.level, exp: grown.exp };
+  }
+
+  const box = normalizeDex(pet).box;
+  if (box.length > 0) {
+    next = {
+      ...next,
+      box: box.map((entry) => {
+        if (!canGrow(entry?.species, entry?.level)) return entry;
+        const grown = grow(entry.level, entry.exp);
+        return { ...entry, level: grown.level, exp: grown.exp };
+      }),
+    };
+  }
+
+  return next;
+}
+
 export function pinFrozenGrowth(before, after) {
   return {
     ...after,

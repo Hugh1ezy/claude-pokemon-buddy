@@ -1,6 +1,6 @@
 export const PARAMS = {
-  dailyExpCap: 100,
-  expPerKTok: 2,
+  dailyExpCap: 200,
+  expPerKTok: 4,
   levelExp: 100,
   maxLevel: 100,
   bondPerActiveDay: 4,
@@ -9,17 +9,33 @@ export const PARAMS = {
   costSpikeUSD: 30,
 };
 
-// EXP is denominated in days: dailyExpCap === levelExp, so a full day of usage is
-// worth exactly one day of progress and a light day earns a fraction of one. The
-// curve below then only has to answer one question -- how much of the road to
-// Lv.100 does each level cover.
+// EXP is denominated in CURVE days, and one real day of full usage is worth two
+// of them: dailyExpCap === levelExp * 2. The curve below then only has to answer
+// one question -- how much of the road to Lv.100 does each level cover -- and the
+// pace is set here, in one place, by how fast a day pays that road down.
 //
-// Shape: a power curve, so early levels fall in a couple of hours and late ones
-// take most of a day, which is what makes the species evolve on a Pokémon-ish
-// schedule (the seed tables gate evolution on level 16/32/36) while a fully
-// maxed buddy is still roughly a month of daily use away. The two constants are
-// deliberately not round numbers and are not documented anywhere the owner
-// reads -- the whole point is that the pace is discovered, not announced.
+// It used to be one for one. Doubled on the owner's instruction, 2026-09-09:
+// 「经验获得太慢了……将每天可获得的经验值加倍」. Both halves of the credit doubled,
+// not just the cap -- doubling `dailyExpCap` alone would have moved the token
+// threshold for a maxed day from 50k to 100k and made ordinary days no faster at
+// all, which is the opposite of what was asked. `expPerKTok` doubled with it, so
+// every day's yield is exactly twice what it was and 50k tokens still fills the
+// day. `levelExp` is deliberately NOT doubled: it is the unit the curve is drawn
+// in, and changing it would rescale the road instead of walking it faster.
+//
+// What that costs, so it is not a surprise later: the level floors on the
+// evolution tables were tuned against the old pace and are now cheap. Bond was
+// always the real clock (it can only rise about four a day and cannot be
+// hurried), so the bond floors still do the gating -- but nothing should be
+// gated on level alone from here on.
+//
+// Shape: a power curve, so early levels fall in an hour or two and late ones
+// still take a real chunk of a day, which is what makes the species evolve on a
+// Pokémon-ish schedule (the seed tables gate evolution on level 16/32/36) while
+// a fully maxed buddy is still a couple of weeks of daily use away. The two
+// constants are deliberately not round numbers and are not documented anywhere
+// the owner reads -- the whole point is that the pace is discovered, not
+// announced.
 const CURVE_TOTAL_DAYS = 31;
 const CURVE_SHAPE = 1.35;
 const CURVE_TOTAL_EXP = CURVE_TOTAL_DAYS * PARAMS.levelExp;
@@ -86,8 +102,8 @@ export function applyDailyGrowth(pet, { todayTokens, today } = {}) {
   const sameDay = pet.lastGrowthDay === today || dateRegressed;
   // Newborn (or never-credited) on a known day: anchor today's already-spent usage as the
   // baseline so the pet earns EXP only from tokens spent AFTER it was created. Without this,
-  // a pet born mid-day retroactively claims the whole day's exp (= one full level, since
-  // dailyExpCap === levelExp) and jumps straight to Lv.2.
+  // a pet born mid-day retroactively claims the whole day's exp -- several levels at
+  // the cheap end of the curve -- and jumps straight up the moment it hatches.
   const firstEver = pet.lastGrowthDay == null;
   const creditedExp = sameDay ? Number(pet.todayCreditedExp ?? 0) : (firstEver ? credited.exp : 0);
   const creditedBond = sameDay ? Number(pet.todayCreditedBond ?? 0) : 0;

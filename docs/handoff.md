@@ -1,7 +1,138 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-09-04
-(WORK PC, item evolutions and two dead branches)**.
+Rolling note between the home PC and the work PC. Last updated **2026-09-09
+(WORK PC, EXP pace doubled, capture pays the collection)**.
+
+## ▶ 2026-09-09 — 「经验获得太慢了」, and a runaway test runner of my own making
+
+Reported: 蚊香蝌蚪 stuck at Lv.5 for days, 「我记得以前没这么慢」.
+
+### Not a bug. Same root cause as 09-04, and I watched it clear.
+
+Two reads of `out/state.json` a minute apart, no intervention in between:
+
+```
+09:19:37  Lv 5   exp 1.75   todayCreditedExp 0
+09:20:40  Lv 11  exp 2.75   todayCreditedExp 100
+```
+
+Today's tokens credited and the buddy went up six levels on the spot — exactly
+what the curve predicts from Lv.5. That is the second direct confirmation that
+settlement works (09-04 was growlithe 32→35).
+
+The cause is the one already written up on 09-04: EXP comes from ccusage on
+**whichever machine runs the host**, and this machine's `activeDays` tail reads
+`… 08-17, 09-04, 09-09` — nothing on 09-05..09-08. Over that stretch the only
+income was the half-heart conversion: exp reached 1.75 against the 14 a Lv.5
+needs. `careDays` was full throughout, so the device was being looked after; the
+usage simply was not on this box.
+
+`sim.js` has not been touched since 2026-07-27 (`083124b`), so 「以前没这么慢」 is
+not a regression — it is the input, not the code. **This has now cost two
+sessions, so it is in `PLAYER-GUIDE.md` as a warning line rather than only here.**
+
+### The daily EXP yield is doubled
+
+Owner's instruction: 「将每天可获得的经验值加倍」. `dailyExpCap` 100→200 and
+`expPerKTok` 2→4, in `PARAMS` (src/pet/sim.js).
+
+**Both halves, and that is the point.** Doubling `dailyExpCap` alone would have
+moved the token threshold for a filled day from 50k to 100k and left every
+ordinary day earning exactly what it earned before — a change that reads as
+"doubled" and is not. There is now a test pinning `dailyExpCap / expPerKTok ===
+50` so that cannot be half-done later.
+
+`levelExp` is deliberately unchanged: it is the unit the curve is drawn in.
+Doubling it would rescale the road rather than walk it faster.
+
+Measured pace, full usage every day:
+
+| | before | after |
+|---|---|---|
+| Lv.1 → Lv.100 | 31 days | **16 days** |
+| Lv.16 gate | day 4 | **day 2** |
+| Lv.32 gate | day 8 | **day 4** |
+| one full day from Lv.5 | → Lv.11 | **→ Lv.15** |
+
+He also asked whether the curve costs less early and more late. It does, and
+already did: 6 EXP for Lv.1, 14 at Lv.5, 28 at Lv.32, 42 at Lv.99, monotonically
+non-decreasing. `exp-curve.test.js` has asserted that all along; nothing needed
+changing.
+
+**The consequence worth carrying forward:** level is no longer the binding
+constraint on anything. The evolution tables' level floors were tuned against
+the old pace and are now roughly half a day's work each. Bond still gates
+everything real — it rises about four a day and cannot be hurried — so nothing
+new should ever be gated on level alone. Noted in the spoiler generator too.
+
+### A capture now pays the whole collection
+
+Owner, same day: 「捕捉到任意宝可梦时，图鉴中所有宝可梦获得一颗心的经验值」.
+
+`grantRosterExp(pet, { hearts })` in `pet/roster.js`, called from
+`applyCaptureResults` after `recordCapture`. One heart = two half hearts = **1%
+of each pokemon's own bar**, so it is worth the same proportion to a Lv.5 in the
+box as to the buddy in the forties. A flat number of points could not be: the
+curve runs 6 EXP a level to 42.
+
+- Paid to the buddy on the panel and every box entry, including the one just
+  caught.
+- Paid on a duplicate, and on a catch the box had no room for. Both are
+  captures; the reward is for the catching.
+- **Not** paid to a keepsake — same rule as everywhere else in roster.js, and it
+  would be invisible growth behind a `Lv -` anyway.
+- A box row with no usable level is left byte-identical rather than treated as
+  Lv.1. Inventing a level would write the invention to disk and a box row has no
+  other copy.
+
+Scale, measured against his own numbers (58 captures over the last stretch, ~2 a
+day, 52 box entries): a boxed pokemon gains ~2% of its bar a day, so ~50 days a
+level. **That is the only way a boxed pokemon grows at all** — nothing else
+gives EXP to anything but the active buddy. If it should feel like more, the
+single knob is `CAPTURE_ROSTER_HEARTS` in src/index.js.
+
+Note the ordering: `applyCaptureResults` runs AFTER `applyPetTransitions`, so a
+level gained from a catch is seen by the evolution check on the NEXT tick, not
+this one. Harmless (evolution needs a KEY press regardless) but worth knowing
+before someone calls it a bug.
+
+### Trap, and it was mine
+
+**I left a `node --test` running on 09-04 and it was still alive five days
+later** — two of them, plus children. This is the exact hazard already written
+up further down this file, and I walked into it. Worse, it was the direct cause
+of today's suite hanging: a second run at 09:33 sat for 35 minutes on 1.0s of
+CPU, deadlocked against the stragglers' ports.
+
+**Run the suite with `--test-timeout` from now on**, so a wedged test fails
+instead of holding the tree:
+
+```powershell
+node --test --test-concurrency=4 --test-reporter=tap --test-timeout=60000 "test/*.test.js"
+```
+
+To find strays without killing the host:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Select ProcessId, CommandLine
+```
+
+Kill the `--test` ones. **Leave the one whose command line is `src\index.js`** —
+that is the buddy.
+
+### Test state
+
+744 tests, 733 pass, **11 fail — the same 11 that fail at HEAD** (six macOS-only
+autostart, two `.inc` drift checks, RM12, two concurrency-flaky `usage-bridge`).
+One genuinely new failure appeared and was fixed: `integration.test.js` had the
+old token→EXP rate written out as literals, and now derives from `PARAMS`.
+
+### For whoever picks this up
+
+- Host restarted at the end of this session so both changes are live.
+- Today's 100 EXP was already banked before the change; on restart the day's
+  allowance became 200 and it topped up by the difference. That is correct, not
+  a double credit.
 
 ## ▶ 2026-09-04 — the buddy stuck at Lv.32, and two branches that were never alive
 
