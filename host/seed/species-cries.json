@@ -45,9 +45,9 @@
         }
       ],
       "bubble": {
-        "idle": "咻~",
-        "happy": "汩汩",
-        "strained": "凛~"
+        "idle": "Shawa!",
+        "happy": "Shawa♪",
+        "strained": "shawa…"
       }
     },
     {
@@ -82,9 +82,9 @@
         }
       ],
       "bubble": {
-        "idle": "滋滋!",
-        "happy": "噼啪!",
-        "strained": "嗞—"
+        "idle": "Daasu!",
+        "happy": "Daasu♪",
+        "strained": "daasu…"
       }
     },
     {
@@ -109,9 +109,9 @@
         }
       ],
       "bubble": {
-        "idle": "呼噜",
-        "happy": "暖暖!",
-        "strained": "咻…"
+        "idle": "Buusu!",
+        "happy": "Buusu♪",
+        "strained": "buusu…"
       }
     },
     {
@@ -136,9 +136,9 @@
         }
       ],
       "bubble": {
-        "idle": "叮~",
-        "happy": "叮铃♪",
-        "strained": "嗯…"
+        "idle": "Eefi!",
+        "happy": "Eefi♪",
+        "strained": "eefi…"
       }
     },
     {
@@ -163,9 +163,9 @@
         }
       ],
       "bubble": {
-        "idle": "呜…",
-        "happy": "呼~",
-        "strained": "……"
+        "idle": "Buraki!",
+        "happy": "Buraki♪",
+        "strained": "buraki…"
       }
     },
     {
@@ -190,9 +190,9 @@
         }
       ],
       "bubble": {
-        "idle": "沙~",
-        "happy": "沙沙♪",
-        "strained": "萎…"
+        "idle": "Riifia!",
+        "happy": "Riifia♪",
+        "strained": "riifia…"
       }
     },
     {
@@ -217,9 +217,9 @@
         }
       ],
       "bubble": {
-        "idle": "叮!",
-        "happy": "叮叮♪",
-        "strained": "咔…"
+        "idle": "Gurei!",
+        "happy": "Gurei♪",
+        "strained": "gurei…"
       }
     },
     {
@@ -244,9 +244,9 @@
         }
       ],
       "bubble": {
-        "idle": "叮铃",
-        "happy": "铃♪",
-        "strained": "呜~"
+        "idle": "Ninfi!",
+        "happy": "Ninfi♪",
+        "strained": "ninfi…"
       }
     },
     {
@@ -271,9 +271,9 @@
         }
       ],
       "bubble": {
-        "idle": "种子!",
-        "happy": "芽芽♪",
-        "strained": "蔫…"
+        "idle": "Dane!",
+        "happy": "Dane♪",
+        "strained": "dane…"
       }
     },
     {
@@ -303,9 +303,9 @@
         }
       ],
       "bubble": {
-        "idle": "蛙草!",
-        "happy": "咕嘟♪",
-        "strained": "垂…"
+        "idle": "Fushi!",
+        "happy": "Fushi♪",
+        "strained": "fushi…"
       }
     },
     {
@@ -340,9 +340,9 @@
         }
       ],
       "bubble": {
-        "idle": "蛙花!",
-        "happy": "轰隆♪",
-        "strained": "沉…"
+        "idle": "Bana!",
+        "happy": "Bana♪",
+        "strained": "bana…"
       }
     },
     {
@@ -367,9 +367,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘎喔!",
-        "happy": "噗噗!",
-        "strained": "咕…"
+        "idle": "Kage!",
+        "happy": "Kage♪",
+        "strained": "kage…"
       }
     },
     {
@@ -404,9 +404,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘎欧!",
-        "happy": "嘶哈!",
-        "strained": "唔…"
+        "idle": "Rizaa!",
+        "happy": "Rizaa♪",
+        "strained": "rizaa…"
       }
     },
     {
@@ -441,9 +441,9 @@
         }
       ],
       "bubble": {
-        "idle": "吼!!",
-        "happy": "嗷吼!",
-        "strained": "嗯…"
+        "idle": "Gaoo!",
+        "happy": "Gaoo♪",
+        "strained": "gaoo…"
       }
     },
     {
@@ -473,9 +473,9 @@
         }
       ],
       "bubble": {
-        "idle": "杰尼!",
-        "happy": "噗噜♪",
-        "strained": "杰…"
+        "idle": "Zeni!",
+        "happy": "Zeni♪",
+        "strained": "zeni…"
       }
     },
     {
@@ -505,9 +505,9 @@
         }
       ],
       "bubble": {
-        "idle": "卡咪~",
-        "happy": "咕噜噜",
-        "strained": "卡咪…"
+        "idle": "Kame!",
+        "happy": "Kame♪",
+        "strained": "kame…"
       }
     },
     {
@@ -542,9 +542,9 @@
         }
       ],
       "bubble": {
-        "idle": "水箭!",
-        "happy": "轰隆~",
-        "strained": "咕嗯…"
+        "idle": "Kamex!",
+        "happy": "Kamex♪",
+        "strained": "kamex…"
       }
     },
     {
@@ -559,9 +559,9 @@
         }
       ],
       "bubble": {
-        "idle": "毛虫!",
-        "happy": "毛虫♪",
-        "strained": "毛虫…"
+        "idle": "Kyata!",
+        "happy": "Kyata♪",
+        "strained": "kyata…"
       }
     },
     {
@@ -581,9 +581,9 @@
         }
       ],
       "bubble": {
-        "idle": "甲蛹!",
-        "happy": "甲蛹♪",
-        "strained": "甲蛹…"
+        "idle": "Toran!",
+        "happy": "Toran♪",
+        "strained": "toran…"
       }
     },
     {
@@ -608,9 +608,9 @@
         }
       ],
       "bubble": {
-        "idle": "大蝴!",
-        "happy": "大蝴♪",
-        "strained": "大蝴…"
+        "idle": "Furii!",
+        "happy": "Furii♪",
+        "strained": "furii…"
       }
     },
     {
@@ -625,9 +625,9 @@
         }
       ],
       "bubble": {
-        "idle": "角虫!",
-        "happy": "角虫♪",
-        "strained": "角虫…"
+        "idle": "Biido!",
+        "happy": "Biido♪",
+        "strained": "biido…"
       }
     },
     {
@@ -647,9 +647,9 @@
         }
       ],
       "bubble": {
-        "idle": "壳蛹!",
-        "happy": "壳蛹♪",
-        "strained": "壳蛹…"
+        "idle": "Kokun!",
+        "happy": "Kokun♪",
+        "strained": "kokun…"
       }
     },
     {
@@ -674,9 +674,9 @@
         }
       ],
       "bubble": {
-        "idle": "针蜂!",
-        "happy": "针蜂♪",
-        "strained": "针蜂…"
+        "idle": "Supia!",
+        "happy": "Supia♪",
+        "strained": "supia…"
       }
     },
     {
@@ -691,9 +691,9 @@
         }
       ],
       "bubble": {
-        "idle": "波波!",
-        "happy": "波波♪",
-        "strained": "波波…"
+        "idle": "Poppo!",
+        "happy": "Poppo♪",
+        "strained": "poppo…"
       }
     },
     {
@@ -708,9 +708,9 @@
         }
       ],
       "bubble": {
-        "idle": "比鸟!",
-        "happy": "比鸟♪",
-        "strained": "比鸟…"
+        "idle": "Pijon!",
+        "happy": "Pijon♪",
+        "strained": "pijon…"
       }
     },
     {
@@ -725,9 +725,9 @@
         }
       ],
       "bubble": {
-        "idle": "比雕!",
-        "happy": "比雕♪",
-        "strained": "比雕…"
+        "idle": "Pijot!",
+        "happy": "Pijot♪",
+        "strained": "pijot…"
       }
     },
     {
@@ -742,9 +742,9 @@
         }
       ],
       "bubble": {
-        "idle": "拉达!",
-        "happy": "拉达♪",
-        "strained": "拉达…"
+        "idle": "Ratta!",
+        "happy": "Ratta♪",
+        "strained": "ratta…"
       }
     },
     {
@@ -759,9 +759,9 @@
         }
       ],
       "bubble": {
-        "idle": "拉达!",
-        "happy": "拉达♪",
-        "strained": "拉达…"
+        "idle": "Rattaa!",
+        "happy": "Rattaa♪",
+        "strained": "rattaa…"
       }
     },
     {
@@ -776,9 +776,9 @@
         }
       ],
       "bubble": {
-        "idle": "烈雀!",
-        "happy": "烈雀♪",
-        "strained": "烈雀…"
+        "idle": "Suzu!",
+        "happy": "Suzu♪",
+        "strained": "suzu…"
       }
     },
     {
@@ -793,9 +793,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘴雀!",
-        "happy": "嘴雀♪",
-        "strained": "嘴雀…"
+        "idle": "Oni!",
+        "happy": "Oni♪",
+        "strained": "oni…"
       }
     },
     {
@@ -810,9 +810,9 @@
         }
       ],
       "bubble": {
-        "idle": "柏蛇!",
-        "happy": "柏蛇♪",
-        "strained": "柏蛇…"
+        "idle": "Aabo!",
+        "happy": "Aabo♪",
+        "strained": "aabo…"
       }
     },
     {
@@ -832,9 +832,9 @@
         }
       ],
       "bubble": {
-        "idle": "柏怪!",
-        "happy": "柏怪♪",
-        "strained": "柏怪…"
+        "idle": "Bokku!",
+        "happy": "Bokku♪",
+        "strained": "bokku…"
       }
     },
     {
@@ -854,9 +854,9 @@
         }
       ],
       "bubble": {
-        "idle": "卡丘!",
-        "happy": "卡丘♪",
-        "strained": "卡丘…"
+        "idle": "Pika!",
+        "happy": "Pika♪",
+        "strained": "pika…"
       }
     },
     {
@@ -876,9 +876,9 @@
         }
       ],
       "bubble": {
-        "idle": "雷丘!",
-        "happy": "雷丘♪",
-        "strained": "雷丘…"
+        "idle": "Rai!",
+        "happy": "Rai♪",
+        "strained": "rai…"
       }
     },
     {
@@ -893,9 +893,9 @@
         }
       ],
       "bubble": {
-        "idle": "山鼠!",
-        "happy": "山鼠♪",
-        "strained": "山鼠…"
+        "idle": "Sando!",
+        "happy": "Sando♪",
+        "strained": "sando…"
       }
     },
     {
@@ -910,9 +910,9 @@
         }
       ],
       "bubble": {
-        "idle": "山王!",
-        "happy": "山王♪",
-        "strained": "山王…"
+        "idle": "Pan!",
+        "happy": "Pan♪",
+        "strained": "pan…"
       }
     },
     {
@@ -927,9 +927,9 @@
         }
       ],
       "bubble": {
-        "idle": "多兰!",
-        "happy": "多兰♪",
-        "strained": "多兰…"
+        "idle": "Nido!",
+        "happy": "Nido♪",
+        "strained": "nido…"
       }
     },
     {
@@ -949,9 +949,9 @@
         }
       ],
       "bubble": {
-        "idle": "多娜!",
-        "happy": "多娜♪",
-        "strained": "多娜…"
+        "idle": "Riina!",
+        "happy": "Riina♪",
+        "strained": "riina…"
       }
     },
     {
@@ -971,9 +971,9 @@
         }
       ],
       "bubble": {
-        "idle": "多后!",
-        "happy": "多后♪",
-        "strained": "多后…"
+        "idle": "Kuin!",
+        "happy": "Kuin♪",
+        "strained": "kuin…"
       }
     },
     {
@@ -988,9 +988,9 @@
         }
       ],
       "bubble": {
-        "idle": "多朗!",
-        "happy": "多朗♪",
-        "strained": "多朗…"
+        "idle": "Nidoo!",
+        "happy": "Nidoo♪",
+        "strained": "nidoo…"
       }
     },
     {
@@ -1010,9 +1010,9 @@
         }
       ],
       "bubble": {
-        "idle": "力诺!",
-        "happy": "力诺♪",
-        "strained": "力诺…"
+        "idle": "Riino!",
+        "happy": "Riino♪",
+        "strained": "riino…"
       }
     },
     {
@@ -1032,9 +1032,9 @@
         }
       ],
       "bubble": {
-        "idle": "多王!",
-        "happy": "多王♪",
-        "strained": "多王…"
+        "idle": "King!",
+        "happy": "King♪",
+        "strained": "king…"
       }
     },
     {
@@ -1054,9 +1054,9 @@
         }
       ],
       "bubble": {
-        "idle": "皮皮!",
-        "happy": "皮皮♪",
-        "strained": "皮皮…"
+        "idle": "Pippi!",
+        "happy": "Pippi♪",
+        "strained": "pippi…"
       }
     },
     {
@@ -1076,9 +1076,9 @@
         }
       ],
       "bubble": {
-        "idle": "可西!",
-        "happy": "可西♪",
-        "strained": "可西…"
+        "idle": "Pikushi!",
+        "happy": "Pikushi♪",
+        "strained": "pikushi…"
       }
     },
     {
@@ -1093,9 +1093,9 @@
         }
       ],
       "bubble": {
-        "idle": "六尾!",
-        "happy": "六尾♪",
-        "strained": "六尾…"
+        "idle": "Kon!",
+        "happy": "Kon♪",
+        "strained": "kon…"
       }
     },
     {
@@ -1115,9 +1115,9 @@
         }
       ],
       "bubble": {
-        "idle": "九尾!",
-        "happy": "九尾♪",
-        "strained": "九尾…"
+        "idle": "Kyuu!",
+        "happy": "Kyuu♪",
+        "strained": "kyuu…"
       }
     },
     {
@@ -1132,9 +1132,9 @@
         }
       ],
       "bubble": {
-        "idle": "胖丁!",
-        "happy": "胖丁♪",
-        "strained": "胖丁…"
+        "idle": "Purin!",
+        "happy": "Purin♪",
+        "strained": "purin…"
       }
     },
     {
@@ -1149,9 +1149,9 @@
         }
       ],
       "bubble": {
-        "idle": "可丁!",
-        "happy": "可丁♪",
-        "strained": "可丁…"
+        "idle": "Puku!",
+        "happy": "Puku♪",
+        "strained": "puku…"
       }
     },
     {
@@ -1166,9 +1166,9 @@
         }
       ],
       "bubble": {
-        "idle": "音蝠!",
-        "happy": "音蝠♪",
-        "strained": "音蝠…"
+        "idle": "Zuba!",
+        "happy": "Zuba♪",
+        "strained": "zuba…"
       }
     },
     {
@@ -1188,9 +1188,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘴蝠!",
-        "happy": "嘴蝠♪",
-        "strained": "嘴蝠…"
+        "idle": "Goru!",
+        "happy": "Goru♪",
+        "strained": "goru…"
       }
     },
     {
@@ -1205,9 +1205,9 @@
         }
       ],
       "bubble": {
-        "idle": "路草!",
-        "happy": "路草♪",
-        "strained": "路草…"
+        "idle": "Nazo!",
+        "happy": "Nazo♪",
+        "strained": "nazo…"
       }
     },
     {
@@ -1227,9 +1227,9 @@
         }
       ],
       "bubble": {
-        "idle": "臭花!",
-        "happy": "臭花♪",
-        "strained": "臭花…"
+        "idle": "Kusai!",
+        "happy": "Kusai♪",
+        "strained": "kusai…"
       }
     },
     {
@@ -1249,9 +1249,9 @@
         }
       ],
       "bubble": {
-        "idle": "王花!",
-        "happy": "王花♪",
-        "strained": "王花…"
+        "idle": "Rafu!",
+        "happy": "Rafu♪",
+        "strained": "rafu…"
       }
     },
     {
@@ -1266,9 +1266,9 @@
         }
       ],
       "bubble": {
-        "idle": "拉斯!",
-        "happy": "拉斯♪",
-        "strained": "拉斯…"
+        "idle": "Para!",
+        "happy": "Para♪",
+        "strained": "para…"
       }
     },
     {
@@ -1288,9 +1288,9 @@
         }
       ],
       "bubble": {
-        "idle": "斯特!",
-        "happy": "斯特♪",
-        "strained": "斯特…"
+        "idle": "Sekuto!",
+        "happy": "Sekuto♪",
+        "strained": "sekuto…"
       }
     },
     {
@@ -1305,9 +1305,9 @@
         }
       ],
       "bubble": {
-        "idle": "毛球!",
-        "happy": "毛球♪",
-        "strained": "毛球…"
+        "idle": "Konpa!",
+        "happy": "Konpa♪",
+        "strained": "konpa…"
       }
     },
     {
@@ -1327,9 +1327,9 @@
         }
       ],
       "bubble": {
-        "idle": "入蛾!",
-        "happy": "入蛾♪",
-        "strained": "入蛾…"
+        "idle": "Morufo!",
+        "happy": "Morufo♪",
+        "strained": "morufo…"
       }
     },
     {
@@ -1344,9 +1344,9 @@
         }
       ],
       "bubble": {
-        "idle": "地鼠!",
-        "happy": "地鼠♪",
-        "strained": "地鼠…"
+        "idle": "Digu!",
+        "happy": "Digu♪",
+        "strained": "digu…"
       }
     },
     {
@@ -1361,9 +1361,9 @@
         }
       ],
       "bubble": {
-        "idle": "地鼠!",
-        "happy": "地鼠♪",
-        "strained": "地鼠…"
+        "idle": "Dagu!",
+        "happy": "Dagu♪",
+        "strained": "dagu…"
       }
     },
     {
@@ -1378,9 +1378,9 @@
         }
       ],
       "bubble": {
-        "idle": "喵喵!",
-        "happy": "喵喵♪",
-        "strained": "喵喵…"
+        "idle": "Nyaa!",
+        "happy": "Nyaa♪",
+        "strained": "nyaa…"
       }
     },
     {
@@ -1395,9 +1395,9 @@
         }
       ],
       "bubble": {
-        "idle": "老大!",
-        "happy": "老大♪",
-        "strained": "老大…"
+        "idle": "Peru!",
+        "happy": "Peru♪",
+        "strained": "peru…"
       }
     },
     {
@@ -1412,9 +1412,9 @@
         }
       ],
       "bubble": {
-        "idle": "达鸭!",
-        "happy": "达鸭♪",
-        "strained": "达鸭…"
+        "idle": "Kwaa!",
+        "happy": "Kwaa♪",
+        "strained": "kwaa…"
       }
     },
     {
@@ -1434,9 +1434,9 @@
         }
       ],
       "bubble": {
-        "idle": "达鸭!",
-        "happy": "达鸭♪",
-        "strained": "达鸭…"
+        "idle": "Goruda!",
+        "happy": "Goruda♪",
+        "strained": "goruda…"
       }
     },
     {
@@ -1451,9 +1451,9 @@
         }
       ],
       "bubble": {
-        "idle": "猴怪!",
-        "happy": "猴怪♪",
-        "strained": "猴怪…"
+        "idle": "Manki!",
+        "happy": "Manki♪",
+        "strained": "manki…"
       }
     },
     {
@@ -1473,9 +1473,9 @@
         }
       ],
       "bubble": {
-        "idle": "暴猴!",
-        "happy": "暴猴♪",
-        "strained": "暴猴…"
+        "idle": "Okori!",
+        "happy": "Okori♪",
+        "strained": "okori…"
       }
     },
     {
@@ -1490,9 +1490,9 @@
         }
       ],
       "bubble": {
-        "idle": "蒂狗!",
-        "happy": "蒂狗♪",
-        "strained": "蒂狗…"
+        "idle": "Gaadi!",
+        "happy": "Gaadi♪",
+        "strained": "gaadi…"
       }
     },
     {
@@ -1512,9 +1512,9 @@
         }
       ],
       "bubble": {
-        "idle": "速狗!",
-        "happy": "速狗♪",
-        "strained": "速狗…"
+        "idle": "Windi!",
+        "happy": "Windi♪",
+        "strained": "windi…"
       }
     },
     {
@@ -1529,9 +1529,9 @@
         }
       ],
       "bubble": {
-        "idle": "蝌蚪!",
-        "happy": "蝌蚪♪",
-        "strained": "蝌蚪…"
+        "idle": "Nyoro!",
+        "happy": "Nyoro♪",
+        "strained": "nyoro…"
       }
     },
     {
@@ -1551,9 +1551,9 @@
         }
       ],
       "bubble": {
-        "idle": "香蛙!",
-        "happy": "香蛙♪",
-        "strained": "香蛙…"
+        "idle": "Nyorozo!",
+        "happy": "Nyorozo♪",
+        "strained": "nyorozo…"
       }
     },
     {
@@ -1573,9 +1573,9 @@
         }
       ],
       "bubble": {
-        "idle": "泳蛙!",
-        "happy": "泳蛙♪",
-        "strained": "泳蛙…"
+        "idle": "Nyobon!",
+        "happy": "Nyobon♪",
+        "strained": "nyobon…"
       }
     },
     {
@@ -1590,9 +1590,9 @@
         }
       ],
       "bubble": {
-        "idle": "凯西!",
-        "happy": "凯西♪",
-        "strained": "凯西…"
+        "idle": "Keshi!",
+        "happy": "Keshi♪",
+        "strained": "keshi…"
       }
     },
     {
@@ -1612,9 +1612,9 @@
         }
       ],
       "bubble": {
-        "idle": "吉拉!",
-        "happy": "吉拉♪",
-        "strained": "吉拉…"
+        "idle": "Yunge!",
+        "happy": "Yunge♪",
+        "strained": "yunge…"
       }
     },
     {
@@ -1639,9 +1639,9 @@
         }
       ],
       "bubble": {
-        "idle": "胡地!",
-        "happy": "胡地♪",
-        "strained": "胡地…"
+        "idle": "Fuudin!",
+        "happy": "Fuudin♪",
+        "strained": "fuudin…"
       }
     },
     {
@@ -1656,9 +1656,9 @@
         }
       ],
       "bubble": {
-        "idle": "腕力!",
-        "happy": "腕力♪",
-        "strained": "腕力…"
+        "idle": "Wanri!",
+        "happy": "Wanri♪",
+        "strained": "wanri…"
       }
     },
     {
@@ -1678,9 +1678,9 @@
         }
       ],
       "bubble": {
-        "idle": "豪力!",
-        "happy": "豪力♪",
-        "strained": "豪力…"
+        "idle": "Goori!",
+        "happy": "Goori♪",
+        "strained": "goori…"
       }
     },
     {
@@ -1700,9 +1700,9 @@
         }
       ],
       "bubble": {
-        "idle": "怪力!",
-        "happy": "怪力♪",
-        "strained": "怪力…"
+        "idle": "Kairi!",
+        "happy": "Kairi♪",
+        "strained": "kairi…"
       }
     },
     {
@@ -1717,9 +1717,9 @@
         }
       ],
       "bubble": {
-        "idle": "叭芽!",
-        "happy": "叭芽♪",
-        "strained": "叭芽…"
+        "idle": "Tsubo!",
+        "happy": "Tsubo♪",
+        "strained": "tsubo…"
       }
     },
     {
@@ -1739,9 +1739,9 @@
         }
       ],
       "bubble": {
-        "idle": "呆花!",
-        "happy": "呆花♪",
-        "strained": "呆花…"
+        "idle": "Utsu!",
+        "happy": "Utsu♪",
+        "strained": "utsu…"
       }
     },
     {
@@ -1761,9 +1761,9 @@
         }
       ],
       "bubble": {
-        "idle": "食花!",
-        "happy": "食花♪",
-        "strained": "食花…"
+        "idle": "Utsubo!",
+        "happy": "Utsubo♪",
+        "strained": "utsubo…"
       }
     },
     {
@@ -1778,9 +1778,9 @@
         }
       ],
       "bubble": {
-        "idle": "水母!",
-        "happy": "水母♪",
-        "strained": "水母…"
+        "idle": "Meno!",
+        "happy": "Meno♪",
+        "strained": "meno…"
       }
     },
     {
@@ -1800,9 +1800,9 @@
         }
       ],
       "bubble": {
-        "idle": "水母!",
-        "happy": "水母♪",
-        "strained": "水母…"
+        "idle": "Doku!",
+        "happy": "Doku♪",
+        "strained": "doku…"
       }
     },
     {
@@ -1817,9 +1817,9 @@
         }
       ],
       "bubble": {
-        "idle": "拳石!",
-        "happy": "拳石♪",
-        "strained": "拳石…"
+        "idle": "Ishi!",
+        "happy": "Ishi♪",
+        "strained": "ishi…"
       }
     },
     {
@@ -1834,9 +1834,9 @@
         }
       ],
       "bubble": {
-        "idle": "隆石!",
-        "happy": "隆石♪",
-        "strained": "隆石…"
+        "idle": "Goroon!",
+        "happy": "Goroon♪",
+        "strained": "goroon…"
       }
     },
     {
@@ -1851,9 +1851,9 @@
         }
       ],
       "bubble": {
-        "idle": "隆岩!",
-        "happy": "隆岩♪",
-        "strained": "隆岩…"
+        "idle": "Goronya!",
+        "happy": "Goronya♪",
+        "strained": "goronya…"
       }
     },
     {
@@ -1868,9 +1868,9 @@
         }
       ],
       "bubble": {
-        "idle": "火马!",
-        "happy": "火马♪",
-        "strained": "火马…"
+        "idle": "Poni!",
+        "happy": "Poni♪",
+        "strained": "poni…"
       }
     },
     {
@@ -1890,9 +1890,9 @@
         }
       ],
       "bubble": {
-        "idle": "焰马!",
-        "happy": "焰马♪",
-        "strained": "焰马…"
+        "idle": "Gyaro!",
+        "happy": "Gyaro♪",
+        "strained": "gyaro…"
       }
     },
     {
@@ -1907,9 +1907,9 @@
         }
       ],
       "bubble": {
-        "idle": "呆兽!",
-        "happy": "呆兽♪",
-        "strained": "呆兽…"
+        "idle": "Yadon!",
+        "happy": "Yadon♪",
+        "strained": "yadon…"
       }
     },
     {
@@ -1929,9 +1929,9 @@
         }
       ],
       "bubble": {
-        "idle": "河马!",
-        "happy": "河马♪",
-        "strained": "河马…"
+        "idle": "Doran!",
+        "happy": "Doran♪",
+        "strained": "doran…"
       }
     },
     {
@@ -1946,9 +1946,9 @@
         }
       ],
       "bubble": {
-        "idle": "磁怪!",
-        "happy": "磁怪♪",
-        "strained": "磁怪…"
+        "idle": "Koiru!",
+        "happy": "Koiru♪",
+        "strained": "koiru…"
       }
     },
     {
@@ -1968,9 +1968,9 @@
         }
       ],
       "bubble": {
-        "idle": "磁怪!",
-        "happy": "磁怪♪",
-        "strained": "磁怪…"
+        "idle": "Rea!",
+        "happy": "Rea♪",
+        "strained": "rea…"
       }
     },
     {
@@ -1985,9 +1985,9 @@
         }
       ],
       "bubble": {
-        "idle": "葱鸭!",
-        "happy": "葱鸭♪",
-        "strained": "葱鸭…"
+        "idle": "Kamo!",
+        "happy": "Kamo♪",
+        "strained": "kamo…"
       }
     },
     {
@@ -2002,9 +2002,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘟嘟!",
-        "happy": "嘟嘟♪",
-        "strained": "嘟嘟…"
+        "idle": "Doodo!",
+        "happy": "Doodo♪",
+        "strained": "doodo…"
       }
     },
     {
@@ -2019,9 +2019,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘟利!",
-        "happy": "嘟利♪",
-        "strained": "嘟利…"
+        "idle": "Dori!",
+        "happy": "Dori♪",
+        "strained": "dori…"
       }
     },
     {
@@ -2036,9 +2036,9 @@
         }
       ],
       "bubble": {
-        "idle": "海狮!",
-        "happy": "海狮♪",
-        "strained": "海狮…"
+        "idle": "Pau!",
+        "happy": "Pau♪",
+        "strained": "pau…"
       }
     },
     {
@@ -2058,9 +2058,9 @@
         }
       ],
       "bubble": {
-        "idle": "海狮!",
-        "happy": "海狮♪",
-        "strained": "海狮…"
+        "idle": "Jugon!",
+        "happy": "Jugon♪",
+        "strained": "jugon…"
       }
     },
     {
@@ -2075,9 +2075,9 @@
         }
       ],
       "bubble": {
-        "idle": "臭泥!",
-        "happy": "臭泥♪",
-        "strained": "臭泥…"
+        "idle": "Beto!",
+        "happy": "Beto♪",
+        "strained": "beto…"
       }
     },
     {
@@ -2097,9 +2097,9 @@
         }
       ],
       "bubble": {
-        "idle": "臭泥!",
-        "happy": "臭泥♪",
-        "strained": "臭泥…"
+        "idle": "Beton!",
+        "happy": "Beton♪",
+        "strained": "beton…"
       }
     },
     {
@@ -2114,9 +2114,9 @@
         }
       ],
       "bubble": {
-        "idle": "舌贝!",
-        "happy": "舌贝♪",
-        "strained": "舌贝…"
+        "idle": "Sheru!",
+        "happy": "Sheru♪",
+        "strained": "sheru…"
       }
     },
     {
@@ -2136,9 +2136,9 @@
         }
       ],
       "bubble": {
-        "idle": "甲贝!",
-        "happy": "甲贝♪",
-        "strained": "甲贝…"
+        "idle": "Paru!",
+        "happy": "Paru♪",
+        "strained": "paru…"
       }
     },
     {
@@ -2153,9 +2153,9 @@
         }
       ],
       "bubble": {
-        "idle": "鬼斯!",
-        "happy": "鬼斯♪",
-        "strained": "鬼斯…"
+        "idle": "Goosu!",
+        "happy": "Goosu♪",
+        "strained": "goosu…"
       }
     },
     {
@@ -2175,9 +2175,9 @@
         }
       ],
       "bubble": {
-        "idle": "斯通!",
-        "happy": "斯通♪",
-        "strained": "斯通…"
+        "idle": "Gosuto!",
+        "happy": "Gosuto♪",
+        "strained": "gosuto…"
       }
     },
     {
@@ -2197,9 +2197,9 @@
         }
       ],
       "bubble": {
-        "idle": "耿鬼!",
-        "happy": "耿鬼♪",
-        "strained": "耿鬼…"
+        "idle": "Genga!",
+        "happy": "Genga♪",
+        "strained": "genga…"
       }
     },
     {
@@ -2214,9 +2214,9 @@
         }
       ],
       "bubble": {
-        "idle": "岩蛇!",
-        "happy": "岩蛇♪",
-        "strained": "岩蛇…"
+        "idle": "Iwaa!",
+        "happy": "Iwaa♪",
+        "strained": "iwaa…"
       }
     },
     {
@@ -2231,9 +2231,9 @@
         }
       ],
       "bubble": {
-        "idle": "利普!",
-        "happy": "利普♪",
-        "strained": "利普…"
+        "idle": "Suri!",
+        "happy": "Suri♪",
+        "strained": "suri…"
       }
     },
     {
@@ -2253,9 +2253,9 @@
         }
       ],
       "bubble": {
-        "idle": "利柏!",
-        "happy": "利柏♪",
-        "strained": "利柏…"
+        "idle": "Suripa!",
+        "happy": "Suripa♪",
+        "strained": "suripa…"
       }
     },
     {
@@ -2270,9 +2270,9 @@
         }
       ],
       "bubble": {
-        "idle": "钳蟹!",
-        "happy": "钳蟹♪",
-        "strained": "钳蟹…"
+        "idle": "Kura!",
+        "happy": "Kura♪",
+        "strained": "kura…"
       }
     },
     {
@@ -2292,9 +2292,9 @@
         }
       ],
       "bubble": {
-        "idle": "钳蟹!",
-        "happy": "钳蟹♪",
-        "strained": "钳蟹…"
+        "idle": "Gura!",
+        "happy": "Gura♪",
+        "strained": "gura…"
       }
     },
     {
@@ -2309,9 +2309,9 @@
         }
       ],
       "bubble": {
-        "idle": "电球!",
-        "happy": "电球♪",
-        "strained": "电球…"
+        "idle": "Biri!",
+        "happy": "Biri♪",
+        "strained": "biri…"
       }
     },
     {
@@ -2331,9 +2331,9 @@
         }
       ],
       "bubble": {
-        "idle": "皮弹!",
-        "happy": "皮弹♪",
-        "strained": "皮弹…"
+        "idle": "Maru!",
+        "happy": "Maru♪",
+        "strained": "maru…"
       }
     },
     {
@@ -2348,9 +2348,9 @@
         }
       ],
       "bubble": {
-        "idle": "蛋蛋!",
-        "happy": "蛋蛋♪",
-        "strained": "蛋蛋…"
+        "idle": "Tama!",
+        "happy": "Tama♪",
+        "strained": "tama…"
       }
     },
     {
@@ -2370,9 +2370,9 @@
         }
       ],
       "bubble": {
-        "idle": "蛋树!",
-        "happy": "蛋树♪",
-        "strained": "蛋树…"
+        "idle": "Nasshi!",
+        "happy": "Nasshi♪",
+        "strained": "nasshi…"
       }
     },
     {
@@ -2387,9 +2387,9 @@
         }
       ],
       "bubble": {
-        "idle": "卡拉!",
-        "happy": "卡拉♪",
-        "strained": "卡拉…"
+        "idle": "Kara!",
+        "happy": "Kara♪",
+        "strained": "kara…"
       }
     },
     {
@@ -2404,9 +2404,9 @@
         }
       ],
       "bubble": {
-        "idle": "嘎啦!",
-        "happy": "嘎啦♪",
-        "strained": "嘎啦…"
+        "idle": "Gara!",
+        "happy": "Gara♪",
+        "strained": "gara…"
       }
     },
     {
@@ -2426,9 +2426,9 @@
         }
       ],
       "bubble": {
-        "idle": "瓦郎!",
-        "happy": "瓦郎♪",
-        "strained": "瓦郎…"
+        "idle": "Sawa!",
+        "happy": "Sawa♪",
+        "strained": "sawa…"
       }
     },
     {
@@ -2448,9 +2448,9 @@
         }
       ],
       "bubble": {
-        "idle": "比郎!",
-        "happy": "比郎♪",
-        "strained": "比郎…"
+        "idle": "Ebi!",
+        "happy": "Ebi♪",
+        "strained": "ebi…"
       }
     },
     {
@@ -2465,9 +2465,9 @@
         }
       ],
       "bubble": {
-        "idle": "舌头!",
-        "happy": "舌头♪",
-        "strained": "舌头…"
+        "idle": "Bero!",
+        "happy": "Bero♪",
+        "strained": "bero…"
       }
     },
     {
@@ -2482,9 +2482,9 @@
         }
       ],
       "bubble": {
-        "idle": "斯弹!",
-        "happy": "斯弹♪",
-        "strained": "斯弹…"
+        "idle": "Doga!",
+        "happy": "Doga♪",
+        "strained": "doga…"
       }
     },
     {
@@ -2504,9 +2504,9 @@
         }
       ],
       "bubble": {
-        "idle": "瓦斯!",
-        "happy": "瓦斯♪",
-        "strained": "瓦斯…"
+        "idle": "Mata!",
+        "happy": "Mata♪",
+        "strained": "mata…"
       }
     },
     {
@@ -2521,9 +2521,9 @@
         }
       ],
       "bubble": {
-        "idle": "犀牛!",
-        "happy": "犀牛♪",
-        "strained": "犀牛…"
+        "idle": "Sai!",
+        "happy": "Sai♪",
+        "strained": "sai…"
       }
     },
     {
@@ -2538,9 +2538,9 @@
         }
       ],
       "bubble": {
-        "idle": "暴龙!",
-        "happy": "暴龙♪",
-        "strained": "暴龙…"
+        "idle": "Saidon!",
+        "happy": "Saidon♪",
+        "strained": "saidon…"
       }
     },
     {
@@ -2555,9 +2555,9 @@
         }
       ],
       "bubble": {
-        "idle": "利蛋!",
-        "happy": "利蛋♪",
-        "strained": "利蛋…"
+        "idle": "Rakki!",
+        "happy": "Rakki♪",
+        "strained": "rakki…"
       }
     },
     {
@@ -2572,9 +2572,9 @@
         }
       ],
       "bubble": {
-        "idle": "藤怪!",
-        "happy": "藤怪♪",
-        "strained": "藤怪…"
+        "idle": "Monja!",
+        "happy": "Monja♪",
+        "strained": "monja…"
       }
     },
     {
@@ -2589,9 +2589,9 @@
         }
       ],
       "bubble": {
-        "idle": "袋龙!",
-        "happy": "袋龙♪",
-        "strained": "袋龙…"
+        "idle": "Garu!",
+        "happy": "Garu♪",
+        "strained": "garu…"
       }
     },
     {
@@ -2606,9 +2606,9 @@
         }
       ],
       "bubble": {
-        "idle": "海马!",
-        "happy": "海马♪",
-        "strained": "海马…"
+        "idle": "Tattsu!",
+        "happy": "Tattsu♪",
+        "strained": "tattsu…"
       }
     },
     {
@@ -2628,9 +2628,9 @@
         }
       ],
       "bubble": {
-        "idle": "刺龙!",
-        "happy": "刺龙♪",
-        "strained": "刺龙…"
+        "idle": "Dora!",
+        "happy": "Dora♪",
+        "strained": "dora…"
       }
     },
     {
@@ -2645,9 +2645,9 @@
         }
       ],
       "bubble": {
-        "idle": "金鱼!",
-        "happy": "金鱼♪",
-        "strained": "金鱼…"
+        "idle": "Tosaki!",
+        "happy": "Tosaki♪",
+        "strained": "tosaki…"
       }
     },
     {
@@ -2667,9 +2667,9 @@
         }
       ],
       "bubble": {
-        "idle": "鱼王!",
-        "happy": "鱼王♪",
-        "strained": "鱼王…"
+        "idle": "Azuma!",
+        "happy": "Azuma♪",
+        "strained": "azuma…"
       }
     },
     {
@@ -2684,9 +2684,9 @@
         }
       ],
       "bubble": {
-        "idle": "星星!",
-        "happy": "星星♪",
-        "strained": "星星…"
+        "idle": "Hitode!",
+        "happy": "Hitode♪",
+        "strained": "hitode…"
       }
     },
     {
@@ -2706,9 +2706,9 @@
         }
       ],
       "bubble": {
-        "idle": "海星!",
-        "happy": "海星♪",
-        "strained": "海星…"
+        "idle": "Staa!",
+        "happy": "Staa♪",
+        "strained": "staa…"
       }
     },
     {
@@ -2728,9 +2728,9 @@
         }
       ],
       "bubble": {
-        "idle": "人偶!",
-        "happy": "人偶♪",
-        "strained": "人偶…"
+        "idle": "Bari!",
+        "happy": "Bari♪",
+        "strained": "bari…"
       }
     },
     {
@@ -2745,9 +2745,9 @@
         }
       ],
       "bubble": {
-        "idle": "螳螂!",
-        "happy": "螳螂♪",
-        "strained": "螳螂…"
+        "idle": "Sutora!",
+        "happy": "Sutora♪",
+        "strained": "sutora…"
       }
     },
     {
@@ -2767,9 +2767,9 @@
         }
       ],
       "bubble": {
-        "idle": "唇姐!",
-        "happy": "唇姐♪",
-        "strained": "唇姐…"
+        "idle": "Ruuju!",
+        "happy": "Ruuju♪",
+        "strained": "ruuju…"
       }
     },
     {
@@ -2789,9 +2789,9 @@
         }
       ],
       "bubble": {
-        "idle": "击兽!",
-        "happy": "击兽♪",
-        "strained": "击兽…"
+        "idle": "Erebu!",
+        "happy": "Erebu♪",
+        "strained": "erebu…"
       }
     },
     {
@@ -2811,9 +2811,9 @@
         }
       ],
       "bubble": {
-        "idle": "火龙!",
-        "happy": "火龙♪",
-        "strained": "火龙…"
+        "idle": "Buuba!",
+        "happy": "Buuba♪",
+        "strained": "buuba…"
       }
     },
     {
@@ -2828,9 +2828,9 @@
         }
       ],
       "bubble": {
-        "idle": "大甲!",
-        "happy": "大甲♪",
-        "strained": "大甲…"
+        "idle": "Kairo!",
+        "happy": "Kairo♪",
+        "strained": "kairo…"
       }
     },
     {
@@ -2845,9 +2845,9 @@
         }
       ],
       "bubble": {
-        "idle": "泰罗!",
-        "happy": "泰罗♪",
-        "strained": "泰罗…"
+        "idle": "Kenta!",
+        "happy": "Kenta♪",
+        "strained": "kenta…"
       }
     },
     {
@@ -2862,9 +2862,9 @@
         }
       ],
       "bubble": {
-        "idle": "鱼王!",
-        "happy": "鱼王♪",
-        "strained": "鱼王…"
+        "idle": "Koi!",
+        "happy": "Koi♪",
+        "strained": "koi…"
       }
     },
     {
@@ -2884,9 +2884,9 @@
         }
       ],
       "bubble": {
-        "idle": "鲤龙!",
-        "happy": "鲤龙♪",
-        "strained": "鲤龙…"
+        "idle": "Gyaa!",
+        "happy": "Gyaa♪",
+        "strained": "gyaa…"
       }
     },
     {
@@ -2901,9 +2901,9 @@
         }
       ],
       "bubble": {
-        "idle": "乘龙!",
-        "happy": "乘龙♪",
-        "strained": "乘龙…"
+        "idle": "Rapu!",
+        "happy": "Rapu♪",
+        "strained": "rapu…"
       }
     },
     {
@@ -2918,9 +2918,9 @@
         }
       ],
       "bubble": {
-        "idle": "变怪!",
-        "happy": "变怪♪",
-        "strained": "变怪…"
+        "idle": "Meta!",
+        "happy": "Meta♪",
+        "strained": "meta…"
       }
     },
     {
@@ -2935,9 +2935,9 @@
         }
       ],
       "bubble": {
-        "idle": "D龙!",
-        "happy": "D龙♪",
-        "strained": "D龙…"
+        "idle": "Pori!",
+        "happy": "Pori♪",
+        "strained": "pori…"
       }
     },
     {
@@ -2952,9 +2952,9 @@
         }
       ],
       "bubble": {
-        "idle": "石兽!",
-        "happy": "石兽♪",
-        "strained": "石兽…"
+        "idle": "Omu!",
+        "happy": "Omu♪",
+        "strained": "omu…"
       }
     },
     {
@@ -2969,9 +2969,9 @@
         }
       ],
       "bubble": {
-        "idle": "石兽!",
-        "happy": "石兽♪",
-        "strained": "石兽…"
+        "idle": "Omusu!",
+        "happy": "Omusu♪",
+        "strained": "omusu…"
       }
     },
     {
@@ -2986,9 +2986,9 @@
         }
       ],
       "bubble": {
-        "idle": "石盔!",
-        "happy": "石盔♪",
-        "strained": "石盔…"
+        "idle": "Kabu!",
+        "happy": "Kabu♪",
+        "strained": "kabu…"
       }
     },
     {
@@ -3003,9 +3003,9 @@
         }
       ],
       "bubble": {
-        "idle": "刀盔!",
-        "happy": "刀盔♪",
-        "strained": "刀盔…"
+        "idle": "Topusu!",
+        "happy": "Topusu♪",
+        "strained": "topusu…"
       }
     },
     {
@@ -3020,9 +3020,9 @@
         }
       ],
       "bubble": {
-        "idle": "翼龙!",
-        "happy": "翼龙♪",
-        "strained": "翼龙…"
+        "idle": "Ptera!",
+        "happy": "Ptera♪",
+        "strained": "ptera…"
       }
     },
     {
@@ -3037,9 +3037,9 @@
         }
       ],
       "bubble": {
-        "idle": "比兽!",
-        "happy": "比兽♪",
-        "strained": "比兽…"
+        "idle": "Kabi!",
+        "happy": "Kabi♪",
+        "strained": "kabi…"
       }
     },
     {
@@ -3064,9 +3064,9 @@
         }
       ],
       "bubble": {
-        "idle": "冻鸟!",
-        "happy": "冻鸟♪",
-        "strained": "冻鸟…"
+        "idle": "Furiza!",
+        "happy": "Furiza♪",
+        "strained": "furiza…"
       }
     },
     {
@@ -3091,9 +3091,9 @@
         }
       ],
       "bubble": {
-        "idle": "电鸟!",
-        "happy": "电鸟♪",
-        "strained": "电鸟…"
+        "idle": "Sanda!",
+        "happy": "Sanda♪",
+        "strained": "sanda…"
       }
     },
     {
@@ -3118,9 +3118,9 @@
         }
       ],
       "bubble": {
-        "idle": "焰鸟!",
-        "happy": "焰鸟♪",
-        "strained": "焰鸟…"
+        "idle": "Faiya!",
+        "happy": "Faiya♪",
+        "strained": "faiya…"
       }
     },
     {
@@ -3135,9 +3135,9 @@
         }
       ],
       "bubble": {
-        "idle": "你龙!",
-        "happy": "你龙♪",
-        "strained": "你龙…"
+        "idle": "Mini!",
+        "happy": "Mini♪",
+        "strained": "mini…"
       }
     },
     {
@@ -3157,9 +3157,9 @@
         }
       ],
       "bubble": {
-        "idle": "克龙!",
-        "happy": "克龙♪",
-        "strained": "克龙…"
+        "idle": "Haku!",
+        "happy": "Haku♪",
+        "strained": "haku…"
       }
     },
     {
@@ -3179,9 +3179,9 @@
         }
       ],
       "bubble": {
-        "idle": "快龙!",
-        "happy": "快龙♪",
-        "strained": "快龙…"
+        "idle": "Kairyu!",
+        "happy": "Kairyu♪",
+        "strained": "kairyu…"
       }
     },
     {
@@ -3211,9 +3211,9 @@
         }
       ],
       "bubble": {
-        "idle": "超梦!",
-        "happy": "超梦♪",
-        "strained": "超梦…"
+        "idle": "Tsuu!",
+        "happy": "Tsuu♪",
+        "strained": "tsuu…"
       }
     },
     {
@@ -3243,9 +3243,9 @@
         }
       ],
       "bubble": {
-        "idle": "梦幻!",
-        "happy": "梦幻♪",
-        "strained": "梦幻…"
+        "idle": "Myuu!",
+        "happy": "Myuu♪",
+        "strained": "myuu…"
       }
     }
   ]
