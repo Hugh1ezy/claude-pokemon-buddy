@@ -1,7 +1,29 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-09-09
-(WORK PC, EXP pace doubled, capture pays the collection)**.
+Rolling note between the home PC and the work PC. Last updated **2026-10-01
+(WORK PC `HUGHIE`, prep sync; 09-09 work found uncommitted)**.
+
+## ▶ 2026-10-01 — prep sync on the work PC, and nine days of unpushed work
+
+- **The 09-09 session below was never committed.** Its changes (EXP doubled,
+  capture pays the roster, PLAYER-GUIDE warning, this file's 09-09 section) sat
+  in the working tree of `HUGHIE` until today, while the host there ran on them.
+  Committed as `a0502dc`. The home PC has therefore been running WITHOUT them
+  since 09-09 — after `git pull hugh main` there, restart its host.
+- New today, both pushed: `b6b453e` left panel usage is two meters now,
+  **Current (5h) above Week**; 图鉴 row moved up 155→142. `3599672` bubble cries
+  are Japanese-name syllables for all 155 non-Eevee species (`Nyoro!` /
+  `Nyoro♪` / `nyoro…`), same shape as Eevee's `Bui!`. Only `bubble` changed;
+  `notes` (the audio) untouched, so no firmware reflash.
+- Save: remote tip was already this machine's own publish (11:10), identical
+  field for field to `out/state.json` — nothing to push.
+- `pollUsage failed: no-token` every 3 min in the host log here: the OAuth
+  usage poll has no token on this machine, so Current/Week depend on the
+  statusline bridge alone and show `--` when that is quiet.
+- This session worked through a Linux VM onto the Windows checkout: git from
+  the VM has no GitHub credentials (pushes went via a bundle), and it leaves
+  `.git/*.lock` files it cannot unlink unless deletion is granted. If a later
+  Windows git complains about `index.lock`, delete it.
 
 ## ▶ 2026-09-09 — 「经验获得太慢了」, and a runaway test runner of my own making
 
