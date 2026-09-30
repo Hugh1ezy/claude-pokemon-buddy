@@ -94,14 +94,10 @@ function drawLeftPanel(g, model) {
   // question the whole 151-species build exists to answer.
   drawDexRow(g, model);
 
-  // Row 5: WEEK usage bar
-  g.font = `800 12px ${MONO}`;
-  g.fillText("WEEK", 11, 188);
-  drawMeter(g, 56, 175, 92, 16, clampPct(model.pweek), { striped: true });
-  g.font = `800 14px ${MONO}`;
-  g.textAlign = "right";
-  g.fillText(text.pweek === "--" ? "--" : `${text.pweek}%`, LEFT_W - 12, 190);
-  g.textAlign = "left";
+  // Rows 5-6: official usage bars -- Current (the 5h window) above Week. Both
+  // read cpb-usage.json via the same model fields the dashboard uses.
+  drawUsageRow(g, "Current", model.p5h, text.p5h, CURRENT_METER_TOP);
+  drawUsageRow(g, "Week", model.pweek, text.pweek, WEEK_METER_TOP);
 
   line(g, 10, 201, LEFT_W - 12, 201);
   // Weather: condition + temp enlarged to a secondary focal point.
@@ -130,9 +126,26 @@ export const DATE_ROW_LEFT = 11;
 export const DATE_ROW_RIGHT = LEFT_W - 12;
 
 const ENC_ROW_Y = 100;      // top of the message row; its baseline is +20
-const DEX_ROW_Y = 155;      // text baseline, 20px clear of the WEEK meter above it
+// Moved up from 155 to make room for a second usage meter (Current + Week).
+export const DEX_ROW_Y = 142;        // text baseline
+export const CURRENT_METER_TOP = 151;
+export const WEEK_METER_TOP = 175;   // unchanged; 16px tall, ends 10px above the 201 separator
+const USAGE_METER_X = 63;   // "Current" at 12px ends at x=57
+const USAGE_METER_W = 85;
+const USAGE_METER_H = 16;
 const PANEL_LEFT = 10;      // matches the separator lines and the 11px text margin
 const PANEL_RIGHT = LEFT_W - 12;
+
+function drawUsageRow(g, label, pct, pctText, top) {
+  g.fillStyle = INK;
+  g.font = `800 12px ${MONO}`;
+  g.fillText(label, 11, top + 13);
+  drawMeter(g, USAGE_METER_X, top, USAGE_METER_W, USAGE_METER_H, clampPct(pct), { striped: true });
+  g.font = `800 14px ${MONO}`;
+  g.textAlign = "right";
+  g.fillText(pctText === "--" ? "--" : `${pctText}%`, LEFT_W - 12, top + 15);
+  g.textAlign = "left";
+}
 
 // The row never goes blank and the text never moves; only the stroke weight
 // alternates. Two reasons it is done this way rather than by inverting a box:

@@ -18,7 +18,7 @@ import { LEFT_W } from "../src/render/palette.js";
 // are the only ones who can answer -- a wrong y or a missing model field
 // misplaces or drops the row without throwing anywhere.
 const ENC_BAND = { y0: 96, y1: 134 };
-const DEX_BAND = { y0: 140, y1: 160 };
+const DEX_BAND = { y0: 128, y1: 147 };  // dex baseline 142; the Current meter starts at 151
 
 function model({ animPhase = 0, encounter = null, dex = null, place = null, clockMs = null } = {}) {
   return {
