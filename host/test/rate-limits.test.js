@@ -82,3 +82,17 @@ test("millisecond-sized reset epoch returns null reset without throwing", () => 
   });
   assert.equal(rl.resets5h, null);
 });
+
+test("loadRateLimits drops a reading whose window has certainly rolled over", () => {
+  const sixHours = fixture({ fiveHourPct: 55, weeklyPct: 13, writtenAt: NOW_SEC - 6 * 60 * 60 });
+  const a = loadRateLimits({ path: sixHours, now: NOW_SEC * 1000 });
+  assert.equal(a.p5h, null);
+  assert.equal(a.pweek, 13);
+  assert.equal(a.stale, true);
+
+  const twoDays = fixture({ fiveHourPct: 55, weeklyPct: 13, writtenAt: NOW_SEC - 48 * 60 * 60 });
+  const b = loadRateLimits({ path: twoDays, now: NOW_SEC * 1000 });
+  assert.equal(b.p5h, null);
+  assert.equal(b.pweek, null);
+  assert.equal(b.official, false);
+});

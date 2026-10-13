@@ -59,7 +59,7 @@ export function applyPetTransitions({
       if (choice) {
         const fromSpecies = next.species;
         next = evolvePet(next, choice.to);
-        evolutionAnimation = { fromSpecies, toSpecies: choice.to };
+        evolutionAnimation = { fromSpecies, toSpecies: choice.to, needs: choice.needs ?? null };
         choiceEvolved = true;
         break;
       }
@@ -79,7 +79,10 @@ export function applyPetTransitions({
       const fromSpecies = next.species;
       const toSpecies = reconciledEvolution.auto;
       next = evolvePet(next, toSpecies);
-      evolutionAnimation = { fromSpecies, toSpecies };
+      // The road actually taken, for the "why" line. Candidates are sorted by
+      // priority, so with two roads to one species this is the one that won.
+      const taken = reconciledEvolution.candidates.find((candidate) => candidate.to === toSpecies);
+      evolutionAnimation = { fromSpecies, toSpecies, needs: taken?.needs ?? null };
     }
   }
 

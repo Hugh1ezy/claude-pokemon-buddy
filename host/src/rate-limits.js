@@ -4,6 +4,12 @@ import { join } from "node:path";
 
 export const USAGE_PATH = join(homedir(), ".claude", "cpb-usage.json");
 const STALE_SEC = 15 * 60; // 没用 CC 超过 15min → stale
+// Past these ages a reading is not "stale", it is about a window that has since
+// rolled over, and showing it is showing a number about nothing. Measured
+// 2026-10-13: with no feed on the machine the panel had been displaying one
+// 55% / 13% from 07-27 for eleven weeks. "--" is the honest value by then.
+const FIVE_HOUR_EXPIRE_SEC = 5 * 60 * 60;
+const WEEK_EXPIRE_SEC = 24 * 60 * 60;
 
 export function loadRateLimits({ path = USAGE_PATH, now = Date.now() } = {}) {
   let data;
@@ -15,9 +21,10 @@ export function loadRateLimits({ path = USAGE_PATH, now = Date.now() } = {}) {
   if (!isPlainObject(data)) return staleAllNull();
   try {
     const writtenAt = Number(data.writtenAt);
-    const stale = !Number.isFinite(writtenAt) || Math.floor(now / 1000) - writtenAt > STALE_SEC;
-    const p5h = numOrNull(data.fiveHourPct);
-    const pweek = numOrNull(data.weeklyPct);
+    const age = Number.isFinite(writtenAt) ? Math.floor(now / 1000) - writtenAt : Infinity;
+    const stale = age > STALE_SEC;
+    const p5h = age > FIVE_HOUR_EXPIRE_SEC ? null : numOrNull(data.fiveHourPct);
+    const pweek = age > WEEK_EXPIRE_SEC ? null : numOrNull(data.weeklyPct);
     return {
       p5h,
       pweek,

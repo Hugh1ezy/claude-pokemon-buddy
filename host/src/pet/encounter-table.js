@@ -22,6 +22,19 @@ export function loadEncounterTable({ path = TABLE_PATH } = {}) {
   return cached;
 }
 
+// The conditions one species was met under, for the "why" line on the capture
+// screen (pet/reveal.js). One species at a time and only ever for the one that
+// is already on the panel, so nothing here can be used to list the table.
+export function encounterNeeds(species, { path = TABLE_PATH } = {}) {
+  let table;
+  try {
+    table = path === TABLE_PATH ? loadEncounterTable() : readTable(path);
+  } catch {
+    return null;
+  }
+  return table.species.find((entry) => entry.species === species)?.needs ?? null;
+}
+
 // Tests and the simulator want a fresh read; the host wants one read for the
 // life of the process.
 export function resetEncounterTableCache() {

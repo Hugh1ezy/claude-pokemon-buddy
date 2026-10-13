@@ -1,7 +1,68 @@
 # Handoff — picking this up on the other machine, or in a fresh session
 
-Rolling note between the home PC and the work PC. Last updated **2026-10-01
-(WORK PC `HUGHIE`, prep sync; 09-09 work found uncommitted)**.
+Rolling note between the home PC and the work PC. Last updated **2026-10-13
+(WORK PC `HUGHIE`; usage rows diagnosed, the "why" line added)**.
+
+## ▶ 2026-10-13 — Current/Week were frozen, not blank; and the "why" line
+
+### Current / Week: there is no feed on this machine, and the panel was lying
+
+Reported as the two usage rows not updating. Measured:
+
+- Both rows read one file, `~/.claude/cpb-usage.json`. It was last written
+  **2026-07-27 17:49** and held 55% / 13% with reset dates in February 2025 —
+  a leftover test write. The panel showed that 55% / 13% for eleven weeks. The
+  10-01 note above says the rows show `--` when the bridge is quiet; they did
+  not, because `loadRateLimits` kept returning the old numbers with `stale`
+  set and nothing downstream blanks on `stale`.
+- Real values at 13:50 the same day, from the desktop app's usage card:
+  5-hour 43%, weekly 83%.
+- Neither writer can run here. All Claude use on this PC is the **desktop
+  app**, which never invokes the CLI `statusLine`, so the bridge never fires;
+  and there is no `~/.claude/.credentials.json` (and no `claude` on PATH), so
+  the host poll logs `no-token` every 3 minutes (9,819 lines). The desktop app
+  keeps its sign-in in its own store and writes the percentages to no file —
+  searched `%APPDATA%\Claude`; only IndexedDB blobs mention them.
+
+**Changed:** `rate-limits.js` now drops a 5-hour reading older than 5h and a
+weekly one older than 24h, so a dead feed reads `--` instead of a number about
+a window that rolled over long ago. Verified on a live tick: `out/frame.png`
+at 14:00 shows `--` on both rows.
+
+**Not fixed, needs the owner:** a real feed needs a token on this machine. The
+desktop app bundles a CLI at
+`%APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe`; `claude.exe auth
+login` once would create the credentials file and the existing poll would pick
+it up within 3 minutes. The access token expires after some hours and
+`usage-poll.mjs` does not refresh it, so that needs adding too. Asked; not
+done until he answers.
+
+### The "why" line (owner's ask)
+
+When an evolution or a wild encounter happened because a hidden condition was
+met, the screen now says what it took, in one 12px line: under the name on the
+evolution reveal frame (which then holds 5s instead of 1s so it can be read),
+and under the timing bar on the capture screen. A level-only evolution and an
+encounter with no conditions draw nothing.
+
+- `src/pet/reveal.js` turns a `needs` object into words. It is species-free,
+  like `encounter.js`: it is handed the needs of the one thing already on the
+  panel and never the table. `encounter-table.js` gained `encounterNeeds()`
+  for that single lookup.
+- `applyPetTransitions` now returns `needs` on `evolutionAnimation` — the road
+  actually taken.
+- `notTheStarter` is never worded: it is true of every wild pokemon the save
+  can meet and explains nothing.
+- Host-rendered only. **No firmware change, no reflash.**
+- This is a deliberate, owner-requested exception to the secrecy rule, and a
+  narrow one: a condition is shown only after it has fired, for that one
+  pokemon. The rule in `CLAUDE.md` about chat, commits, docs and tests is
+  unchanged, and `test/reveal.test.js` uses invented conditions only.
+
+Suite: **752 tests, 739 pass, 13 fail** under `--test-concurrency=4` — the
+standing 11 plus `RH2` and the `pollUsage` transition test, both of which pass
+when `main-orchestration.test.js` is run alone, with or without this change.
+Host restarted onto it at **13:58:54 (pid 8744)**.
 
 ## ▶ 2026-10-01 — prep sync on the work PC, and nine days of unpushed work
 

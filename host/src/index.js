@@ -11,7 +11,8 @@ import { applyBondTick, applyOfflineBond, heartsFromHalves } from "./pet/bond.js
 import { dexProgress, normalizeDex, recordCapture, recordSeen } from "./pet/dex.js";
 import { stepEncounter } from "./pet/encounter.js";
 import { buildEncounterContext } from "./pet/encounter-context.js";
-import { loadEncounterTable } from "./pet/encounter-table.js";
+import { encounterNeeds, loadEncounterTable } from "./pet/encounter-table.js";
+import { encounterRevealParts } from "./pet/reveal.js";
 import { SPECIES_DEX, isDexSpecies, zhName } from "./pet/species-meta.js";
 import { grantRosterExp, isFrozenSpecies, pinFrozenGrowth, rosterEntries, swapActiveBuddy } from "./pet/roster.js";
 import { applyDailyGrowth, deriveMood, expToNextLevel, PARAMS } from "./pet/sim.js";
@@ -294,6 +295,9 @@ export function createButtonDispatcher({
     syncScreenHold();
     capturePress = false;
     captureAbort = false;
+    // Why this one showed up, worded once for the whole session. Empty for a
+    // species that asks for nothing, which draws no line at all.
+    const why = encounterRevealParts(encounterNeeds(offer.species), { nameOf: zhName });
 
     actions.run(async () => {
       animator.pause();
@@ -302,7 +306,7 @@ export function createButtonDispatcher({
           species: offer.species,
           zh: zhName(offer.species),
           params: captureParams(offer.species),
-          render: renderCapture,
+          render: (args) => renderCapture({ ...args, why }),
           push: (frame) => transport.push(frame),
           now: captureNow,
           sleep: captureSleep,

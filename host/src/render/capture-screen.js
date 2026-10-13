@@ -8,6 +8,7 @@ import { createCanvas } from "@napi-rs/canvas";
 
 import { sliderBands } from "../pet/capture.js";
 import { STEP, hpFraction } from "../pet/capture-rules.js";
+import { fitReveal } from "../pet/reveal.js";
 import { imageDataToFrame } from "./frame.js";
 import { H, INK, PAPER, W } from "./palette.js";
 import { drawShadow } from "./layout.js";
@@ -24,6 +25,11 @@ const HP_X = 24;
 const HP_Y = 26;
 const HP_H = 20;
 const TITLE_Y = 248;   // just above the timing bar, at the owner's ask
+// The "why" line (pet/reveal.js) takes the strip under the timing bar, the only
+// free row on this screen. Already fitted to WHY_MAX_W by the caller's measure.
+const WHY_Y = 297;
+const WHY_SIZE = 12;
+export const WHY_MAX_W = W - 24;
 const SPRITE_SLOT = 132;
 const SPRITE_TOP = 68;
 const GROUND_Y = SPRITE_TOP + SPRITE_SLOT;
@@ -70,7 +76,7 @@ export const PHASE_MS = {
   [PHASE.ESCAPED]: 1400,
 };
 
-export async function renderCaptureFrame({ species, phase, elapsed = 0, state, zh, rules, kind, before }) {
+export async function renderCaptureFrame({ species, phase, elapsed = 0, state, zh, rules, kind, before, why = [] }) {
   const canvas = createCanvas(W, H);
   const g = canvas.getContext("2d");
   g.imageSmoothingEnabled = false;
@@ -129,6 +135,10 @@ export async function renderCaptureFrame({ species, phase, elapsed = 0, state, z
   if (phase !== PHASE.CAUGHT && phase !== PHASE.ESCAPED) {
     drawBar(g, state, phase === PHASE.AIM ? elapsed : state.frozenAt ?? elapsed);
   }
+
+  g.font = `700 ${WHY_SIZE}px ${CJK}`;
+  const whyText = fitReveal(why, { measure: (t) => g.measureText(t).width, maxWidth: WHY_MAX_W });
+  if (whyText) g.fillText(whyText, Math.round((W - g.measureText(whyText).width) / 2), WHY_Y);
 
   return imageDataToFrame(g.getImageData(0, 0, W, H), W, H);
 }

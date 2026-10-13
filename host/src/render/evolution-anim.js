@@ -2,14 +2,23 @@ import { createCanvas } from "@napi-rs/canvas";
 
 import { zhName } from "../pet/species-meta.js";
 import { MUSIC } from "../pet/music-audio.js";
+import { evolutionRevealParts, fitReveal } from "../pet/reveal.js";
 import { imageDataToFrame } from "./frame.js";
 import { H, INK, PAPER, W } from "./palette.js";
 import { drawSprite, line, px } from "./sprite-pipeline.js";
 import { loadBuddySprite } from "./sprites.js";
 
 const ALT_GAPS = [420, 360, 300, 250, 210, 170, 140, 110];
+// The last frame holds for a second when there is only a name to read, and
+// long enough to read a sentence when there is a "why" line under it.
+const REVEAL_GAP = 1000;
+const REVEAL_GAP_WITH_WHY = 5000;
+const WHY_Y = 264;
+const WHY_SIZE = 12;
+const WHY_MAX_W = W - 36;
 
-export async function playEvolutionAnimation({ transport, fromSpecies, toSpecies, delay = realDelay }) {
+export async function playEvolutionAnimation({ transport, fromSpecies, toSpecies, needs = null, delay = realDelay }) {
+  const why = evolutionRevealParts(needs);
   const seq = [
     { kind: "black", gap: 180 },
     { kind: "black", gap: 120 },
@@ -20,7 +29,7 @@ export async function playEvolutionAnimation({ transport, fromSpecies, toSpecies
     })),
     { kind: "black", gap: 120 },
     { kind: "black", gap: 120 },
-    { kind: "reveal", species: toSpecies, gap: 1000 },
+    { kind: "reveal", species: toSpecies, gap: why.length > 0 ? REVEAL_GAP_WITH_WHY : REVEAL_GAP },
   ];
 
   for (let i = 0; i < seq.length; i += 1) {
@@ -29,6 +38,7 @@ export async function playEvolutionAnimation({ transport, fromSpecies, toSpecies
       species: step.species,
       fromSpecies,
       toSpecies,
+      why,
     });
     await transport.push(frame);
     // Its own track since 2026-07-31. This was SOUND.EVOLVE, the same four notes
@@ -41,7 +51,7 @@ export async function playEvolutionAnimation({ transport, fromSpecies, toSpecies
   }
 }
 
-export async function renderEvolutionFrame(kind, { species, fromSpecies, toSpecies } = {}) {
+export async function renderEvolutionFrame(kind, { species, fromSpecies, toSpecies, why = [] } = {}) {
   const canvas = createCanvas(W, H);
   const g = canvas.getContext("2d");
   g.imageSmoothingEnabled = false;
@@ -64,6 +74,9 @@ export async function renderEvolutionFrame(kind, { species, fromSpecies, toSpeci
     rays(g, W / 2, 116, 76, 106, 12);
     await drawCenteredSprite(g, target, 44, 156);
     px(g, `★ ${zhName(fromSpecies)} 进化成了 ${zhName(toSpecies)}！ ★`, W / 2, 240, 12, "center", 800); // ★+12px (✦缺字形/18非整数倍→糊; 12px 长物种名也不溢出)
+    g.font = `700 ${WHY_SIZE}px "Zpix"`;
+    const whyText = fitReveal(why, { measure: (t) => g.measureText(t).width, maxWidth: WHY_MAX_W });
+    if (whyText) px(g, whyText, W / 2, WHY_Y, WHY_SIZE, "center", 700);
   } else {
     px(g, "进化中…", W / 2, 44, 24, "center", 800);
     await drawCenteredSprite(g, target, 68, 156);
