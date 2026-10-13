@@ -388,3 +388,38 @@ function timeoutSignalFactory() {
     return controller.signal;
   };
 }
+
+test("refreshCredentialsIfNeeded renews a token that is about to expire and keeps unknown fields", async () => {
+  const { refreshCredentialsIfNeeded, TOKEN_ENDPOINT } = await import("../src/usage-poll.mjs");
+  const now = 1_800_000_000_000;
+  const stored = { claudeAiOauth: { accessToken: "old-a", refreshToken: "old-r", expiresAt: now + 60_000, scopes: ["x", "y"], subscriptionType: "pro" }, other: 1 };
+  const written = [];
+  const calls = [];
+  const result = await refreshCredentialsIfNeeded({
+    platform: "win32", home: "/h", now,
+    readFile: () => JSON.stringify(stored),
+    fetchImpl: async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return { status: 200, json: async () => ({ access_token: "new-a", refresh_token: "new-r", expires_in: 3600 }) }; },
+    timeoutSignal: () => undefined,
+    mkdir: () => {}, writeFile: (path, text) => written.push({ path, text }), rename: () => {},
+  });
+  assert.deepEqual(result, { refreshed: true });
+  assert.equal(calls[0].url, TOKEN_ENDPOINT);
+  assert.equal(calls[0].body.refresh_token, "old-r");
+  assert.equal(calls[0].body.scope, "x y");
+  const saved = JSON.parse(written[0].text);
+  assert.equal(saved.other, 1);
+  assert.deepEqual(saved.claudeAiOauth, { accessToken: "new-a", refreshToken: "new-r", expiresAt: now + 3_600_000, scopes: ["x", "y"], subscriptionType: "pro" });
+});
+
+test("refreshCredentialsIfNeeded leaves a fresh token and a failed renewal alone", async () => {
+  const { refreshCredentialsIfNeeded } = await import("../src/usage-poll.mjs");
+  const now = 1_800_000_000_000;
+  const file = (expiresAt) => () => JSON.stringify({ claudeAiOauth: { accessToken: "a", refreshToken: "r", expiresAt } });
+  const never = async () => { throw new Error("must not be called"); };
+  const writes = [];
+  const io = { platform: "win32", home: "/h", now, timeoutSignal: () => undefined, mkdir: () => {}, writeFile: (...a) => writes.push(a), rename: () => {} };
+  assert.equal((await refreshCredentialsIfNeeded({ ...io, readFile: file(now + 3_600_000), fetchImpl: never })).reason, "fresh");
+  assert.equal((await refreshCredentialsIfNeeded({ ...io, readFile: file(now - 1), fetchImpl: async () => ({ status: 400 }) })).reason, "http-400");
+  assert.equal((await refreshCredentialsIfNeeded({ ...io, platform: "darwin", readFile: file(now - 1), fetchImpl: never })).reason, "keychain");
+  assert.equal(writes.length, 0);
+});

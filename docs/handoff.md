@@ -29,13 +29,30 @@ weekly one older than 24h, so a dead feed reads `--` instead of a number about
 a window that rolled over long ago. Verified on a live tick: `out/frame.png`
 at 14:00 shows `--` on both rows.
 
-**Not fixed, needs the owner:** a real feed needs a token on this machine. The
-desktop app bundles a CLI at
-`%APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe`; `claude.exe auth
-login` once would create the credentials file and the existing poll would pick
-it up within 3 minutes. The access token expires after some hours and
-`usage-poll.mjs` does not refresh it, so that needs adding too. Asked; not
-done until he answers.
+**Fixed the same afternoon.** The owner ran `claude.exe auth login` (the CLI the
+desktop app bundles, under `%APPDATA%\Claude\claude-code\`) at 14:03, which
+created `~/.claude/.credentials.json`. The host's existing poll picked it up on
+its own at 14:05:16 — `cpb-usage.json` read 49% / 84% with real reset times,
+against 43% / 83% from the desktop card fifteen minutes earlier.
+
+The access token lasts eight hours (issued 14:03, `expiresAt` 22:03) and nothing
+else on this machine opens the CLI to renew it, so `usage-poll.mjs` now renews
+it itself: `refreshCredentialsIfNeeded` posts the refresh token to the same
+endpoint with the same client id the bundled CLI uses (read out of
+`claude.exe`), and rewrites the credentials file atomically, keeping every
+field it does not understand. It runs only within ten minutes of expiry, only
+on the file-credentials path (not macOS keychain), and only when the poll is
+using the real token reader, so tests cannot reach the real home directory.
+
+> **The renewal is unit-tested and NOT yet seen working live.** A forced live
+> renewal was blocked by the session's permission layer, so the first real one
+> is whichever poll lands after ~21:53 on 10-13, or the first poll the next
+> morning. If the rows are `--` on 10-14 and the log shows `pollUsage failed:
+> http-401`, the renewal did not work: log in again and look at
+> `refreshCredentialsIfNeeded` first.
+
+**The home PC needs the same one-time login** if its rows are to work; the
+credentials file is per-machine and git does not carry it.
 
 ### The "why" line (owner's ask)
 

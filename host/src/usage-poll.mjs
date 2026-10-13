@@ -11,6 +11,15 @@ const DEFAULT_VERSION = "2.1.0";
 const OAUTH_BETA = "oauth-2025-04-20";
 const KEYCHAIN_SERVICE = "Claude Code-credentials";
 const FETCH_TIMEOUT_MS = 10_000;
+// Renewing the CLI's own sign-in, the way the CLI does it. On a machine where
+// Claude is only ever used through the desktop app nothing else opens the CLI,
+// so nothing else would renew the access token and the usage rows would go
+// back to "--" about eight hours after every login (measured 2026-10-13: the
+// token issued at 14:03 expires at 22:03). Endpoint, client id and body shape
+// are the ones the bundled claude.exe uses.
+export const TOKEN_ENDPOINT = "https://platform.claude.com/v1/oauth/token";
+const OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const REFRESH_MARGIN_MS = 10 * 60 * 1000;
 const defaultAttemptState = { lastAttemptSec: 0 };
 
 export function readOAuthToken({
@@ -26,6 +35,78 @@ export function readOAuthToken({
     return tokenFromCredentials(outputText(raw));
   } catch {
     return null;
+  }
+}
+
+// Renews the credentials file in place when the access token is about to
+// expire. Never throws and never logs a token. A refresh token is single-use:
+// the reply carries its replacement, so the file is rewritten atomically and
+// every field this code does not understand is kept as it was.
+export async function refreshCredentialsIfNeeded({
+  platform = process.platform,
+  home = homedir(),
+  now = Date.now(),
+  readFile = readFileSync,
+  fetchImpl = globalThis.fetch,
+  timeoutSignal = defaultTimeoutSignal,
+  mkdir = mkdirSync,
+  writeFile = writeFileSync,
+  rename = renameSync,
+  force = false,
+} = {}) {
+  try {
+    if (platform === "darwin") return { refreshed: false, reason: "keychain" };
+    const path = join(home, ".claude", ".credentials.json");
+    const parsed = JSON.parse(outputText(readFile(path, "utf8")));
+    const oauth = parsed?.claudeAiOauth;
+    const expiresAt = Number(oauth?.expiresAt);
+    if (typeof oauth?.refreshToken !== "string" || !Number.isFinite(expiresAt)) {
+      return { refreshed: false, reason: "not-refreshable" };
+    }
+    if (!force && expiresAt - now > REFRESH_MARGIN_MS) return { refreshed: false, reason: "fresh" };
+    if (typeof fetchImpl !== "function") return { refreshed: false, reason: "no-fetch" };
+
+    const body = { grant_type: "refresh_token", refresh_token: oauth.refreshToken, client_id: OAUTH_CLIENT_ID };
+    if (Array.isArray(oauth.scopes) && oauth.scopes.length > 0) body.scope = oauth.scopes.join(" ");
+    const res = await fetchImpl(TOKEN_ENDPOINT, {
+      method: "POST",
+      signal: timeoutSignal(FETCH_TIMEOUT_MS),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res?.status !== 200) return { refreshed: false, reason: `http-${Number(res?.status) || "error"}` };
+    const data = await res.json();
+    if (typeof data?.access_token !== "string" || data.access_token.length === 0) {
+      return { refreshed: false, reason: "bad-reply" };
+    }
+
+    const next = {
+      ...parsed,
+      claudeAiOauth: {
+        ...oauth,
+        accessToken: data.access_token,
+        refreshToken: typeof data.refresh_token === "string" ? data.refresh_token : oauth.refreshToken,
+        expiresAt: now + (Number(data.expires_in) || 0) * 1000,
+        ...(typeof data.scope === "string" ? { scopes: data.scope.split(" ").filter(Boolean) } : {}),
+      },
+    };
+    writeUsageFile(path, next, { mkdir, writeFile, rename });
+    return { refreshed: true };
+  } catch {
+    return { refreshed: false, reason: "error" };
+  }
+}
+
+// The synchronous half of the question, so a poll whose token is fine does not
+// take an extra turn of the event loop to find that out.
+export function credentialsExpiring({ platform = process.platform, home = homedir(), now = Date.now(), readFile = readFileSync } = {}) {
+  try {
+    if (platform === "darwin") return false;
+    const oauth = JSON.parse(outputText(readFile(join(home, ".claude", ".credentials.json"), "utf8")))?.claudeAiOauth;
+    const expiresAt = Number(oauth?.expiresAt);
+    return typeof oauth?.refreshToken === "string" && Number.isFinite(expiresAt) && expiresAt - now <= REFRESH_MARGIN_MS;
+  } catch {
+    return false;
   }
 }
 
@@ -85,6 +166,10 @@ export async function pollUsageOnce({
   readOAuthTokenImpl = readOAuthToken,
   ccVersionImpl = ccVersion,
   fetchUsageImpl = fetchUsage,
+  // Only alongside the real token reader: a caller that supplies its own token
+  // has said where the token comes from, and must not have this reach for the
+  // credentials file in the real home directory behind its back.
+  refreshImpl = readOAuthTokenImpl === readOAuthToken ? refreshCredentialsIfNeeded : null,
   timeoutSignal = defaultTimeoutSignal,
   mkdir = mkdirSync,
   writeFile = writeFileSync,
@@ -103,6 +188,9 @@ export async function pollUsageOnce({
     }
     markAttempt(attemptState, nowSec);
 
+    if (refreshImpl && credentialsExpiring({ platform, home, now: nowMs, readFile })) {
+      await refreshImpl({ platform, home, now: nowMs, readFile, fetchImpl, timeoutSignal, mkdir, writeFile, rename });
+    }
     const token = await readOAuthTokenImpl({ platform, home, exec, readFile });
     if (!token) return { ok: false, reason: "no-token" };
 
